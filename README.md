@@ -8,7 +8,7 @@
 
 We've designed a new type of Merkle Tree/DAG. It can contain file directories like Merkle DAGs, while maintaining the small branches of classic Merkle Trees for inexpensive and quick user validation of data. Scionic Merkle Trees are an innovative model that merge the advantages of Classic Merkle trees and Merkle DAGs while addressing several of their limitations.
 
-![Tree Comparison Diagram](https://nostr.build/i/8a1af5936288416bd3b12385341c201b3de96f38bad8b26ec814357ad34035b5.jpg)
+![Tree Comparison Diagram](https://i.ibb.co/5LGmSqm/Tree-Comparison-Diagram.png)
 
 ## Classic Merkle Trees and Merkle DAGs: A Comparison
 
@@ -40,7 +40,7 @@ If a user wants a specific file from a folder on the tree, they no longer need t
 
 This streamlined process significantly improves efficiency, especially with large datasets. Scionic Merkle Trees are a powerful tool for handling folders with numerous files, combining the directory-friendly nature of Merkle DAGs and the compact efficiency of Classic Merkle Trees.
 
-![Scionic Merkle Tree Diagram](https://i.ibb.co/5LGmSqm/Tree-Comparison-Diagram.png)
+![Scionic Merkle Tree Diagram](https://i.ibb.co/XJjbwmP/Scionic-Merkle-Tree.jpg)
 
 ## Scionic Merkle Branch Statistics
 
