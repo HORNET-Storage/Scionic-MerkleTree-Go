@@ -108,4 +108,4 @@ if err != nil {
 }
 ```
 
-This repository is a work in progress. We plan to make quite a few improvements as we move forward with integrating them into H.O.R.N.E.T. Storage. Although, what we have is currently working -- we do not recommend using the trees in anything production-related yet.
+This repository is a work in progress. We plan to make quite a few improvements as we move forward with integrating the Scionc Merkle Trees into H.O.R.N.E.T. Storage. Although, what we have is currently working -- we do not recommend using the trees in anything production-related yet.
