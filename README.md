@@ -110,5 +110,5 @@ if err != nil {
 }
 ```
 
-This repository is a work in progress and we plan to make quite a few changes and developments as we move forward
-Although what we have is working currently, we do not recommend using this in anything production related yet.
+This repository is a work in progress. We plan to make quite a few changes and developments as we move forward.
+Although, what we have is currently working -- we do not recommend using this in anything production related yet.
