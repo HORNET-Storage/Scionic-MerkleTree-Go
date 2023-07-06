@@ -80,7 +80,7 @@ go get github.com/HORNET-Storage/scionic-merkletree
 #### Example Usage
 There are good examples inside the dag/dag_test.go file, but below is a basic example to get you started.   This library is intended to be very simple while still allowing for powerful usage...
 
-Create our Scionic Merkle Tree/DAG from a directory and convert the tree back into the directory files somewhere else:
+Turn a folder and its files into a Scionic Merkle Tree/DAG, then convert the Scionic Merkle tree back to the original files in a new directory:
 ```go
 input := filepath.Join(tmpDir, "input")
 output := filepath.Join(tmpDir, "output")
