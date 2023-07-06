@@ -78,10 +78,11 @@ go get github.com/HORNET-Storage/scionic-merkletree
 ```
 
 #### Example Usage
-There are good examples inside the dag/dag_test.go file but here is a basic example to get you started.   
-This library is intended to be very simple while allowing for very powerful usage...
+There are good examples inside the dag/dag_test.go file, but below is a basic example to get you started.   
 
-Create a dag from a directory and re-create it somewhere else:
+This library is intended to be very simple while still allowing for powerful usage...
+
+Create our Scionic Merkle Tree/DAG from a directory and re-create it somewhere else:
 ```go
 input := filepath.Join(tmpDir, "input")
 output := filepath.Join(tmpDir, "output")
@@ -110,4 +111,4 @@ if err != nil {
 ```
 
 This repository is a work in progress and we plan to make quite a few changes and developments as we move forward
-Although what we have is working currently, we do not recommend using this in anything production related yet
+Although what we have is working currently, we do not recommend using this in anything production related yet.
