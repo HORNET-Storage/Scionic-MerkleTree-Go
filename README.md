@@ -75,7 +75,7 @@ See the docs [here](https://godoc.org/github.com/HORNET-Storage/scionic-merkletr
 
 #### Install
 ```
-go get github.com/HORNET-Storage/scionic-merkletree
+go get github.com/HORNET-Storage/scionic-merkletree/dag
 ```
 
 #### Example Usage
