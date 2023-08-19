@@ -87,13 +87,13 @@ func TestPartial(t *testing.T) {
 	parentLeaf.Links = map[string]string{}
 
 	// Verify the root leaf
-	result, err := parentLeaf.VerifyLeaf(encoder)
+	result, err := parentLeaf.VerifyRootLeaf(encoder)
 	if err != nil {
 		t.Fatal("Failed to verify branch for random leaf")
 	}
 
 	if !result {
-		t.Fatal("Root leaf verified correctly")
+		t.Fatal("Root leaf failed to verify")
 	}
 
 	// Create a new dag builder and add the root leaf
@@ -108,7 +108,7 @@ func TestPartial(t *testing.T) {
 		}
 
 		// Now retrieve a random child of the parent leaf from the original dag to simulate branch verification
-		randomLeaf := FindRandomChild(originalParentLeaf, dag.Leafs, encoder)
+		randomLeaf := originalParentLeaf.FindRandomChild(dag.Leafs, encoder)
 		randomLeaf = randomLeaf.Clone()
 
 		// Remove the links as the leaf probably wouldn't have them
@@ -127,17 +127,20 @@ func TestPartial(t *testing.T) {
 		// Retrieve the branch for random child
 		branch, err := originalParentLeaf.GetBranch(GetLabel(randomLeaf.Hash)) //index
 		if err != nil {
-			t.Fatal("Failed to retrieve root leaf branch")
+			t.Errorf("Failed to retrieve root leaf branch: %v", err)
+			//t.Fatal("Failed to retrieve root leaf branch")
 		}
 
-		// Verify the branch before adding the leaf to the dag
-		result, err = parentLeaf.VerifyBranch(branch)
-		if err != nil {
-			t.Fatal("Failed to verify branch for random leaf")
-		}
+		if branch != nil {
+			// Verify the branch before adding the leaf to the dag
+			result, err = parentLeaf.VerifyBranch(branch)
+			if err != nil {
+				t.Fatal("Failed to verify branch for random leaf")
+			}
 
-		if !result {
-			t.Fatal("Branch verified correctly")
+			if !result {
+				t.Fatal("Branch verified correctly")
+			}
 		}
 
 		// Add the leaf to the dag builder
@@ -212,7 +215,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	rootLeaf := dag.Leafs[dag.Root]
-	randomLeaf := FindRandomChild(rootLeaf, dag.Leafs, encoder)
+	randomLeaf := rootLeaf.FindRandomChild(dag.Leafs, encoder)
 
 	err = dag.DeleteLeaf(randomLeaf, encoder)
 	if err != nil {

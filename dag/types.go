@@ -15,12 +15,14 @@ const (
 )
 
 type Dag struct {
-	Root  string
-	Leafs map[string]*DagLeaf
+	Root   string
+	Labels map[string]string
+	Leafs  map[string]*DagLeaf
 }
 
 type DagBuilder struct {
-	Leafs map[string]*DagLeaf
+	Labels map[string]string
+	Leafs  map[string]*DagLeaf
 }
 
 type DagLeaf struct {
@@ -30,6 +32,7 @@ type DagLeaf struct {
 	Data             []byte
 	MerkleRoot       []byte
 	CurrentLinkCount int
+	LeafCount        int
 	LatestLabel      string
 	Links            map[string]string
 	ParentHash       string
@@ -46,10 +49,6 @@ type DagLeafBuilder struct {
 type ClassicTreeBranch struct {
 	Leaf  *merkletree.DataBlock
 	Proof *merkletree.Proof
-}
-
-type MetaData struct {
-	Deleted []string
 }
 
 func SetChunkSize(size int) {
