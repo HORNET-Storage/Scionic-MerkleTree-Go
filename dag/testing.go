@@ -52,7 +52,7 @@ func createRandomDirsAndFiles(path string, depth int, maxItems int) error {
 	return nil
 }
 
-func FindRandomChild(leaf *DagLeaf, leafs map[string]*DagLeaf, encoder multibase.Encoder) *DagLeaf {
+func (leaf *DagLeaf) FindRandomChild(leafs map[string]*DagLeaf, encoder multibase.Encoder) *DagLeaf {
 	if leaf.Type == DirectoryLeafType {
 		rand.Seed(time.Now().UnixNano())
 		index := rand.Intn(len(leaf.Links))
@@ -62,14 +62,23 @@ func FindRandomChild(leaf *DagLeaf, leafs map[string]*DagLeaf, encoder multibase
 		curIndex := 1
 		for _, link := range leaf.Links {
 			if curIndex >= index {
-				newLeaf = leafs[link]
+				new := leafs[link]
+
+				if GetLabel(new.Hash) != "0" {
+					newLeaf = new
+					break
+				}
 			}
 
 			curIndex++
 		}
 
+		fmt.Println("Returning new leaf")
+
 		return newLeaf
 	}
+
+	fmt.Println("Returning original leaf")
 
 	return leaf
 }
