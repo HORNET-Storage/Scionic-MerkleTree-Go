@@ -264,3 +264,26 @@ func ReadDag(path string) (*Dag, error) {
 
 	return &result, nil
 }
+
+func (dag *Dag) GetDataFromLeaf(leaf *DagLeaf) ([]byte, error) {
+	if len(leaf.Data) <= 0 {
+		return []byte{}, nil
+	}
+
+	var content []byte
+
+	if len(leaf.Links) > 0 {
+		for _, link := range leaf.Links {
+			childLeaf := dag.Leafs[link]
+			if childLeaf == nil {
+				return nil, fmt.Errorf("invalid link: %s", link)
+			}
+
+			content = append(content, childLeaf.Data...)
+		}
+	} else {
+		content = leaf.Data
+	}
+
+	return content, nil
+}
