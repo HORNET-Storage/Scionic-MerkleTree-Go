@@ -1,5 +1,5 @@
 ![example workflow](https://github.com/HORNET-Storage/scionic-merkletree/actions/workflows/go.yml/badge.svg)
-[![codecov](https://codecov.io/gh/HORNET-Storage/scionic-merkledag/branch/main/graph/badge.svg?token=1UBLJ1YYFI)](https://codecov.io/gh/HORNET-Storage/scionic-merkledag)
+[![codecov](https://codecov.io/gh/HORNET-Storage/scionic-merkletree/graph/badge.svg?token=1UBLJ1YYFI)](https://codecov.io/gh/HORNET-Storage/scionic-merkletree)
 
 
 # Scionic Merkle Trees
