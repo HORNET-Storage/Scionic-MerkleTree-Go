@@ -41,10 +41,10 @@ func (b *DagLeafBuilder) AddLink(label string, hash string) {
 	b.Links[label] = label + ":" + hash
 }
 
-func (b *DagLeafBuilder) GetLatestLabel() string {
-	var result string = "0"
-	var latestLabel int64 = 0
-	for _, hash := range b.Links {
+func (b *DagBuilder) GetLatestLabel() string {
+	var result string = "1"
+	var latestLabel int64 = 1
+	for hash, _ := range b.Leafs {
 		label := GetLabel(hash)
 
 		if label == "" {
@@ -63,6 +63,19 @@ func (b *DagLeafBuilder) GetLatestLabel() string {
 	}
 
 	return result
+}
+
+func (b *DagBuilder) GetNextAvailableLabel() string {
+	latestLabel := b.GetLatestLabel()
+
+	number, err := strconv.ParseInt(latestLabel, 10, 64)
+	if err != nil {
+		fmt.Println("Failed to parse label")
+	}
+
+	nextLabel := strconv.FormatInt(number+1, 10)
+
+	return nextLabel
 }
 
 func (b *DagLeafBuilder) BuildLeaf(encoder multibase.Encoder) (*DagLeaf, error) {
@@ -87,7 +100,13 @@ func (b *DagLeafBuilder) BuildLeaf(encoder multibase.Encoder) (*DagLeaf, error) 
 		merkleRoot = merkleTree.Root
 	}
 
-	leafData := &DagLeaf{
+	leafData := struct {
+		Name             string
+		Type             LeafType
+		MerkleRoot       []byte
+		CurrentLinkCount int
+		Data             []byte
+	}{
 		Name:             b.Name,
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
@@ -114,8 +133,11 @@ func (b *DagLeafBuilder) BuildLeaf(encoder multibase.Encoder) (*DagLeaf, error) 
 	return result, nil
 }
 
-func (b *DagLeafBuilder) BuildRootLeaf(encoder multibase.Encoder, leafCount int) (*DagLeaf, error) {
-	b.LeafType = DirectoryLeafType
+func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, encoder multibase.Encoder) (*DagLeaf, error) {
+	if b.LeafType == "" {
+		err := fmt.Errorf("Leaf must have a type defined")
+		return nil, err
+	}
 
 	merkleRoot := []byte{}
 
@@ -133,16 +155,24 @@ func (b *DagLeafBuilder) BuildRootLeaf(encoder multibase.Encoder, leafCount int)
 		merkleRoot = merkleTree.Root
 	}
 
-	latestLabel := b.GetLatestLabel()
+	latestLabel := dag.GetLatestLabel()
 
-	leafData := &DagLeaf{
+	leafData := struct {
+		Name             string
+		Type             LeafType
+		MerkleRoot       []byte
+		CurrentLinkCount int
+		LatestLabel      string
+		LeafCount        int
+		Data             []byte
+	}{
 		Name:             b.Name,
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
 		CurrentLinkCount: len(b.Links),
-		Data:             b.Data,
-		LeafCount:        leafCount,
 		LatestLabel:      latestLabel,
+		LeafCount:        len(dag.Leafs),
+		Data:             b.Data,
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -157,10 +187,10 @@ func (b *DagLeafBuilder) BuildRootLeaf(encoder multibase.Encoder, leafCount int)
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
 		CurrentLinkCount: len(b.Links),
+		LatestLabel:      latestLabel,
+		LeafCount:        len(dag.Leafs),
 		Data:             b.Data,
 		Links:            b.Links,
-		LeafCount:        leafCount,
-		LatestLabel:      latestLabel,
 	}
 
 	return result, nil
@@ -199,9 +229,9 @@ func (leaf *DagLeaf) GetBranch(key string) (*ClassicTreeBranch, error) {
 		}
 
 		return branch, nil
+	} else {
+		return nil, nil
 	}
-
-	return nil, nil
 }
 
 func (leaf *DagLeaf) VerifyBranch(branch *ClassicTreeBranch) (bool, error) {
@@ -214,7 +244,13 @@ func (leaf *DagLeaf) VerifyBranch(branch *ClassicTreeBranch) (bool, error) {
 }
 
 func (leaf *DagLeaf) VerifyLeaf(encoder multibase.Encoder) (bool, error) {
-	leafData := &DagLeaf{
+	leafData := struct {
+		Name             string
+		Type             LeafType
+		MerkleRoot       []byte
+		CurrentLinkCount int
+		Data             []byte
+	}{
 		Name:             leaf.Name,
 		Type:             leaf.Type,
 		MerkleRoot:       leaf.MerkleRoot,
@@ -259,14 +295,22 @@ func (leaf *DagLeaf) VerifyLeaf(encoder multibase.Encoder) (bool, error) {
 }
 
 func (leaf *DagLeaf) VerifyRootLeaf(encoder multibase.Encoder) (bool, error) {
-	leafData := &DagLeaf{
+	leafData := struct {
+		Name             string
+		Type             LeafType
+		MerkleRoot       []byte
+		CurrentLinkCount int
+		LatestLabel      string
+		LeafCount        int
+		Data             []byte
+	}{
 		Name:             leaf.Name,
 		Type:             leaf.Type,
 		MerkleRoot:       leaf.MerkleRoot,
 		CurrentLinkCount: leaf.CurrentLinkCount,
-		Data:             leaf.Data,
 		LatestLabel:      leaf.LatestLabel,
 		LeafCount:        leaf.LeafCount,
+		Data:             leaf.Data,
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -394,134 +438,14 @@ func (leaf *DagLeaf) Clone() *DagLeaf {
 		Data:             leaf.Data,
 		MerkleRoot:       leaf.MerkleRoot,
 		CurrentLinkCount: leaf.CurrentLinkCount,
-		LeafCount:        leaf.LeafCount,
 		LatestLabel:      leaf.LatestLabel,
+		LeafCount:        leaf.LeafCount,
 		Links:            leaf.Links,
-		ParentHash:       leaf.ParentHash,
 	}
-}
-
-func (builder *DagBuilder) GetLatestLabel() string {
-	var result string = "0"
-	var latestLabel int64 = 0
-
-	for _, leaf := range builder.Leafs {
-		for _, hash := range leaf.Links {
-			label := GetLabel(hash)
-
-			if label == "" {
-				fmt.Println("Failed to find label in hash")
-			}
-
-			parsed, err := strconv.ParseInt(label, 10, 64)
-			if err != nil {
-				fmt.Println("Failed to parse label")
-			}
-
-			if parsed > latestLabel {
-				latestLabel = parsed
-				result = label
-			}
-		}
-	}
-
-	return result
-}
-
-func (dag *Dag) GetLatestLabel() string {
-	var result string = "0"
-	var latestLabel int64 = 0
-
-	for _, leaf := range dag.Leafs {
-		for _, hash := range leaf.Links {
-			label := GetLabel(hash)
-
-			if label == "" {
-				fmt.Println("Failed to find label in hash")
-			}
-
-			parsed, err := strconv.ParseInt(label, 10, 64)
-			if err != nil {
-				fmt.Println("Failed to parse label")
-			}
-
-			if parsed > latestLabel {
-				latestLabel = parsed
-				result = label
-			}
-		}
-	}
-
-	return result
-}
-
-func (dag *DagBuilder) GetNextAvailableLabel() string {
-	latestLabel := dag.GetLatestLabel()
-
-	number, err := strconv.ParseInt(latestLabel, 10, 64)
-	if err != nil {
-		fmt.Println("Failed to parse label")
-	}
-
-	nextLabel := strconv.FormatInt(number+1, 10)
-
-	return nextLabel
-}
-
-func (dag *Dag) GetNextAvailableLabel() string {
-	latestLabel := dag.GetLatestLabel()
-
-	number, err := strconv.ParseInt(latestLabel, 10, 64)
-	if err != nil {
-		fmt.Println("Failed to parse label")
-	}
-
-	nextLabel := strconv.FormatInt(number+1, 10)
-
-	return nextLabel
 }
 
 func (leaf *DagLeaf) SetLabel(label string) {
 	leaf.Hash = label + ":" + leaf.Hash
-}
-
-func (leaf *DagLeaf) RebuildLeaf(encoder multibase.Encoder) (*DagLeaf, error) {
-	log.Println("Rebuilding leaf: " + leaf.Hash)
-	builder := CreateDagLeafBuilder(leaf.Name)
-
-	builder.Data = leaf.Data
-	builder.LeafType = leaf.Type
-
-	for label, hash := range leaf.Links {
-		builder.AddLink(label, GetHash(hash))
-	}
-
-	newLeaf, err := builder.BuildLeaf(encoder)
-	if err != nil {
-		return nil, err
-	}
-
-	return newLeaf, nil
-}
-
-func (leaf *DagLeaf) RemoveLink(label string) error {
-	if _, ok := leaf.Links[label]; !ok {
-		return fmt.Errorf("link with label %s does not exist", label)
-	}
-
-	delete(leaf.Links, label)
-
-	return nil
-}
-
-func (leaf *DagLeaf) ReplaceLink(label string, hash string) error {
-	if _, ok := leaf.Links[label]; !ok {
-		return fmt.Errorf("link with label %s does not exist", label)
-	}
-
-	leaf.Links[label] = hash
-
-	return nil
 }
 
 func HasLabel(hash string) bool {

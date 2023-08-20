@@ -17,7 +17,7 @@ func TestFull(t *testing.T) {
 
 	defer os.RemoveAll(tmpDir)
 
-	GenerateDummyDirectory(filepath.Join(tmpDir, "input"), 3, 3)
+	GenerateDummyDirectory(filepath.Join(tmpDir, "input"), 6, 6)
 	if err != nil {
 		t.Fatalf("Could not generate dummy directory: %s", err)
 	}
@@ -56,7 +56,7 @@ func TestPartial(t *testing.T) {
 
 	defer os.RemoveAll(tmpDir)
 
-	GenerateDummyDirectory(filepath.Join(tmpDir, "input"), 3, 3)
+	GenerateDummyDirectory(filepath.Join(tmpDir, "input"), 6, 6)
 	if err != nil {
 		t.Fatalf("Could not generate dummy directory: %s", err)
 	}
@@ -93,7 +93,7 @@ func TestPartial(t *testing.T) {
 	}
 
 	if !result {
-		t.Fatal("Root leaf failed to verify")
+		t.Fatal("Root leaf verified correctly")
 	}
 
 	// Create a new dag builder and add the root leaf
@@ -108,7 +108,7 @@ func TestPartial(t *testing.T) {
 		}
 
 		// Now retrieve a random child of the parent leaf from the original dag to simulate branch verification
-		randomLeaf := originalParentLeaf.FindRandomChild(dag.Leafs, encoder)
+		randomLeaf := FindRandomChild(originalParentLeaf, dag.Leafs, encoder)
 		randomLeaf = randomLeaf.Clone()
 
 		// Remove the links as the leaf probably wouldn't have them
@@ -127,8 +127,7 @@ func TestPartial(t *testing.T) {
 		// Retrieve the branch for random child
 		branch, err := originalParentLeaf.GetBranch(GetLabel(randomLeaf.Hash)) //index
 		if err != nil {
-			t.Errorf("Failed to retrieve root leaf branch: %v", err)
-			//t.Fatal("Failed to retrieve root leaf branch")
+			t.Fatal("Failed to retrieve root leaf branch")
 		}
 
 		if branch != nil {
@@ -167,138 +166,5 @@ func TestPartial(t *testing.T) {
 	err = dag.CreateDirectory(output, encoder)
 	if err != nil {
 		t.Fatal("Error: ", err)
-	}
-}
-
-func TestDelete(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "test")
-	if err != nil {
-		t.Fatalf("Could not create temp directory: %s", err)
-	}
-
-	defer os.RemoveAll(tmpDir)
-
-	GenerateDummyDirectory(filepath.Join(tmpDir, "input"), 3, 3)
-	if err != nil {
-		t.Fatalf("Could not generate dummy directory: %s", err)
-	}
-
-	input := filepath.Join(tmpDir, "input")
-	output := filepath.Join(tmpDir, "output")
-	deleted := filepath.Join(tmpDir, "deleted")
-
-	SetChunkSize(4096)
-
-	dag, err := CreateDag(input, multibase.Base64)
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-
-	encoder := multibase.MustNewEncoder(multibase.Base64)
-	result, err := dag.Verify(encoder)
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-
-	if !result {
-		t.Fatal("Dag failed to verify")
-	}
-
-	err = dag.CreateDirectory(output, encoder)
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-
-	dag, err = ReadDag(filepath.Join(output, ".dag"))
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-
-	rootLeaf := dag.Leafs[dag.Root]
-	randomLeaf := rootLeaf.FindRandomChild(dag.Leafs, encoder)
-
-	err = dag.DeleteLeaf(randomLeaf, encoder)
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-
-	result, err = dag.Verify(encoder)
-	if !result {
-		t.Fatal("Dag failed to verify")
-	}
-
-	err = dag.CreateDirectory(deleted, encoder)
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-}
-
-func TestReplace(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "test")
-	if err != nil {
-		t.Fatalf("Could not create temp directory: %s", err)
-	}
-
-	defer os.RemoveAll(tmpDir)
-
-	GenerateDummyDirectory(filepath.Join(tmpDir, "input"), 5, 1)
-	if err != nil {
-		t.Fatalf("Could not generate dummy directory: %s", err)
-	}
-
-	input := filepath.Join(tmpDir, "input")
-	output := filepath.Join(tmpDir, "output")
-	deleted := filepath.Join(tmpDir, "deleted")
-
-	SetChunkSize(4096)
-
-	dag, err := CreateDag(input, multibase.Base64)
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-
-	encoder := multibase.MustNewEncoder(multibase.Base64)
-	result, err := dag.Verify(encoder)
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-
-	if !result {
-		t.Fatal("Dag failed to verify")
-	}
-
-	err = dag.CreateDirectory(output, encoder)
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-
-	dag, err = ReadDag(filepath.Join(output, ".dag"))
-	if err != nil {
-		t.Fatalf("Error: %s", err)
-	}
-
-	/*
-		rootLeaf := dag.Leafs[dag.Root]
-		randomLeaf := FindRandomChild(rootLeaf, dag.Leafs, encoder)
-
-		newLeaf, err := CreateDummyLeaf(randomLeaf.Name, encoder)
-		if err != nil {
-			t.Fatal("Failed to make dummy leaf")
-		}
-
-		err = dag.ReplaceLeaf(randomLeaf, newLeaf, encoder)
-		if err != nil {
-			t.Fatalf("Error: %s", err)
-		}
-	*/
-
-	result, err = dag.Verify(encoder)
-	if !result {
-		t.Fatal("Dag failed to verify")
-	}
-
-	err = dag.CreateDirectory(deleted, encoder)
-	if err != nil {
-		t.Fatalf("Error: %s", err)
 	}
 }
