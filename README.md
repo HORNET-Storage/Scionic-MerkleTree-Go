@@ -65,7 +65,7 @@ In stark contrast, the number of hashes required to validate a single folder in 
 
 ## Syncing Trees Across Relays by Requesting a Range of Leafs
 
-To further enhance the functionality of Scionic Merkle DAG-Trees and support efficient data retrieval, each leaf in the tree is labelled with a unique number. This method facilitates the request for ranges of leaves, much like what GraphSync attempts to accomplish, but without the complexity of using complex graph selectors and large request sizes.
+To further enhance the functionality of Scionic Merkle DAG-Trees and support efficient data retrieval, each leaf in the tree is labelled with a unique number. This method facilitates the [request for a range of Merkle leaves](https://www.hornetstorage.com/forest), much like what GraphSync attempts to accomplish, but without the complexity of using complex graph selectors and large request sizes.
 
 The total number of leaves is recorded at the root of the tree, and each folder also carries information about the total number of leaves it contains. By doing so, users can request a range of leaves from a given folder, simplifying data retrieval, and reducing the bandwidth overhead and computational workload required to access multiple files from the same folder.
 
