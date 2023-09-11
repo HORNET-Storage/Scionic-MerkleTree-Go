@@ -20,7 +20,7 @@ The number of hashes required for a Merkle proof in a Classic Merkle Tree grows 
 
 ### ***Merkle DAGs (Directed Acyclic Graphs)***
 
-Merkle DAGs were developed as a solution to incorporate folders and files, addressing a key limitation of Classic Merkle Trees. However, this structure has its own challenge: to securely download a single file, you must download the hash of every other file inside the folder its stored in. This requirement can be slow and costly for users when dealing with folders that contain large amounts of files.
+Merkle DAGs were developed as a solution to incorporate folders and files, addressing a key limitation of Classic Merkle Trees. However, this structure has its own challenge: to securely download a single file, you must download the hash of every other file inside the folder its stored in. This requirement can be slow and costly for users when dealing with folders that contain a large number of files.
 
 ## The Strengths of Scionic Merkle DAG-Trees
 
@@ -30,7 +30,7 @@ Like Merkle DAGs, Scionic Merkle DAG-Trees can accommodate folders and files. Ho
 
 ### ***Internal Arrangement:***
 
-The unique feature of Scionic Merkle DAG-Trees is their internal structure. Within each folder (parent leaf) across the tree, its list of files (children) is organized as a Classic Merkle tree rather than a plaintext list.
+The unique feature of Scionic Merkle DAG-Trees is their internal structure. Within each folder (parent leaf) across the tree, its list of files (children) are organized as a Classic Merkle tree rather than a plaintext list.
 
 ### ***Efficient File Download and Branch Verification:***
 
@@ -59,15 +59,15 @@ These statistics underline the substantial efficiency improvements made by Scion
 
 ## Understanding Growth Patterns: Logarithmic vs Linear
 
-In the case of Scionic Merkle DAG-Trees, which incorporate Classic Merkle Trees within their structure, they exhibit logarithmic growth. This means that as the size of the input (the number of files in a folder) increases, the growth rate of the Classic Merkle Tree branches slow down. This makes Scionic Merkle DAG-Trees an efficient structure for managing large datasets, ***as the branches become exponentially smaller with the increasing number of files in the folder.***
+In the case of Scionic Merkle DAG-Trees, which incorporate Classic Merkle Trees within their structure, they exhibit logarithmic growth. This means that as the size of the input (the number of files in a folder) increases, the growth rate of the Classic Merkle Tree branches decrease. This makes Scionic Merkle DAG-Trees an efficient structure for managing large datasets, ***as the branches become exponentially smaller with the increasing number of files in the folder.***
 
-In stark contrast, the number of hashes required to validate a single folder in a Merkle DAG exhibits linear growth. If there are more children (files) in the folder, you must download the hashes to all of them to retrieve a single file. This constant requirement can lead to overly large merkle branches. The amount of hashes needed to validate a single file increases in direct proportion to the number of files in the folder, making it less efficient for large datasets, as it demands more computational work from users for each new file added to a folder in the DAG.
+In stark contrast, the number of hashes required to validate a single folder in a Merkle DAG exhibits linear growth. If there are more children (files) in the folder, you must download the hash of each one to retrieve any individual file from the folder. This constant requirement can lead to overly large Merkle branches. The amount of hashes needed to validate a single file increases in direct proportion to the number of files in the folder, making it less efficient for large datasets.
 
 ## Syncing Trees Across Relays by Requesting a Range of Leafs
 
-To further enhance the functionality of Scionic Merkle DAG-Trees and support efficient data retrieval, each leaf in the tree is labelled with a unique number. This method facilitates the [request for a range of Merkle leaves](https://www.hornetstorage.com/forest), much like what GraphSync attempts to accomplish, but without the complexity of using complex graph selectors and large request sizes.
+To further enhance the functionality of Scionic Merkle DAG-Trees and support efficient data retrieval, each leaf in the tree is labelled with a sequenced number. This method facilitates the [request for a range of Merkle leaves](https://www.hornetstorage.com/forest), much like what GraphSync attempts to accomplish, but without the complexity of using complex graph selectors and large request sizes.
 
-The total number of leaves is recorded at the root of the tree, and each folder also carries information about the total number of leaves it contains. By doing so, users can request a range of leaves from a given folder, simplifying data retrieval, and reducing the bandwidth overhead and computational workload required to access multiple files from the same folder.
+The total number of leaves is recorded at the root of the tree. By doing so, users can request a range of leaves from a given folder and receive it as a small Scionic Merkle branch, reducing the bandwidth overhead and computational workload required to access multiple files in the same folder.
 
 This approach not only maintains the structural advantages of Scionic Merkle DAG-Trees, such as logarithmic growth of branches and efficient file download and verification, but also provides enhanced support for range queries, contributing to their practicality in large-scale data management scenarios.
 
