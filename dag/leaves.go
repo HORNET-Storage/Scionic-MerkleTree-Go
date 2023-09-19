@@ -210,7 +210,7 @@ func (leaf *DagLeaf) GetBranch(key string) (*ClassicTreeBranch, error) {
 			t.AddLeaf(k, v)
 		}
 
-		merkleTree, leafs, err := t.Build()
+		merkleTree, _, err := t.Build()
 		if err != nil {
 			log.Println("Failed to build merkle tree")
 			return nil, err
@@ -221,10 +221,10 @@ func (leaf *DagLeaf) GetBranch(key string) (*ClassicTreeBranch, error) {
 			return nil, fmt.Errorf("Unable to find index for given key")
 		}
 
-		branchLeaf := leafs[key]
+		branchLeaf := leaf.Links[key]
 
 		branch := &ClassicTreeBranch{
-			Leaf:  &branchLeaf,
+			Leaf:  branchLeaf,
 			Proof: merkleTree.Proofs[index],
 		}
 
@@ -235,7 +235,9 @@ func (leaf *DagLeaf) GetBranch(key string) (*ClassicTreeBranch, error) {
 }
 
 func (leaf *DagLeaf) VerifyBranch(branch *ClassicTreeBranch) (bool, error) {
-	result, err := merkletree.Verify(*branch.Leaf, branch.Proof, leaf.MerkleRoot, nil)
+	block := tree.CreateLeaf(branch.Leaf)
+
+	result, err := merkletree.Verify(block, branch.Proof, leaf.MerkleRoot, nil)
 	if err != nil {
 		return false, err
 	}

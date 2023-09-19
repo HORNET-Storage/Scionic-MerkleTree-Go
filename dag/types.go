@@ -45,7 +45,7 @@ type DagLeafBuilder struct {
 }
 
 type ClassicTreeBranch struct {
-	Leaf  *merkletree.DataBlock
+	Leaf  string
 	Proof *merkletree.Proof
 }
 
