@@ -6,7 +6,7 @@
 
 ## An Evolution of Merkle DAGs and Merkle Trees
 
-We've designed a [new type of Merkle DAG-Tree hybrid](https://www.hornetstorage.com/). Scionic Merkle DAG-Trees have small branches like Classic Merkle Trees, the file storage ability of Merkle DAGs, and numbered leaves so relays can request a range of missing leaf numbers to sync quickly. They are an innovative model that merge the advantages of Classic Merkle Trees and Merkle DAGs while addressing several of their limitations.
+We've designed a [new type of Merkle DAG-Tree hybrid](https://www.hornetstorage.com/dag-trees). Scionic Merkle DAG-Trees have small branches like Classic Merkle Trees, the file storage ability of Merkle DAGs, and numbered leaves so relays can request a range of missing leaf numbers to sync quickly. They are an innovative model that merge the advantages of Classic Merkle Trees and Merkle DAGs while addressing several of their limitations.
 
 ![Tree Comparison Diagram](https://static.wixstatic.com/media/e9326a_d4a555d0ed9e46da8e751967961710a3~mv2.png/v1/fill/w_1679,h_421,al_c,q_90,usm_0.66_1.00_0.01,enc_auto/Merkle%20DAG%20Tree%20Comparison%20Diagram.png)
 
