@@ -13,6 +13,34 @@ import (
 	"github.com/multiformats/go-multibase"
 )
 
+type fileInfoDirEntry struct {
+	fileInfo os.FileInfo
+}
+
+func (e fileInfoDirEntry) Name() string {
+	return e.fileInfo.Name()
+}
+
+func (e fileInfoDirEntry) IsDir() bool {
+	return e.fileInfo.IsDir()
+}
+
+func (e fileInfoDirEntry) Type() fs.FileMode {
+	return e.fileInfo.Mode().Type()
+}
+
+func (e fileInfoDirEntry) Info() (fs.FileInfo, error) {
+	return e.fileInfo, nil
+}
+
+func newDirEntry(path string) (fs.DirEntry, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	return fileInfoDirEntry{fileInfo: fileInfo}, nil
+}
+
 func CreateDag(path string, encoding ...multibase.Encoding) (*Dag, error) {
 	var e multibase.Encoding
 	if len(encoding) > 0 {
@@ -24,30 +52,25 @@ func CreateDag(path string, encoding ...multibase.Encoding) (*Dag, error) {
 
 	dag := CreateDagBuilder()
 
-	relPath := filepath.Base(path)
-	builder := CreateDagLeafBuilder(relPath)
-	builder.SetType(DirectoryLeafType)
-
-	entries, err := ioutil.ReadDir(path)
+	fileInfo, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, entry := range entries {
-		if entry.Name() != ".meta" {
-			leaf, err := processEntry(entry, &path, dag, encoder)
-			if err != nil {
-				return nil, err
-			}
-
-			label := dag.GetNextAvailableLabel()
-			builder.AddLink(label, leaf.Hash)
-			leaf.SetLabel(label)
-			dag.AddLeaf(leaf, encoder, nil)
-		}
+	dirEntry, err := newDirEntry(path)
+	if err != nil {
+		return nil, err
 	}
 
-	leaf, err := builder.BuildRootLeaf(dag, encoder)
+	parentPath := filepath.Dir(path)
+
+	var leaf *DagLeaf
+
+	if fileInfo.IsDir() {
+		leaf, err = processDirectory(dirEntry, &parentPath, dag, encoder, true)
+	} else {
+		leaf, err = processFile(dirEntry, &parentPath, dag, encoder, true)
+	}
 
 	if err != nil {
 		return nil, err
@@ -59,7 +82,24 @@ func CreateDag(path string, encoding ...multibase.Encoding) (*Dag, error) {
 	return dag.BuildDag(rootHash), nil
 }
 
-func processEntry(entry fs.FileInfo, path *string, dag *DagBuilder, encoder multibase.Encoder) (*DagLeaf, error) {
+func processEntry(entry fs.DirEntry, path *string, dag *DagBuilder, encoder multibase.Encoder) (*DagLeaf, error) {
+	var result *DagLeaf
+	var err error
+
+	if entry.IsDir() {
+		result, err = processDirectory(entry, path, dag, encoder, false)
+	} else {
+		result, err = processFile(entry, path, dag, encoder, false)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, encoder multibase.Encoder, isRoot bool) (*DagLeaf, error) {
 	entryPath := filepath.Join(*path, entry.Name())
 
 	relPath, err := filepath.Rel(*path, entryPath)
@@ -69,61 +109,91 @@ func processEntry(entry fs.FileInfo, path *string, dag *DagBuilder, encoder mult
 
 	builder := CreateDagLeafBuilder(relPath)
 
-	if entry.IsDir() {
-		builder.SetType(DirectoryLeafType)
+	builder.SetType(DirectoryLeafType)
 
-		entries, err := ioutil.ReadDir(entryPath)
+	entries, err := os.ReadDir(entryPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var result *DagLeaf
+
+	for _, entry := range entries {
+		leaf, err := processEntry(entry, &entryPath, dag, encoder)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, entry := range entries {
-			if entry.Name() != ".meta" {
-				leaf, err := processEntry(entry, &entryPath, dag, encoder)
-				if err != nil {
-					return nil, err
-				}
+		label := dag.GetNextAvailableLabel()
+		builder.AddLink(label, leaf.Hash)
+		leaf.SetLabel(label)
+		dag.AddLeaf(leaf, encoder, nil)
+	}
 
-				label := dag.GetNextAvailableLabel()
-				builder.AddLink(label, leaf.Hash)
-				leaf.SetLabel(label)
-				dag.AddLeaf(leaf, encoder, nil)
-			}
-		}
+	if isRoot {
+		result, err = builder.BuildRootLeaf(dag, encoder)
 	} else {
-		fileData, err := ioutil.ReadFile(entryPath)
-		if err != nil {
-			return nil, err
-		}
+		result, err = builder.BuildLeaf(encoder)
+	}
 
-		builder.SetType(FileLeafType)
+	if err != nil {
+		return nil, err
+	}
 
-		fileChunks := chunkFile(fileData, ChunkSize)
+	return result, nil
+}
 
-		if len(fileChunks) == 1 {
-			builder.SetData(fileChunks[0])
-		} else {
-			for i, chunk := range fileChunks {
-				chunkEntryPath := filepath.Join(relPath, strconv.Itoa(i))
-				chunkBuilder := CreateDagLeafBuilder(chunkEntryPath)
+func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, encoder multibase.Encoder, isRoot bool) (*DagLeaf, error) {
+	entryPath := filepath.Join(*path, entry.Name())
 
-				chunkBuilder.SetType(ChunkLeafType)
-				chunkBuilder.SetData(chunk)
+	relPath, err := filepath.Rel(*path, entryPath)
+	if err != nil {
+		return nil, err
+	}
 
-				chunkLeaf, err := chunkBuilder.BuildLeaf(encoder)
-				if err != nil {
-					return nil, err
-				}
+	var result *DagLeaf
 
-				label := dag.GetNextAvailableLabel()
-				builder.AddLink(label, chunkLeaf.Hash)
-				chunkLeaf.SetLabel(label)
-				dag.AddLeaf(chunkLeaf, encoder, nil)
+	builder := CreateDagLeafBuilder(relPath)
+
+	builder.SetType(FileLeafType)
+
+	fileData, err := os.ReadFile(entryPath)
+	if err != nil {
+		return nil, err
+	}
+
+	builder.SetType(FileLeafType)
+
+	fileChunks := chunkFile(fileData, ChunkSize)
+
+	if len(fileChunks) == 1 {
+		builder.SetData(fileChunks[0])
+	} else {
+		for i, chunk := range fileChunks {
+			chunkEntryPath := filepath.Join(relPath, strconv.Itoa(i))
+			chunkBuilder := CreateDagLeafBuilder(chunkEntryPath)
+
+			chunkBuilder.SetType(ChunkLeafType)
+			chunkBuilder.SetData(chunk)
+
+			chunkLeaf, err := chunkBuilder.BuildLeaf(encoder)
+			if err != nil {
+				return nil, err
 			}
+
+			label := dag.GetNextAvailableLabel()
+			builder.AddLink(label, chunkLeaf.Hash)
+			chunkLeaf.SetLabel(label)
+			dag.AddLeaf(chunkLeaf, encoder, nil)
 		}
 	}
 
-	result, err := builder.BuildLeaf(encoder)
+	if isRoot {
+		result, err = builder.BuildRootLeaf(dag, encoder)
+	} else {
+		result, err = builder.BuildLeaf(encoder)
+	}
+
 	if err != nil {
 		return nil, err
 	}
