@@ -388,7 +388,10 @@ func (d *Dag) IterateDag(processLeaf func(leaf *DagLeaf, parent *DagLeaf)) error
 		})
 
 		for _, childHash := range childHashes {
-			return iterate(childHash, &leaf.Hash)
+			err := iterate(childHash, &leaf.Hash)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
