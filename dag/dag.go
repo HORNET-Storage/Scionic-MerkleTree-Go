@@ -7,7 +7,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 
 	cbor "github.com/fxamacker/cbor/v2"
 	"github.com/multiformats/go-multibase"
@@ -356,4 +358,41 @@ func (dag *Dag) GetDataFromLeaf(leaf *DagLeaf) ([]byte, error) {
 	}
 
 	return content, nil
+}
+
+func (d *Dag) IterateDag(processLeaf func(leaf *DagLeaf, parent *DagLeaf)) error {
+	var iterate func(leafHash string, parentHash *string) error
+	iterate = func(leafHash string, parentHash *string) error {
+		leaf, exists := d.Leafs[leafHash]
+		if !exists {
+			return fmt.Errorf("child is missing when iterating dag")
+		}
+
+		var parent *DagLeaf
+		if parentHash != nil {
+			parent = d.Leafs[*parentHash]
+		}
+
+		processLeaf(leaf, parent)
+
+		childHashes := []string{}
+		for _, childHash := range leaf.Links {
+			childHashes = append(childHashes, childHash)
+		}
+
+		sort.Slice(childHashes, func(i, j int) bool {
+			numI, _ := strconv.Atoi(strings.Split(childHashes[i], ":")[0])
+			numJ, _ := strconv.Atoi(strings.Split(childHashes[j], ":")[0])
+
+			return numI < numJ
+		})
+
+		for _, childHash := range childHashes {
+			return iterate(childHash, &leaf.Hash)
+		}
+
+		return nil
+	}
+
+	return iterate(d.Root, nil)
 }
