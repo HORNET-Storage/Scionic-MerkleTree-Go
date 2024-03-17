@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/fs"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -282,24 +281,26 @@ func (dag *Dag) CreateDirectory(path string, encoder multibase.Encoder) error {
 		return err
 	}
 
-	cborData, err := dag.ToCBOR()
-	if err != nil {
-		log.Println("Failed to serialize dag into cbor")
-		os.Exit(1)
-	}
+	/*
+		cborData, err := dag.ToCBOR()
+		if err != nil {
+			log.Println("Failed to serialize dag into cbor")
+			os.Exit(1)
+		}
 
-	fileName := filepath.Join(path, ".dag")
-	file, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
+		fileName := filepath.Join(path, ".dag")
+		file, err := os.Create(fileName)
+		if err != nil {
+			return err
+		}
 
-	defer file.Close()
+		defer file.Close()
 
-	_, err = file.Write(cborData)
-	if err != nil {
-		return fmt.Errorf("failed to write to file: %w", err)
-	}
+		_, err = file.Write(cborData)
+		if err != nil {
+			return fmt.Errorf("failed to write to file: %w", err)
+		}
+	*/
 
 	/*
 		if runtime.GOOS == "windows" {
