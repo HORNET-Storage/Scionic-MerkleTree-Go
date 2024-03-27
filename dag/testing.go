@@ -6,8 +6,6 @@ import (
 	"math/rand"
 	"os"
 	"time"
-
-	"github.com/multiformats/go-multibase"
 )
 
 func GenerateDummyDirectory(path string, maxItems int, maxDepth int) {
@@ -52,7 +50,7 @@ func createRandomDirsAndFiles(path string, depth int, maxItems int) error {
 	return nil
 }
 
-func FindRandomChild(leaf *DagLeaf, leafs map[string]*DagLeaf, encoder multibase.Encoder) *DagLeaf {
+func FindRandomChild(leaf *DagLeaf, leafs map[string]*DagLeaf) *DagLeaf {
 	if leaf.Type == DirectoryLeafType {
 		rand.Seed(time.Now().UnixNano())
 		index := rand.Intn(len(leaf.Links))
@@ -74,7 +72,7 @@ func FindRandomChild(leaf *DagLeaf, leafs map[string]*DagLeaf, encoder multibase
 	return leaf
 }
 
-func CreateDummyLeaf(name string, encoder multibase.Encoder) (*DagLeaf, error) {
+func CreateDummyLeaf(name string) (*DagLeaf, error) {
 	rand.Seed(time.Now().UnixNano())
 
 	builder := CreateDagLeafBuilder(name)
@@ -104,7 +102,7 @@ func CreateDummyLeaf(name string, encoder multibase.Encoder) (*DagLeaf, error) {
 			chunkBuilder.SetType(ChunkLeafType)
 			chunkBuilder.SetData(chunk)
 
-			chunkLeaf, err := chunkBuilder.BuildLeaf(encoder)
+			chunkLeaf, err := chunkBuilder.BuildLeaf()
 			if err != nil {
 				return nil, err
 			}
@@ -114,5 +112,5 @@ func CreateDummyLeaf(name string, encoder multibase.Encoder) (*DagLeaf, error) {
 		}
 	}
 
-	return builder.BuildLeaf(encoder)
+	return builder.BuildLeaf()
 }

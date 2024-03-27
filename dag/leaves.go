@@ -10,14 +10,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/HORNET-Storage/scionic-merkletree/tree"
-
 	"github.com/HORNET-Storage/scionic-merkletree/merkletree"
 
 	cbor "github.com/fxamacker/cbor/v2"
-	"github.com/multiformats/go-multibase"
 
 	merkle_tree "github.com/HORNET-Storage/scionic-merkletree/tree"
+
+	"github.com/ipfs/go-cid"
+	mc "github.com/multiformats/go-multicodec"
+	mh "github.com/multiformats/go-multihash"
 )
 
 func CreateDagLeafBuilder(name string) *DagLeafBuilder {
@@ -44,7 +45,7 @@ func (b *DagLeafBuilder) AddLink(label string, hash string) {
 func (b *DagBuilder) GetLatestLabel() string {
 	var result string = "1"
 	var latestLabel int64 = 1
-	for hash, _ := range b.Leafs {
+	for hash := range b.Leafs {
 		label := GetLabel(hash)
 
 		if label == "" {
@@ -78,16 +79,16 @@ func (b *DagBuilder) GetNextAvailableLabel() string {
 	return nextLabel
 }
 
-func (b *DagLeafBuilder) BuildLeaf(encoder multibase.Encoder) (*DagLeaf, error) {
+func (b *DagLeafBuilder) BuildLeaf() (*DagLeaf, error) {
 	if b.LeafType == "" {
-		err := fmt.Errorf("Leaf must have a type defined")
+		err := fmt.Errorf("leaf must have a type defined")
 		return nil, err
 	}
 
 	merkleRoot := []byte{}
 
 	if len(b.Links) > 1 {
-		builder := tree.CreateTree()
+		builder := merkle_tree.CreateTree()
 		for _, link := range b.Links {
 			builder.AddLeaf(GetLabel(link), link)
 		}
@@ -121,9 +122,20 @@ func (b *DagLeafBuilder) BuildLeaf(encoder multibase.Encoder) (*DagLeaf, error) 
 		return nil, err
 	}
 
-	hash := sha256.Sum256(serializedLeafData)
+	pref := cid.Prefix{
+		Version:  1,
+		Codec:    uint64(mc.Cbor),
+		MhType:   mh.SHA2_256,
+		MhLength: -1,
+	}
+
+	c, err := pref.Sum(serializedLeafData)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &DagLeaf{
-		Hash:             encoder.Encode(hash[:]),
+		Hash:             c.String(),
 		Name:             b.Name,
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
@@ -136,7 +148,7 @@ func (b *DagLeafBuilder) BuildLeaf(encoder multibase.Encoder) (*DagLeaf, error) 
 	return result, nil
 }
 
-func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, encoder multibase.Encoder) (*DagLeaf, error) {
+func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder) (*DagLeaf, error) {
 	if b.LeafType == "" {
 		err := fmt.Errorf("leaf must have a type defined")
 		return nil, err
@@ -145,7 +157,7 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, encoder multibase.Encode
 	merkleRoot := []byte{}
 
 	if len(b.Links) > 1 {
-		builder := tree.CreateTree()
+		builder := merkle_tree.CreateTree()
 		for _, link := range b.Links {
 			builder.AddLeaf(GetLabel(link), link)
 		}
@@ -159,6 +171,7 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, encoder multibase.Encode
 	}
 
 	latestLabel := dag.GetLatestLabel()
+
 	contentHash := sha256.Sum256(b.Data)
 
 	leafData := struct {
@@ -184,9 +197,20 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, encoder multibase.Encode
 		return nil, err
 	}
 
-	hash := sha256.Sum256(serializedLeafData)
+	pref := cid.Prefix{
+		Version:  1,
+		Codec:    uint64(mc.Cbor),
+		MhType:   mh.SHA2_256,
+		MhLength: -1,
+	}
+
+	c, err := pref.Sum(serializedLeafData)
+	if err != nil {
+		return nil, err
+	}
+
 	result := &DagLeaf{
-		Hash:             encoder.Encode(hash[:]),
+		Hash:             c.String(),
 		Name:             b.Name,
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
@@ -217,7 +241,7 @@ func (leaf *DagLeaf) GetBranch(key string) (*ClassicTreeBranch, error) {
 
 		index, result := merkleTree.GetIndexForKey(key)
 		if !result {
-			return nil, fmt.Errorf("Unable to find index for given key")
+			return nil, fmt.Errorf("unable to find index for given key")
 		}
 
 		branchLeaf := leaf.Links[key]
@@ -233,18 +257,18 @@ func (leaf *DagLeaf) GetBranch(key string) (*ClassicTreeBranch, error) {
 	}
 }
 
-func (leaf *DagLeaf) VerifyBranch(branch *ClassicTreeBranch) (bool, error) {
-	block := tree.CreateLeaf(branch.Leaf)
+func (leaf *DagLeaf) VerifyBranch(branch *ClassicTreeBranch) error {
+	block := merkle_tree.CreateLeaf(branch.Leaf)
 
-	result, err := merkletree.Verify(block, branch.Proof, leaf.MerkleRoot, nil)
+	err := merkletree.Verify(block, branch.Proof, leaf.MerkleRoot, nil)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return result, nil
+	return nil
 }
 
-func (leaf *DagLeaf) VerifyLeaf(encoder multibase.Encoder) (bool, error) {
+func (leaf *DagLeaf) VerifyLeaf() error {
 	leafData := struct {
 		Name             string
 		Type             LeafType
@@ -261,16 +285,29 @@ func (leaf *DagLeaf) VerifyLeaf(encoder multibase.Encoder) (bool, error) {
 
 	serializedLeafData, err := cbor.Marshal(leafData)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	hash := sha256.Sum256(serializedLeafData)
+	pref := cid.Prefix{
+		Version:  1,
+		Codec:    uint64(mc.Cbor),
+		MhType:   mh.SHA2_256,
+		MhLength: -1,
+	}
 
-	var result bool = false
-	if HasLabel(leaf.Hash) {
-		result = encoder.Encode(hash[:]) == GetHash(leaf.Hash)
-	} else {
-		result = encoder.Encode(hash[:]) == leaf.Hash
+	c, err := pref.Sum(serializedLeafData)
+	if err != nil {
+		return err
+	}
+
+	currentCid, err := cid.Decode(GetHash(leaf.Hash))
+	if err != nil {
+		return err
+	}
+
+	success := c.Equals(currentCid)
+	if !success {
+		return fmt.Errorf("leaf failed to verify")
 	}
 
 	/*
@@ -292,10 +329,10 @@ func (leaf *DagLeaf) VerifyLeaf(encoder multibase.Encoder) (bool, error) {
 		}
 	*/
 
-	return result, nil
+	return nil
 }
 
-func (leaf *DagLeaf) VerifyRootLeaf(encoder multibase.Encoder) (bool, error) {
+func (leaf *DagLeaf) VerifyRootLeaf() error {
 	leafData := struct {
 		Name             string
 		Type             LeafType
@@ -316,16 +353,29 @@ func (leaf *DagLeaf) VerifyRootLeaf(encoder multibase.Encoder) (bool, error) {
 
 	serializedLeafData, err := cbor.Marshal(leafData)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	hash := sha256.Sum256(serializedLeafData)
+	pref := cid.Prefix{
+		Version:  1,
+		Codec:    uint64(mc.Cbor),
+		MhType:   mh.SHA2_256,
+		MhLength: -1,
+	}
 
-	var result bool = false
-	if HasLabel(leaf.Hash) {
-		result = encoder.Encode(hash[:]) == GetHash(leaf.Hash)
-	} else {
-		result = encoder.Encode(hash[:]) == leaf.Hash
+	c, err := pref.Sum(serializedLeafData)
+	if err != nil {
+		return err
+	}
+
+	currentCid, err := cid.Decode(GetHash(leaf.Hash))
+	if err != nil {
+		return err
+	}
+
+	success := c.Equals(currentCid)
+	if !success {
+		return fmt.Errorf("leaf failed to verify")
 	}
 
 	/*
@@ -347,10 +397,10 @@ func (leaf *DagLeaf) VerifyRootLeaf(encoder multibase.Encoder) (bool, error) {
 		}
 	*/
 
-	return result, nil
+	return nil
 }
 
-func (leaf *DagLeaf) CreateDirectoryLeaf(path string, dag *Dag, encoder multibase.Encoder) error {
+func (leaf *DagLeaf) CreateDirectoryLeaf(path string, dag *Dag) error {
 	switch leaf.Type {
 	case DirectoryLeafType:
 		_ = os.Mkdir(path, os.ModePerm)
@@ -362,7 +412,7 @@ func (leaf *DagLeaf) CreateDirectoryLeaf(path string, dag *Dag, encoder multibas
 			}
 
 			childPath := filepath.Join(path, childLeaf.Name)
-			err := childLeaf.CreateDirectoryLeaf(childPath, dag, encoder)
+			err := childLeaf.CreateDirectoryLeaf(childPath, dag)
 			if err != nil {
 				return err
 			}

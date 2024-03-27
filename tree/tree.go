@@ -52,13 +52,13 @@ func VerifyTree(tree *mt.MerkleTree, leafs []mt.DataBlock) bool {
 	proofs := tree.Proofs
 	// verify the proofs
 	for i := 0; i < len(proofs); i++ {
-		ok, err := tree.Verify(leafs[i], proofs[i])
+		err := tree.Verify(leafs[i], proofs[i])
 		if err != nil {
 			fmt.Println("Verification failed for leaf")
 		}
 
-		if ok == false {
-			result = ok
+		if err != nil {
+			result = false
 		}
 	}
 
@@ -70,13 +70,13 @@ func VerifyRoot(root []byte, proofs []*mt.Proof, leafs []mt.DataBlock) bool {
 
 	for i := 0; i < len(leafs); i++ {
 		// if hashFunc is nil, use SHA256 by default
-		ok, err := mt.Verify(leafs[i], proofs[i], root, nil)
+		err := mt.Verify(leafs[i], proofs[i], root, nil)
 		if err != nil {
 			fmt.Println("Verification failed for leaf")
 		}
 
-		if ok == false {
-			result = ok
+		if err != nil {
+			result = false
 		}
 	}
 

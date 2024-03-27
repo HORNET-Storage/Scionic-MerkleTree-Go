@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/multiformats/go-multibase"
 )
 
 func TestFull(t *testing.T) {
@@ -27,18 +25,17 @@ func TestFull(t *testing.T) {
 
 	SetChunkSize(4096)
 
-	dag, err := CreateDag(input, multibase.Base64)
+	dag, err := CreateDag(input)
 	if err != nil {
 		t.Fatalf("Error: %s", err)
 	}
 
-	encoder := multibase.MustNewEncoder(multibase.Base64)
-	err = dag.Verify(encoder)
+	err = dag.Verify()
 	if err != nil {
 		t.Fatalf("Error: %s", err)
 	}
 
-	err = dag.CreateDirectory(output, encoder)
+	err = dag.CreateDirectory(output)
 	if err != nil {
 		t.Fatalf("Error: %s", err)
 	}
@@ -62,19 +59,10 @@ func TestPartial(t *testing.T) {
 
 	SetChunkSize(4096)
 
-	dag, err := CreateDag(input, multibase.Base64)
+	dag, err := CreateDag(input)
 	if err != nil {
 		t.Fatal("Error: ", err)
 	}
-
-	// Figure out what encoder was used by decoding the root hash
-	encoding, _, err := multibase.Decode(dag.Root)
-	if err != nil {
-		t.Fatal("Failed to decode root hash")
-	}
-
-	// Create encoder from encoding
-	encoder := multibase.MustNewEncoder(encoding)
 
 	// Retrieve the root leaf as this is what you will always start with
 	parentLeaf := dag.Leafs[dag.Root].Clone()
@@ -83,18 +71,14 @@ func TestPartial(t *testing.T) {
 	parentLeaf.Links = map[string]string{}
 
 	// Verify the root leaf
-	result, err := parentLeaf.VerifyRootLeaf(encoder)
+	err = parentLeaf.VerifyRootLeaf()
 	if err != nil {
 		t.Fatal("Failed to verify branch for random leaf")
 	}
 
-	if !result {
-		t.Fatal("Root leaf verified correctly")
-	}
-
 	// Create a new dag builder and add the root leaf
 	dagBuilder := CreateDagBuilder()
-	dagBuilder.AddLeaf(parentLeaf, encoder, nil)
+	dagBuilder.AddLeaf(parentLeaf, nil)
 
 	for ok := true; ok; ok = parentLeaf.Type == DirectoryLeafType {
 		originalParentLeaf := dag.Leafs[parentLeaf.Hash]
@@ -104,20 +88,16 @@ func TestPartial(t *testing.T) {
 		}
 
 		// Now retrieve a random child of the parent leaf from the original dag to simulate branch verification
-		randomLeaf := FindRandomChild(originalParentLeaf, dag.Leafs, encoder)
+		randomLeaf := FindRandomChild(originalParentLeaf, dag.Leafs)
 		randomLeaf = randomLeaf.Clone()
 
 		// Remove the links as the leaf probably wouldn't have them
 		randomLeaf.Links = map[string]string{}
 
 		// Verify the random leaf
-		result, err := randomLeaf.VerifyLeaf(encoder)
+		err := randomLeaf.VerifyLeaf()
 		if err != nil {
 			t.Fatal("Failed to verify branch for random leaf")
-		}
-
-		if !result {
-			t.Fatal("Random leaf verified incorrectly")
 		}
 
 		// Retrieve the branch for random child
@@ -128,18 +108,14 @@ func TestPartial(t *testing.T) {
 
 		if branch != nil {
 			// Verify the branch before adding the leaf to the dag
-			result, err = parentLeaf.VerifyBranch(branch)
+			err = parentLeaf.VerifyBranch(branch)
 			if err != nil {
 				t.Fatal("Failed to verify branch for random leaf")
-			}
-
-			if !result {
-				t.Fatal("Branch verified correctly")
 			}
 		}
 
 		// Add the leaf to the dag builder
-		dagBuilder.AddLeaf(randomLeaf, encoder, parentLeaf)
+		dagBuilder.AddLeaf(randomLeaf, parentLeaf)
 
 		// Set the parent leaf to the new leaf so we can find the next random child if it's a directory
 		parentLeaf = randomLeaf
@@ -149,13 +125,13 @@ func TestPartial(t *testing.T) {
 	dag = dagBuilder.BuildDag(dag.Root)
 
 	// Verify the dag
-	err = dag.Verify(encoder)
+	err = dag.Verify()
 	if err != nil {
 		t.Fatal("Error: ", err)
 	}
 
 	// Re-create the directory from the dag
-	err = dag.CreateDirectory(output, encoder)
+	err = dag.CreateDirectory(output)
 	if err != nil {
 		t.Fatal("Error: ", err)
 	}

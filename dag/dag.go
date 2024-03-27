@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	cbor "github.com/fxamacker/cbor/v2"
-	"github.com/multiformats/go-multibase"
 )
 
 type fileInfoDirEntry struct {
@@ -42,15 +41,7 @@ func newDirEntry(path string) (fs.DirEntry, error) {
 	return fileInfoDirEntry{fileInfo: fileInfo}, nil
 }
 
-func CreateDag(path string, encoding ...multibase.Encoding) (*Dag, error) {
-	var e multibase.Encoding
-	if len(encoding) > 0 {
-		e = encoding[0]
-	} else {
-		e = multibase.Base64
-	}
-	encoder := multibase.MustNewEncoder(e)
-
+func CreateDag(path string) (*Dag, error) {
 	dag := CreateDagBuilder()
 
 	fileInfo, err := os.Stat(path)
@@ -68,29 +59,29 @@ func CreateDag(path string, encoding ...multibase.Encoding) (*Dag, error) {
 	var leaf *DagLeaf
 
 	if fileInfo.IsDir() {
-		leaf, err = processDirectory(dirEntry, &parentPath, dag, encoder, true)
+		leaf, err = processDirectory(dirEntry, &parentPath, dag, true)
 	} else {
-		leaf, err = processFile(dirEntry, &parentPath, dag, encoder, true)
+		leaf, err = processFile(dirEntry, &parentPath, dag, true)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	dag.AddLeaf(leaf, encoder, nil)
+	dag.AddLeaf(leaf, nil)
 
 	rootHash := leaf.Hash
 	return dag.BuildDag(rootHash), nil
 }
 
-func processEntry(entry fs.DirEntry, path *string, dag *DagBuilder, encoder multibase.Encoder) (*DagLeaf, error) {
+func processEntry(entry fs.DirEntry, path *string, dag *DagBuilder) (*DagLeaf, error) {
 	var result *DagLeaf
 	var err error
 
 	if entry.IsDir() {
-		result, err = processDirectory(entry, path, dag, encoder, false)
+		result, err = processDirectory(entry, path, dag, false)
 	} else {
-		result, err = processFile(entry, path, dag, encoder, false)
+		result, err = processFile(entry, path, dag, false)
 	}
 
 	if err != nil {
@@ -100,7 +91,7 @@ func processEntry(entry fs.DirEntry, path *string, dag *DagBuilder, encoder mult
 	return result, nil
 }
 
-func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, encoder multibase.Encoder, isRoot bool) (*DagLeaf, error) {
+func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool) (*DagLeaf, error) {
 	entryPath := filepath.Join(*path, entry.Name())
 
 	relPath, err := filepath.Rel(*path, entryPath)
@@ -120,7 +111,7 @@ func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, encoder 
 	var result *DagLeaf
 
 	for _, entry := range entries {
-		leaf, err := processEntry(entry, &entryPath, dag, encoder)
+		leaf, err := processEntry(entry, &entryPath, dag)
 		if err != nil {
 			return nil, err
 		}
@@ -128,13 +119,13 @@ func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, encoder 
 		label := dag.GetNextAvailableLabel()
 		builder.AddLink(label, leaf.Hash)
 		leaf.SetLabel(label)
-		dag.AddLeaf(leaf, encoder, nil)
+		dag.AddLeaf(leaf, nil)
 	}
 
 	if isRoot {
-		result, err = builder.BuildRootLeaf(dag, encoder)
+		result, err = builder.BuildRootLeaf(dag)
 	} else {
-		result, err = builder.BuildLeaf(encoder)
+		result, err = builder.BuildLeaf()
 	}
 
 	if err != nil {
@@ -144,7 +135,7 @@ func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, encoder 
 	return result, nil
 }
 
-func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, encoder multibase.Encoder, isRoot bool) (*DagLeaf, error) {
+func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool) (*DagLeaf, error) {
 	entryPath := filepath.Join(*path, entry.Name())
 
 	relPath, err := filepath.Rel(*path, entryPath)
@@ -177,7 +168,7 @@ func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, encoder multi
 			chunkBuilder.SetType(ChunkLeafType)
 			chunkBuilder.SetData(chunk)
 
-			chunkLeaf, err := chunkBuilder.BuildLeaf(encoder)
+			chunkLeaf, err := chunkBuilder.BuildLeaf()
 			if err != nil {
 				return nil, err
 			}
@@ -185,14 +176,14 @@ func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, encoder multi
 			label := dag.GetNextAvailableLabel()
 			builder.AddLink(label, chunkLeaf.Hash)
 			chunkLeaf.SetLabel(label)
-			dag.AddLeaf(chunkLeaf, encoder, nil)
+			dag.AddLeaf(chunkLeaf, nil)
 		}
 	}
 
 	if isRoot {
-		result, err = builder.BuildRootLeaf(dag, encoder)
+		result, err = builder.BuildRootLeaf(dag)
 	} else {
-		result, err = builder.BuildLeaf(encoder)
+		result, err = builder.BuildLeaf()
 	}
 
 	if err != nil {
@@ -223,7 +214,7 @@ func CreateDagBuilder() *DagBuilder {
 	}
 }
 
-func (b *DagBuilder) AddLeaf(leaf *DagLeaf, encoder multibase.Encoder, parentLeaf *DagLeaf) error {
+func (b *DagBuilder) AddLeaf(leaf *DagLeaf, parentLeaf *DagLeaf) error {
 	if parentLeaf != nil {
 		label := GetLabel(leaf.Hash)
 		_, exists := parentLeaf.Links[label]
@@ -244,25 +235,17 @@ func (b *DagBuilder) BuildDag(root string) *Dag {
 	}
 }
 
-func (dag *Dag) Verify(encoder multibase.Encoder) error {
+func (dag *Dag) Verify() error {
 	err := dag.IterateDag(func(leaf *DagLeaf, parent *DagLeaf) error {
 		if leaf.Hash == dag.Root {
-			leafResult, err := leaf.VerifyRootLeaf(encoder)
+			err := leaf.VerifyRootLeaf()
 			if err != nil {
 				return err
-			}
-
-			if !leafResult {
-				return fmt.Errorf("root leaf %s failed to verify", leaf.Hash)
 			}
 		} else {
-			leafResult, err := leaf.VerifyLeaf(encoder)
+			err := leaf.VerifyLeaf()
 			if err != nil {
 				return err
-			}
-
-			if !leafResult {
-				return fmt.Errorf("leaf %s failed to verify", leaf.Hash)
 			}
 
 			if !parent.HasLink(leaf.Hash) {
@@ -280,11 +263,11 @@ func (dag *Dag) Verify(encoder multibase.Encoder) error {
 	return nil
 }
 
-func (dag *Dag) CreateDirectory(path string, encoder multibase.Encoder) error {
+func (dag *Dag) CreateDirectory(path string) error {
 	rootHash := dag.Root
 	rootLeaf := dag.Leafs[rootHash]
 
-	err := rootLeaf.CreateDirectoryLeaf(path, dag, encoder)
+	err := rootLeaf.CreateDirectoryLeaf(path, dag)
 	if err != nil {
 		return err
 	}
