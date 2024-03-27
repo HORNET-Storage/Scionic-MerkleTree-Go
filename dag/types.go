@@ -27,7 +27,8 @@ type DagLeaf struct {
 	Hash             string
 	Name             string
 	Type             LeafType
-	Data             []byte
+	ContentHash      []byte
+	Content          []byte
 	MerkleRoot       []byte
 	CurrentLinkCount int
 	LatestLabel      string

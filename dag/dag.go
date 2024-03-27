@@ -244,32 +244,40 @@ func (b *DagBuilder) BuildDag(root string) *Dag {
 	}
 }
 
-func (dag *Dag) Verify(encoder multibase.Encoder) (bool, error) {
-	result := true
-
-	for _, leaf := range dag.Leafs {
+func (dag *Dag) Verify(encoder multibase.Encoder) error {
+	err := dag.IterateDag(func(leaf *DagLeaf, parent *DagLeaf) error {
 		if leaf.Hash == dag.Root {
 			leafResult, err := leaf.VerifyRootLeaf(encoder)
 			if err != nil {
-				return false, err
+				return err
 			}
 
 			if !leafResult {
-				result = false
+				return fmt.Errorf("root leaf %s failed to verify", leaf.Hash)
 			}
 		} else {
 			leafResult, err := leaf.VerifyLeaf(encoder)
 			if err != nil {
-				return false, err
+				return err
 			}
 
 			if !leafResult {
-				result = false
+				return fmt.Errorf("leaf %s failed to verify", leaf.Hash)
+			}
+
+			if !parent.HasLink(leaf.Hash) {
+				return fmt.Errorf("parent %s does not contain link to child %s", parent.Hash, leaf.Hash)
 			}
 		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
 	}
 
-	return result, nil
+	return nil
 }
 
 func (dag *Dag) CreateDirectory(path string, encoder multibase.Encoder) error {
@@ -338,8 +346,8 @@ func ReadDag(path string) (*Dag, error) {
 	return &result, nil
 }
 
-func (dag *Dag) GetDataFromLeaf(leaf *DagLeaf) ([]byte, error) {
-	if len(leaf.Data) <= 0 {
+func (dag *Dag) GetContentFromLeaf(leaf *DagLeaf) ([]byte, error) {
+	if len(leaf.Content) <= 0 {
 		return []byte{}, nil
 	}
 
@@ -352,16 +360,16 @@ func (dag *Dag) GetDataFromLeaf(leaf *DagLeaf) ([]byte, error) {
 				return nil, fmt.Errorf("invalid link: %s", link)
 			}
 
-			content = append(content, childLeaf.Data...)
+			content = append(content, childLeaf.Content...)
 		}
 	} else {
-		content = leaf.Data
+		content = leaf.Content
 	}
 
 	return content, nil
 }
 
-func (d *Dag) IterateDag(processLeaf func(leaf *DagLeaf, parent *DagLeaf)) error {
+func (d *Dag) IterateDag(processLeaf func(leaf *DagLeaf, parent *DagLeaf) error) error {
 	var iterate func(leafHash string, parentHash *string) error
 	iterate = func(leafHash string, parentHash *string) error {
 		leaf, exists := d.Leafs[leafHash]
@@ -374,7 +382,10 @@ func (d *Dag) IterateDag(processLeaf func(leaf *DagLeaf, parent *DagLeaf)) error
 			parent = d.Leafs[*parentHash]
 		}
 
-		processLeaf(leaf, parent)
+		err := processLeaf(leaf, parent)
+		if err != nil {
+			return err
+		}
 
 		childHashes := []string{}
 		for _, childHash := range leaf.Links {

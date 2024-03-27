@@ -100,18 +100,20 @@ func (b *DagLeafBuilder) BuildLeaf(encoder multibase.Encoder) (*DagLeaf, error) 
 		merkleRoot = merkleTree.Root
 	}
 
+	contentHash := sha256.Sum256(b.Data)
+
 	leafData := struct {
 		Name             string
 		Type             LeafType
 		MerkleRoot       []byte
 		CurrentLinkCount int
-		Data             []byte
+		ContentHash      []byte
 	}{
 		Name:             b.Name,
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
 		CurrentLinkCount: len(b.Links),
-		Data:             b.Data,
+		ContentHash:      contentHash[:],
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -126,7 +128,8 @@ func (b *DagLeafBuilder) BuildLeaf(encoder multibase.Encoder) (*DagLeaf, error) 
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
 		CurrentLinkCount: len(b.Links),
-		Data:             b.Data,
+		Content:          b.Data,
+		ContentHash:      contentHash[:],
 		Links:            b.Links,
 	}
 
@@ -135,7 +138,7 @@ func (b *DagLeafBuilder) BuildLeaf(encoder multibase.Encoder) (*DagLeaf, error) 
 
 func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, encoder multibase.Encoder) (*DagLeaf, error) {
 	if b.LeafType == "" {
-		err := fmt.Errorf("Leaf must have a type defined")
+		err := fmt.Errorf("leaf must have a type defined")
 		return nil, err
 	}
 
@@ -156,6 +159,7 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, encoder multibase.Encode
 	}
 
 	latestLabel := dag.GetLatestLabel()
+	contentHash := sha256.Sum256(b.Data)
 
 	leafData := struct {
 		Name             string
@@ -164,7 +168,7 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, encoder multibase.Encode
 		CurrentLinkCount int
 		LatestLabel      string
 		LeafCount        int
-		Data             []byte
+		ContentHash      []byte
 	}{
 		Name:             b.Name,
 		Type:             b.LeafType,
@@ -172,7 +176,7 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, encoder multibase.Encode
 		CurrentLinkCount: len(b.Links),
 		LatestLabel:      latestLabel,
 		LeafCount:        len(dag.Leafs),
-		Data:             b.Data,
+		ContentHash:      contentHash[:],
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -189,17 +193,12 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, encoder multibase.Encode
 		CurrentLinkCount: len(b.Links),
 		LatestLabel:      latestLabel,
 		LeafCount:        len(dag.Leafs),
-		Data:             b.Data,
+		Content:          b.Data,
+		ContentHash:      contentHash[:],
 		Links:            b.Links,
 	}
 
 	return result, nil
-}
-
-type kv struct {
-	Key   string
-	Value string
-	Order int
 }
 
 func (leaf *DagLeaf) GetBranch(key string) (*ClassicTreeBranch, error) {
@@ -251,13 +250,13 @@ func (leaf *DagLeaf) VerifyLeaf(encoder multibase.Encoder) (bool, error) {
 		Type             LeafType
 		MerkleRoot       []byte
 		CurrentLinkCount int
-		Data             []byte
+		ContentHash      []byte
 	}{
 		Name:             leaf.Name,
 		Type:             leaf.Type,
 		MerkleRoot:       leaf.MerkleRoot,
 		CurrentLinkCount: leaf.CurrentLinkCount,
-		Data:             leaf.Data,
+		ContentHash:      leaf.ContentHash,
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -304,7 +303,7 @@ func (leaf *DagLeaf) VerifyRootLeaf(encoder multibase.Encoder) (bool, error) {
 		CurrentLinkCount int
 		LatestLabel      string
 		LeafCount        int
-		Data             []byte
+		ContentHash      []byte
 	}{
 		Name:             leaf.Name,
 		Type:             leaf.Type,
@@ -312,7 +311,7 @@ func (leaf *DagLeaf) VerifyRootLeaf(encoder multibase.Encoder) (bool, error) {
 		CurrentLinkCount: leaf.CurrentLinkCount,
 		LatestLabel:      leaf.LatestLabel,
 		LeafCount:        leaf.LeafCount,
-		Data:             leaf.Data,
+		ContentHash:      leaf.ContentHash,
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -379,10 +378,10 @@ func (leaf *DagLeaf) CreateDirectoryLeaf(path string, dag *Dag, encoder multibas
 					return fmt.Errorf("invalid link: %s", link)
 				}
 
-				content = append(content, childLeaf.Data...)
+				content = append(content, childLeaf.Content...)
 			}
 		} else {
-			content = leaf.Data
+			content = leaf.Content
 		}
 
 		err := ioutil.WriteFile(path, content, os.ModePerm)
@@ -437,7 +436,8 @@ func (leaf *DagLeaf) Clone() *DagLeaf {
 		Hash:             leaf.Hash,
 		Name:             leaf.Name,
 		Type:             leaf.Type,
-		Data:             leaf.Data,
+		Content:          leaf.Content,
+		ContentHash:      leaf.ContentHash,
 		MerkleRoot:       leaf.MerkleRoot,
 		CurrentLinkCount: leaf.CurrentLinkCount,
 		LatestLabel:      leaf.LatestLabel,

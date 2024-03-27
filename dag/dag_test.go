@@ -33,13 +33,9 @@ func TestFull(t *testing.T) {
 	}
 
 	encoder := multibase.MustNewEncoder(multibase.Base64)
-	result, err := dag.Verify(encoder)
+	err = dag.Verify(encoder)
 	if err != nil {
 		t.Fatalf("Error: %s", err)
-	}
-
-	if !result {
-		t.Fatal("Dag failed to verify")
 	}
 
 	err = dag.CreateDirectory(output, encoder)
@@ -153,13 +149,9 @@ func TestPartial(t *testing.T) {
 	dag = dagBuilder.BuildDag(dag.Root)
 
 	// Verify the dag
-	result, err = dag.Verify(encoder)
+	err = dag.Verify(encoder)
 	if err != nil {
 		t.Fatal("Error: ", err)
-	}
-
-	if !result {
-		t.Fatal("Dag failed to verify")
 	}
 
 	// Re-create the directory from the dag
