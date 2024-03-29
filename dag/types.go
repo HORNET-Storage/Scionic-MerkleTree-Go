@@ -24,21 +24,22 @@ type DagBuilder struct {
 }
 
 type DagLeaf struct {
-	Hash             string
-	Name             string
-	Type             LeafType
-	ContentHash      []byte
-	Content          []byte
-	MerkleRoot       []byte
-	CurrentLinkCount int
-	LatestLabel      string
-	LeafCount        int
-	Links            map[string]string
-	ParentHash       string
+	Hash              string
+	ItemName          string
+	Type              LeafType
+	ContentHash       []byte
+	Content           []byte
+	ClassicMerkleRoot []byte
+	CurrentLinkCount  int
+	LatestLabel       string
+	LeafCount         int
+	Links             map[string]string
+	ParentHash        string
+	AdditionalData    map[string]string
 }
 
 type DagLeafBuilder struct {
-	Name     string
+	ItemName string
 	Label    int64
 	LeafType LeafType
 	Data     []byte

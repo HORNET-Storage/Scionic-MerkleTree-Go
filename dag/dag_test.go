@@ -25,7 +25,7 @@ func TestFull(t *testing.T) {
 
 	SetChunkSize(4096)
 
-	dag, err := CreateDag(input)
+	dag, err := CreateDag(input, true)
 	if err != nil {
 		t.Fatalf("Error: %s", err)
 	}
@@ -59,7 +59,7 @@ func TestPartial(t *testing.T) {
 
 	SetChunkSize(4096)
 
-	dag, err := CreateDag(input)
+	dag, err := CreateDag(input, true)
 	if err != nil {
 		t.Fatal("Error: ", err)
 	}
@@ -73,6 +73,7 @@ func TestPartial(t *testing.T) {
 	// Verify the root leaf
 	err = parentLeaf.VerifyRootLeaf()
 	if err != nil {
+		t.Logf("ERROR: %v", err)
 		t.Fatal("Failed to verify branch for random leaf")
 	}
 

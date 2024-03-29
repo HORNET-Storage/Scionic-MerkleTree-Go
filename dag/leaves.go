@@ -3,10 +3,10 @@ package dag
 import (
 	"crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -23,8 +23,8 @@ import (
 
 func CreateDagLeafBuilder(name string) *DagLeafBuilder {
 	builder := &DagLeafBuilder{
-		Name:  name,
-		Links: map[string]string{},
+		ItemName: name,
+		Links:    map[string]string{},
 	}
 
 	return builder
@@ -79,7 +79,7 @@ func (b *DagBuilder) GetNextAvailableLabel() string {
 	return nextLabel
 }
 
-func (b *DagLeafBuilder) BuildLeaf() (*DagLeaf, error) {
+func (b *DagLeafBuilder) BuildLeaf(additionalData map[string]string) (*DagLeaf, error) {
 	if b.LeafType == "" {
 		err := fmt.Errorf("leaf must have a type defined")
 		return nil, err
@@ -103,18 +103,22 @@ func (b *DagLeafBuilder) BuildLeaf() (*DagLeaf, error) {
 
 	contentHash := sha256.Sum256(b.Data)
 
+	additionalData = sortMapByKeys(additionalData)
+
 	leafData := struct {
-		Name             string
+		ItemName         string
 		Type             LeafType
 		MerkleRoot       []byte
 		CurrentLinkCount int
 		ContentHash      []byte
+		AdditionalData   map[string]string
 	}{
-		Name:             b.Name,
+		ItemName:         b.ItemName,
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
 		CurrentLinkCount: len(b.Links),
 		ContentHash:      contentHash[:],
+		AdditionalData:   additionalData,
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -135,20 +139,21 @@ func (b *DagLeafBuilder) BuildLeaf() (*DagLeaf, error) {
 	}
 
 	result := &DagLeaf{
-		Hash:             c.String(),
-		Name:             b.Name,
-		Type:             b.LeafType,
-		MerkleRoot:       merkleRoot,
-		CurrentLinkCount: len(b.Links),
-		Content:          b.Data,
-		ContentHash:      contentHash[:],
-		Links:            b.Links,
+		Hash:              c.String(),
+		ItemName:          b.ItemName,
+		Type:              b.LeafType,
+		ClassicMerkleRoot: merkleRoot,
+		CurrentLinkCount:  len(b.Links),
+		Content:           b.Data,
+		ContentHash:       contentHash[:],
+		Links:             b.Links,
+		AdditionalData:    additionalData,
 	}
 
 	return result, nil
 }
 
-func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder) (*DagLeaf, error) {
+func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, additionalData map[string]string) (*DagLeaf, error) {
 	if b.LeafType == "" {
 		err := fmt.Errorf("leaf must have a type defined")
 		return nil, err
@@ -174,22 +179,26 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder) (*DagLeaf, error) {
 
 	contentHash := sha256.Sum256(b.Data)
 
+	additionalData = sortMapByKeys(additionalData)
+
 	leafData := struct {
-		Name             string
+		ItemName         string
 		Type             LeafType
 		MerkleRoot       []byte
 		CurrentLinkCount int
 		LatestLabel      string
 		LeafCount        int
 		ContentHash      []byte
+		AdditionalData   map[string]string
 	}{
-		Name:             b.Name,
+		ItemName:         b.ItemName,
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
 		CurrentLinkCount: len(b.Links),
 		LatestLabel:      latestLabel,
 		LeafCount:        len(dag.Leafs),
 		ContentHash:      contentHash[:],
+		AdditionalData:   additionalData,
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -210,16 +219,17 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder) (*DagLeaf, error) {
 	}
 
 	result := &DagLeaf{
-		Hash:             c.String(),
-		Name:             b.Name,
-		Type:             b.LeafType,
-		MerkleRoot:       merkleRoot,
-		CurrentLinkCount: len(b.Links),
-		LatestLabel:      latestLabel,
-		LeafCount:        len(dag.Leafs),
-		Content:          b.Data,
-		ContentHash:      contentHash[:],
-		Links:            b.Links,
+		Hash:              c.String(),
+		ItemName:          b.ItemName,
+		Type:              b.LeafType,
+		ClassicMerkleRoot: merkleRoot,
+		CurrentLinkCount:  len(b.Links),
+		LatestLabel:       latestLabel,
+		LeafCount:         len(dag.Leafs),
+		Content:           b.Data,
+		ContentHash:       contentHash[:],
+		Links:             b.Links,
+		AdditionalData:    additionalData,
 	}
 
 	return result, nil
@@ -260,7 +270,7 @@ func (leaf *DagLeaf) GetBranch(key string) (*ClassicTreeBranch, error) {
 func (leaf *DagLeaf) VerifyBranch(branch *ClassicTreeBranch) error {
 	block := merkle_tree.CreateLeaf(branch.Leaf)
 
-	err := merkletree.Verify(block, branch.Proof, leaf.MerkleRoot, nil)
+	err := merkletree.Verify(block, branch.Proof, leaf.ClassicMerkleRoot, nil)
 	if err != nil {
 		return err
 	}
@@ -269,18 +279,22 @@ func (leaf *DagLeaf) VerifyBranch(branch *ClassicTreeBranch) error {
 }
 
 func (leaf *DagLeaf) VerifyLeaf() error {
+	additionalData := sortMapByKeys(leaf.AdditionalData)
+
 	leafData := struct {
-		Name             string
+		ItemName         string
 		Type             LeafType
 		MerkleRoot       []byte
 		CurrentLinkCount int
 		ContentHash      []byte
+		AdditionalData   map[string]string
 	}{
-		Name:             leaf.Name,
+		ItemName:         leaf.ItemName,
 		Type:             leaf.Type,
-		MerkleRoot:       leaf.MerkleRoot,
+		MerkleRoot:       leaf.ClassicMerkleRoot,
 		CurrentLinkCount: leaf.CurrentLinkCount,
 		ContentHash:      leaf.ContentHash,
+		AdditionalData:   additionalData,
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -333,22 +347,26 @@ func (leaf *DagLeaf) VerifyLeaf() error {
 }
 
 func (leaf *DagLeaf) VerifyRootLeaf() error {
+	additionalData := sortMapByKeys(leaf.AdditionalData)
+
 	leafData := struct {
-		Name             string
+		ItemName         string
 		Type             LeafType
 		MerkleRoot       []byte
 		CurrentLinkCount int
 		LatestLabel      string
 		LeafCount        int
 		ContentHash      []byte
+		AdditionalData   map[string]string
 	}{
-		Name:             leaf.Name,
+		ItemName:         leaf.ItemName,
 		Type:             leaf.Type,
-		MerkleRoot:       leaf.MerkleRoot,
+		MerkleRoot:       leaf.ClassicMerkleRoot,
 		CurrentLinkCount: leaf.CurrentLinkCount,
 		LatestLabel:      leaf.LatestLabel,
 		LeafCount:        leaf.LeafCount,
 		ContentHash:      leaf.ContentHash,
+		AdditionalData:   additionalData,
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -411,7 +429,7 @@ func (leaf *DagLeaf) CreateDirectoryLeaf(path string, dag *Dag) error {
 				return fmt.Errorf("invalid link: %s", link)
 			}
 
-			childPath := filepath.Join(path, childLeaf.Name)
+			childPath := filepath.Join(path, childLeaf.ItemName)
 			err := childLeaf.CreateDirectoryLeaf(childPath, dag)
 			if err != nil {
 				return err
@@ -434,7 +452,7 @@ func (leaf *DagLeaf) CreateDirectoryLeaf(path string, dag *Dag) error {
 			content = leaf.Content
 		}
 
-		err := ioutil.WriteFile(path, content, os.ModePerm)
+		err := os.WriteFile(path, content, os.ModePerm)
 		if err != nil {
 			return err
 		}
@@ -483,16 +501,17 @@ func (leaf *DagLeaf) AddLink(hash string) {
 
 func (leaf *DagLeaf) Clone() *DagLeaf {
 	return &DagLeaf{
-		Hash:             leaf.Hash,
-		Name:             leaf.Name,
-		Type:             leaf.Type,
-		Content:          leaf.Content,
-		ContentHash:      leaf.ContentHash,
-		MerkleRoot:       leaf.MerkleRoot,
-		CurrentLinkCount: leaf.CurrentLinkCount,
-		LatestLabel:      leaf.LatestLabel,
-		LeafCount:        leaf.LeafCount,
-		Links:            leaf.Links,
+		Hash:              leaf.Hash,
+		ItemName:          leaf.ItemName,
+		Type:              leaf.Type,
+		Content:           leaf.Content,
+		ContentHash:       leaf.ContentHash,
+		ClassicMerkleRoot: leaf.ClassicMerkleRoot,
+		CurrentLinkCount:  leaf.CurrentLinkCount,
+		LatestLabel:       leaf.LatestLabel,
+		LeafCount:         leaf.LeafCount,
+		Links:             leaf.Links,
+		AdditionalData:    leaf.AdditionalData,
 	}
 }
 
@@ -525,4 +544,25 @@ func GetLabel(hash string) string {
 	}
 
 	return parts[0]
+}
+
+func sortMapByKeys(inputMap map[string]string) map[string]string {
+	if inputMap == nil {
+		return inputMap
+	}
+
+	keys := make([]string, 0, len(inputMap))
+
+	for key := range inputMap {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	sortedMap := make(map[string]string)
+	for _, key := range keys {
+		sortedMap[key] = inputMap[key]
+	}
+
+	return sortedMap
 }

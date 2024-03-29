@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	cbor "github.com/fxamacker/cbor/v2"
 )
@@ -41,7 +42,7 @@ func newDirEntry(path string) (fs.DirEntry, error) {
 	return fileInfoDirEntry{fileInfo: fileInfo}, nil
 }
 
-func CreateDag(path string) (*Dag, error) {
+func CreateDag(path string, timestampRoot bool) (*Dag, error) {
 	dag := CreateDagBuilder()
 
 	fileInfo, err := os.Stat(path)
@@ -59,9 +60,9 @@ func CreateDag(path string) (*Dag, error) {
 	var leaf *DagLeaf
 
 	if fileInfo.IsDir() {
-		leaf, err = processDirectory(dirEntry, &parentPath, dag, true)
+		leaf, err = processDirectory(dirEntry, &parentPath, dag, true, timestampRoot)
 	} else {
-		leaf, err = processFile(dirEntry, &parentPath, dag, true)
+		leaf, err = processFile(dirEntry, &parentPath, dag, true, timestampRoot)
 	}
 
 	if err != nil {
@@ -79,9 +80,9 @@ func processEntry(entry fs.DirEntry, path *string, dag *DagBuilder) (*DagLeaf, e
 	var err error
 
 	if entry.IsDir() {
-		result, err = processDirectory(entry, path, dag, false)
+		result, err = processDirectory(entry, path, dag, false, false)
 	} else {
-		result, err = processFile(entry, path, dag, false)
+		result, err = processFile(entry, path, dag, false, false)
 	}
 
 	if err != nil {
@@ -91,7 +92,7 @@ func processEntry(entry fs.DirEntry, path *string, dag *DagBuilder) (*DagLeaf, e
 	return result, nil
 }
 
-func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool) (*DagLeaf, error) {
+func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool, timestampRoot bool) (*DagLeaf, error) {
 	entryPath := filepath.Join(*path, entry.Name())
 
 	relPath, err := filepath.Rel(*path, entryPath)
@@ -122,10 +123,22 @@ func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot b
 		dag.AddLeaf(leaf, nil)
 	}
 
+	var additionalData map[string]string = nil
+
+	if timestampRoot {
+		currentTime := time.Now().UTC()
+
+		timeString := currentTime.Format(time.RFC3339)
+
+		additionalData = map[string]string{
+			"timestamp": timeString,
+		}
+	}
+
 	if isRoot {
-		result, err = builder.BuildRootLeaf(dag)
+		result, err = builder.BuildRootLeaf(dag, additionalData)
 	} else {
-		result, err = builder.BuildLeaf()
+		result, err = builder.BuildLeaf(nil)
 	}
 
 	if err != nil {
@@ -135,7 +148,7 @@ func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot b
 	return result, nil
 }
 
-func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool) (*DagLeaf, error) {
+func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool, timestampRoot bool) (*DagLeaf, error) {
 	entryPath := filepath.Join(*path, entry.Name())
 
 	relPath, err := filepath.Rel(*path, entryPath)
@@ -168,7 +181,7 @@ func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool) 
 			chunkBuilder.SetType(ChunkLeafType)
 			chunkBuilder.SetData(chunk)
 
-			chunkLeaf, err := chunkBuilder.BuildLeaf()
+			chunkLeaf, err := chunkBuilder.BuildLeaf(nil)
 			if err != nil {
 				return nil, err
 			}
@@ -180,10 +193,22 @@ func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool) 
 		}
 	}
 
+	var additionalData map[string]string = nil
+
+	if timestampRoot {
+		currentTime := time.Now().UTC()
+
+		timeString := currentTime.Format(time.RFC3339)
+
+		additionalData = map[string]string{
+			"timestamp": timeString,
+		}
+	}
+
 	if isRoot {
-		result, err = builder.BuildRootLeaf(dag)
+		result, err = builder.BuildRootLeaf(dag, additionalData)
 	} else {
-		result, err = builder.BuildLeaf()
+		result, err = builder.BuildLeaf(nil)
 	}
 
 	if err != nil {

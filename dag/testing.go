@@ -102,7 +102,7 @@ func CreateDummyLeaf(name string) (*DagLeaf, error) {
 			chunkBuilder.SetType(ChunkLeafType)
 			chunkBuilder.SetData(chunk)
 
-			chunkLeaf, err := chunkBuilder.BuildLeaf()
+			chunkLeaf, err := chunkBuilder.BuildLeaf(nil)
 			if err != nil {
 				return nil, err
 			}
@@ -112,5 +112,5 @@ func CreateDummyLeaf(name string) (*DagLeaf, error) {
 		}
 	}
 
-	return builder.BuildLeaf()
+	return builder.BuildLeaf(nil)
 }
