@@ -71,47 +71,165 @@ The total number of leaves is recorded at the root of the tree. By doing so, use
 
 This approach provides the structural advantages of Scionic Merkle DAG Trees, such as logarithmic growth of branches and efficient file download and verification, and also provides enhanced support for ranged requests, contributing to their practicality in large-scale data management scenarios.
 
-##
+# Documentation
 
-#### Documentation 
-
-See the docs [here](https://godoc.org/github.com/HORNET-Storage/scionic-merkletree).
-
-#### Install
+## Install
 ```
 go get github.com/HORNET-Storage/scionic-merkletree/dag
 ```
 
-#### Example Usage
-There are good examples inside the dag/dag_test.go file, but below is a basic example to get you started.   This library is intended to be very simple while still allowing for powerful usage...
+## Example Usage
+There are good examples inside the dag/dag_test.go file, but below is a basic example to get you started. This library is intended to be very simple while still allowing for powerful usage...
 
-Turn a folder and its files into a Scionic Merkle DAG-Tree, then convert the Scionic Merkle tree back to the original files in a new directory:
+Turn a folder and its files into a Scionic Merkle DAG-Tree, verify, then convert the Scionic Merkle tree back to the original files in a new directory:
 ```go
 input := filepath.Join(tmpDir, "input")
 output := filepath.Join(tmpDir, "output")
 
 SetChunkSize(4096)
 
-dag, err := CreateDag(input, multibase.Base64)
+dag, err := CreateDag(input, true)
 if err != nil {
-  t.Fatalf("Error: %s", err)
+  fmt.Fatalf("Error: %s", err)
 }
 
-encoder := multibase.MustNewEncoder(multibase.Base64)
-result, err := dag.Verify(encoder)
+result, err := dag.Verify()
 if err != nil {
-  t.Fatalf("Error: %s", err)
+  fmt.Fatalf("Error: %s", err)
 }
 
-if !result {
-  t.Fatal("Dag failed to verify")
-}
+fmt.Println("Dag verified successfully")
 
-err = dag.CreateDirectory(output, encoder)
+err = dag.CreateDirectory(output)
 if err != nil {
-  t.Fatalf("Error: %s", err)
+  fmt.Fatalf("Error: %s", err)
 }
 ```
 
-This repository is a work in progress. We plan to make quite a few improvements as we move forward with integrating the Scionic Merkle DAG-Trees into H.O.R.N.E.T. Storage. Although, what we have is currently working -- we do not recommend using the trees in anything production-related yet.
+## Types
+
+The dag builder and dag leaf builder types are used to temporarily store data during the dag creation process as the dag is created from the root down but then built from the bottom back up to the root.
+It is not required to understand how this works but if you plan to build the trees yourself without the built in creation process (for example you may wish to create trees from data already in memory) then these will be useful.
+
+### Dag Leaf
+```go
+type DagLeaf struct {
+	Hash              string
+	ItemName          string
+	Type              LeafType
+	ContentHash       []byte
+	Content           []byte
+	ClassicMerkleRoot []byte
+	CurrentLinkCount  int
+	LatestLabel       string
+	LeafCount         int
+	Links             map[string]string
+	ParentHash        string
+	AdditionalData    map[string]string
+}
+```
+
+Every leaf in the tree consists of the DagLeaf data type and these are what they are used for:
+
+### Hash: string
+The hash field is a cid, encoded as a string, of the following fields serialized in cbor with sha256 hasing:
+- ItemName
+- Type
+- ContentHash
+- ClassicMerkleRoot
+- CurrentLinkCount
+- AdditionalData
+
+Only the root leaf has these fields included in the hash
+- LatestLabel
+- LeafCount
+
+### ItemName: string
+This can be anything but our usage is the file name including the type so that we can accurately re-create a directory / file with all the files and types intact
+
+### Type: LeafType
+This is a string but we use a custom type to enforce specific usage, there are currently only 3 types that a leaf can be:
+```go
+type LeafType string
+
+const (
+	FileLeafType      LeafType = "file"
+	ChunkLeafType     LeafType = "chunk"
+	DirectoryLeafType LeafType = "directory"
+)
+```
+
+file is a file
+chunk are the chunks that make up a file incase the file was larger than the max chunk size
+directory is a directory
+
+New types can be added without breaking existing data if needed
+
+### ContentHash: []byte
+### content: []byte
+ContentHash and Content are important together as you can't have one without the other.
+The content hash is a sha256 hash of the content, currently the content is from a file on disk but it could be anything as long as it's serialized in a byte array.
+We have no need to encode any of this data as we are using cbor for serializing the leaf data which can safely handle byte arrays directly as it's not a plain text format like json.
+The content hash is included in the leaf hash which means it's cryptographically verifiable, which also means the content can be verified as well to ensure there isn't tampering.
+This is important because it means we can send and recieve the leaves with or without the content, while still being able to verify the content, which is important for de-duplicating data transmission over the network.
+
+### ClassicMerkleRoot: []byte
+We use classic merkle trees inside of our dag by creating a tree of the links inside of a leaf, if the leaf has more than 1 link. This allows us to verify the leaves without having all of the children present making our branches a lot smaller.
+This also means we do not need to include the links in the leaf hash because this merkle root is included in their place, potentially removing a lot of data when sending individual leaves if there are a lot of child leaves present.
+
+### CurrentLinkCount: int
+This is the count of how many links a leaf has and it's included in the leaf hash to ensure that we always know and can verify how many links a leaf should have which prevents any lying about the number of children when verifying branches or partial trees.
+
+### LatestLabel: string
+We label every child leaf in the dag where the root starts at 0 and each leaf that gets built becomes the next integer. Because these are included in the classic merkle tree, and the classic merkle root is included in the leaf hash, we can now reference leaves by their root hash and number instead of their root hash and their leaf hash.
+This is stored as a string as it is appended to the cid (Hash) of each leaf. It's important to remember that labelling is not per leaf but per dag.
+
+### LeafCount: int
+The overall number of leaves that the entire dag contains which is why this is only stored and hashed in the root leaf, it ensures you can always know if you have all of the children or not.
+
+### Links: map[string]string
+The links to all of the children of a leaf where the key is the label and the value is the label:cid of the child
+
+### ParentHash: string
+We add the parent hash (label:cid) to the child leaf to make traversal upwards possible but this is purely for speed and the parent it points to should still be verified as we can't include the parent hash inside of the leaf hash.
+This is because the parent hash doesn't exist yet, the leaf hashes are created from bottom to top, despite dag creation starting at the top.
+
+### AdditionalData: map[string]string
+This map is included in the leaf hash allowing for developers to add additional data to the dag leaves if and when needed.
+AdditionalData does get included in the leaf hash so any content stored here is cryptographically verifiable, the map is sorted by keys alphanumerically before it gets serialized and hashed to ensure consistency no matter what order they get added.
+Currently we only use this to store the timestamp in the root leaf which is an optional parameter when creating a dag from a directory or file but advanced users that build the trees themselves can utilize this feature to store anything they want.
+
+## Functions
+```go
+func CreateDagBuilder() *DagBuilder
+func (b *DagBuilder) AddLeaf(leaf *DagLeaf, parentLeaf *DagLeaf) error
+func (b *DagBuilder) BuildDag(root string) *Dag
+func (b *DagBuilder) GetLatestLabel()
+func (b *DagBuilder) GetNextAvailableLabel()
+
+func CreateDag(path string, timestampRoot bool) (*Dag, error)
+func (dag *Dag) Verify() error
+func (dag *Dag) CreateDirectory(path string) error
+func (dag *Dag) GetContentFromLeaf(leaf *DagLeaf) ([]byte, error)
+func (dag *Dag) IterateDag(processLeaf func(leaf *DagLeaf, parent *DagLeaf) error) error
+
+func CreateDagLeafBuilder(name string) *DagLeafBuilder
+func (b *DagLeafBuilder) SetType(leafType LeafType) 
+func (b *DagLeafBuilder) SetData(data []byte)
+func (b *DagLeafBuilder) AddLink(label string, hash string) 
+func (b *DagLeafBuilder) BuildLeaf(additionalData map[string]string) (*DagLeaf, error) 
+func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, additionalData map[string]string) (*DagLeaf, error)
+
+func (leaf *DagLeaf) GetBranch(key string) (*ClassicTreeBranch, error)
+func (leaf *DagLeaf) VerifyBranch(branch *ClassicTreeBranch) error
+func (leaf *DagLeaf) VerifyLeaf() error
+func (leaf *DagLeaf) VerifyRootLeaf() error
+func (leaf *DagLeaf) CreateDirectoryLeaf(path string, dag *Dag) error
+func (leaf *DagLeaf) HasLink(hash string) bool
+func (leaf *DagLeaf) AddLink(hash string)
+func (leaf *DagLeaf) Clone() *DagLeaf
+func (leaf *DagLeaf) SetLabel(label string)
+```
+
+The trees are now in beta and the data structure of the trees will no longer change
 #
