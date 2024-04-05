@@ -8,6 +8,8 @@
 
 We've designed a [new type of Merkle DAG-Tree hybrid](https://www.hornetstorage.com/dag-trees). Scionic Merkle DAG Trees have small branches like Classic Merkle Trees, the file storage ability of Merkle DAGs, and numbered leaves so relays can request a range of missing leaf numbers to sync quickly. They are an innovative model that merge the advantages of Classic Merkle Trees and Merkle DAGs while addressing several of their limitations.
 
+In plant grafting, the scion is the upper part of the plant, chosen for its desirable fruits or flowers. It's grafted onto another plant's base to grow together. In a similar vein, the Scionic Merkle DAG-Tree was born from grafting together Merkle DAGs and Classic Merkle Trees. This process emphasizes why we use the term "scion" for the Scionic Merkle DAG-Trees… it symbolizes the digital grafting of these two similar data structures, combining their strengths into one piece.
+
 ![Tree Comparison Diagram](https://static.wixstatic.com/media/e9326a_b761315944af43f993b01b00b2ac11b5~mv2.png/v1/fill/w_1718,h_431,al_c,q_90,usm_0.66_1.00_0.01,enc_auto/Comparsion_Diagram_Yellow.png)
 
 ## Classic Merkle Trees and Merkle DAGs: A Comparison
