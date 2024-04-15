@@ -101,8 +101,6 @@ func (b *DagLeafBuilder) BuildLeaf(additionalData map[string]string) (*DagLeaf, 
 		merkleRoot = merkleTree.Root
 	}
 
-	contentHash := sha256.Sum256(b.Data)
-
 	additionalData = sortMapByKeys(additionalData)
 
 	leafData := struct {
@@ -117,8 +115,13 @@ func (b *DagLeafBuilder) BuildLeaf(additionalData map[string]string) (*DagLeaf, 
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
 		CurrentLinkCount: len(b.Links),
-		ContentHash:      contentHash[:],
+		ContentHash:      nil,
 		AdditionalData:   additionalData,
+	}
+
+	if b.Data != nil {
+		hash := sha256.Sum256(b.Data)
+		leafData.ContentHash = hash[:]
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -145,7 +148,7 @@ func (b *DagLeafBuilder) BuildLeaf(additionalData map[string]string) (*DagLeaf, 
 		ClassicMerkleRoot: merkleRoot,
 		CurrentLinkCount:  len(b.Links),
 		Content:           b.Data,
-		ContentHash:       contentHash[:],
+		ContentHash:       leafData.ContentHash,
 		Links:             b.Links,
 		AdditionalData:    additionalData,
 	}
@@ -177,8 +180,6 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, additionalData map[strin
 
 	latestLabel := dag.GetLatestLabel()
 
-	contentHash := sha256.Sum256(b.Data)
-
 	additionalData = sortMapByKeys(additionalData)
 
 	leafData := struct {
@@ -197,8 +198,13 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, additionalData map[strin
 		CurrentLinkCount: len(b.Links),
 		LatestLabel:      latestLabel,
 		LeafCount:        len(dag.Leafs),
-		ContentHash:      contentHash[:],
+		ContentHash:      nil,
 		AdditionalData:   additionalData,
+	}
+
+	if b.Data != nil {
+		hash := sha256.Sum256(b.Data)
+		leafData.ContentHash = hash[:]
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -227,7 +233,7 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, additionalData map[strin
 		LatestLabel:       latestLabel,
 		LeafCount:         len(dag.Leafs),
 		Content:           b.Data,
-		ContentHash:       contentHash[:],
+		ContentHash:       leafData.ContentHash,
 		Links:             b.Links,
 		AdditionalData:    additionalData,
 	}
