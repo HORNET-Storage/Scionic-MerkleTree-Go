@@ -43,6 +43,36 @@ func newDirEntry(path string) (fs.DirEntry, error) {
 }
 
 func CreateDag(path string, timestampRoot bool) (*Dag, error) {
+	var additionalData map[string]string = nil
+
+	if timestampRoot {
+		currentTime := time.Now().UTC()
+
+		timeString := currentTime.Format(time.RFC3339)
+
+		additionalData = map[string]string{
+			"timestamp": timeString,
+		}
+	}
+
+	dag, err := createDag(path, additionalData)
+	if err != nil {
+		return nil, err
+	}
+
+	return dag, nil
+}
+
+func CreateDagAdvanced(path string, additionalData map[string]string) (*Dag, error) {
+	dag, err := createDag(path, additionalData)
+	if err != nil {
+		return nil, err
+	}
+
+	return dag, nil
+}
+
+func createDag(path string, additionalData map[string]string) (*Dag, error) {
 	dag := CreateDagBuilder()
 
 	fileInfo, err := os.Stat(path)
@@ -60,9 +90,9 @@ func CreateDag(path string, timestampRoot bool) (*Dag, error) {
 	var leaf *DagLeaf
 
 	if fileInfo.IsDir() {
-		leaf, err = processDirectory(dirEntry, &parentPath, dag, true, timestampRoot)
+		leaf, err = processDirectory(dirEntry, &parentPath, dag, true, additionalData)
 	} else {
-		leaf, err = processFile(dirEntry, &parentPath, dag, true, timestampRoot)
+		leaf, err = processFile(dirEntry, &parentPath, dag, true, additionalData)
 	}
 
 	if err != nil {
@@ -72,6 +102,7 @@ func CreateDag(path string, timestampRoot bool) (*Dag, error) {
 	dag.AddLeaf(leaf, nil)
 
 	rootHash := leaf.Hash
+
 	return dag.BuildDag(rootHash), nil
 }
 
@@ -80,9 +111,9 @@ func processEntry(entry fs.DirEntry, path *string, dag *DagBuilder) (*DagLeaf, e
 	var err error
 
 	if entry.IsDir() {
-		result, err = processDirectory(entry, path, dag, false, false)
+		result, err = processDirectory(entry, path, dag, false, nil)
 	} else {
-		result, err = processFile(entry, path, dag, false, false)
+		result, err = processFile(entry, path, dag, false, nil)
 	}
 
 	if err != nil {
@@ -92,7 +123,7 @@ func processEntry(entry fs.DirEntry, path *string, dag *DagBuilder) (*DagLeaf, e
 	return result, nil
 }
 
-func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool, timestampRoot bool) (*DagLeaf, error) {
+func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool, additionalData map[string]string) (*DagLeaf, error) {
 	entryPath := filepath.Join(*path, entry.Name())
 
 	relPath, err := filepath.Rel(*path, entryPath)
@@ -123,18 +154,6 @@ func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot b
 		dag.AddLeaf(leaf, nil)
 	}
 
-	var additionalData map[string]string = nil
-
-	if timestampRoot {
-		currentTime := time.Now().UTC()
-
-		timeString := currentTime.Format(time.RFC3339)
-
-		additionalData = map[string]string{
-			"timestamp": timeString,
-		}
-	}
-
 	if isRoot {
 		result, err = builder.BuildRootLeaf(dag, additionalData)
 	} else {
@@ -148,7 +167,7 @@ func processDirectory(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot b
 	return result, nil
 }
 
-func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool, timestampRoot bool) (*DagLeaf, error) {
+func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool, additionalData map[string]string) (*DagLeaf, error) {
 	entryPath := filepath.Join(*path, entry.Name())
 
 	relPath, err := filepath.Rel(*path, entryPath)
@@ -190,18 +209,6 @@ func processFile(entry fs.DirEntry, path *string, dag *DagBuilder, isRoot bool, 
 			builder.AddLink(label, chunkLeaf.Hash)
 			chunkLeaf.SetLabel(label)
 			dag.AddLeaf(chunkLeaf, nil)
-		}
-	}
-
-	var additionalData map[string]string = nil
-
-	if timestampRoot {
-		currentTime := time.Now().UTC()
-
-		timeString := currentTime.Format(time.RFC3339)
-
-		additionalData = map[string]string{
-			"timestamp": timeString,
 		}
 	}
 
