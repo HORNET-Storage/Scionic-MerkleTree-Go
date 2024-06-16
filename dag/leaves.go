@@ -109,14 +109,14 @@ func (b *DagLeafBuilder) BuildLeaf(additionalData map[string]string) (*DagLeaf, 
 		MerkleRoot       []byte
 		CurrentLinkCount int
 		ContentHash      []byte
-		AdditionalData   map[string]string
+		AdditionalData   []keyValue
 	}{
 		ItemName:         b.ItemName,
 		Type:             b.LeafType,
 		MerkleRoot:       merkleRoot,
 		CurrentLinkCount: len(b.Links),
 		ContentHash:      nil,
-		AdditionalData:   additionalData,
+		AdditionalData:   sortMapForVerification(additionalData),
 	}
 
 	if b.Data != nil {
@@ -190,7 +190,7 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, additionalData map[strin
 		LatestLabel      string
 		LeafCount        int
 		ContentHash      []byte
-		AdditionalData   map[string]string
+		AdditionalData   []keyValue
 	}{
 		ItemName:         b.ItemName,
 		Type:             b.LeafType,
@@ -199,7 +199,7 @@ func (b *DagLeafBuilder) BuildRootLeaf(dag *DagBuilder, additionalData map[strin
 		LatestLabel:      latestLabel,
 		LeafCount:        len(dag.Leafs),
 		ContentHash:      nil,
-		AdditionalData:   additionalData,
+		AdditionalData:   sortMapForVerification(additionalData),
 	}
 
 	if b.Data != nil {
@@ -293,14 +293,14 @@ func (leaf *DagLeaf) VerifyLeaf() error {
 		MerkleRoot       []byte
 		CurrentLinkCount int
 		ContentHash      []byte
-		AdditionalData   map[string]string
+		AdditionalData   []keyValue
 	}{
 		ItemName:         leaf.ItemName,
 		Type:             leaf.Type,
 		MerkleRoot:       leaf.ClassicMerkleRoot,
 		CurrentLinkCount: leaf.CurrentLinkCount,
 		ContentHash:      leaf.ContentHash,
-		AdditionalData:   additionalData,
+		AdditionalData:   sortMapForVerification(additionalData),
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -363,7 +363,7 @@ func (leaf *DagLeaf) VerifyRootLeaf() error {
 		LatestLabel      string
 		LeafCount        int
 		ContentHash      []byte
-		AdditionalData   map[string]string
+		AdditionalData   []keyValue
 	}{
 		ItemName:         leaf.ItemName,
 		Type:             leaf.Type,
@@ -372,7 +372,7 @@ func (leaf *DagLeaf) VerifyRootLeaf() error {
 		LatestLabel:      leaf.LatestLabel,
 		LeafCount:        leaf.LeafCount,
 		ContentHash:      leaf.ContentHash,
-		AdditionalData:   additionalData,
+		AdditionalData:   sortMapForVerification(additionalData),
 	}
 
 	serializedLeafData, err := cbor.Marshal(leafData)
@@ -571,4 +571,28 @@ func sortMapByKeys(inputMap map[string]string) map[string]string {
 	}
 
 	return sortedMap
+}
+
+type keyValue struct {
+	Key   string
+	Value string
+}
+
+func sortMapForVerification(inputMap map[string]string) []keyValue {
+	if inputMap == nil {
+		return nil
+	}
+
+	keys := make([]string, 0, len(inputMap))
+	for key := range inputMap {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	sortedPairs := make([]keyValue, 0, len(keys))
+	for _, key := range keys {
+		sortedPairs = append(sortedPairs, keyValue{Key: key, Value: inputMap[key]})
+	}
+
+	return sortedPairs
 }
