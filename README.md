@@ -18,7 +18,7 @@ Scionic Merkle Trees maintain the advantages of IPFS Merkle DAGs with the slim M
 
  Merkle Trees are cryptographic structures used to manage and securely verify large amounts of data. However, there's a significant drawback: they cannot store folders of files.
 
-The number of hashes required for a Merkle proof in a Classic Merkle Tree grows logarithmically with the number of files, meaning the growth rate slows as the input (tree) size increases. This pattern makes them very efficient for large datasets because the branches become exponentially smaller as the number of files in the folder rises.
+The number of hashes required for a Merkle proof in a Classic Merkle Tree grows logarithmically with the number of files, meaning the growth rate slows as the input (tree) size increases. This pattern makes them very efficient for large datasets because the growth of branch size becomes exponentially less as the number of files in the folder rises.
 
 ### ***Scionic Merkle Trees v.s IPFS Merkle DAGs***
 
