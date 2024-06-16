@@ -34,7 +34,7 @@ Within each parent leaf (folder), its list of hashes (chunks/children) are organ
 
 ### ***Efficient File Download and Branch Verification:***
 
-If a user wants a specific file from a folder on the tree, they no longer need to download every file chunk hash in the folder. Instead, they download a Classic Merkle branch linked to the folder (parent leaf) they're downloading the file from. This process allows the user to verify that the file is part of the tree without needing to download every hash of all other files in the folder.
+If a user wants to download a specific file chunk within a Scionic Merkle Tree, they no longer need to download every file chunk hash in its folder. Instead, they will download a Classic Merkle branch linked to the folder (parent leaf) they're downloading the file chunk from. This process allows the user to verify that the file is part of the tree without needing to download every hash of all other files in the folder.
 
 ### ***Scionic Merkle Tree:***
 ![Scionic Merkle Tree Diagram](https://i.ibb.co/XJjbwmP/Scionic-Merkle-Tree.jpg)
