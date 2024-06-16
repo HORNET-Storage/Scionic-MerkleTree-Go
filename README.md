@@ -32,7 +32,7 @@ Like Merkle DAGs, Scionic Merkle Trees can accommodate storing folders of files.
 
 Within each parent leaf (folder), its list of hashes (chunks/children) are organized as a Classic Merkle Tree rather than a potentially large plaintext list of hashes. Large files or folders lead to many chunks, which can eventually lead to an extremely large lists of hashes. By ensuring the parent leaf is chunked with a Classic Merkle Tree, this scaling problem emerging from large amounts of data can be avoided.
 
-### ***Efficient File Download and Branch Verification:***
+### ***File Chunk Downloading with Chunked Parent Leaves:***
 
 If a user wants to download a specific file chunk within a Scionic Merkle Tree, they no longer need to download every file chunk hash in its folder. Instead, they will download a Classic Merkle branch linked to the folder (parent leaf) they're downloading the file chunk from. This process allows the user to verify that the file is part of the tree without needing to download every hash of all other files in the folder.
 
