@@ -18,7 +18,7 @@ Scionic Merkle Trees maintain the advantages of IPFS Merkle DAGs with the slim M
 
  Merkle Trees are cryptographic structures used to manage and securely verify large amounts of data. However, there's a significant drawback: they cannot store folders of files.
 
-The number of hashes required for a Merkle proof in a Classic Merkle Tree grows logarithmically with the number of files, meaning the growth rate slows as the input (tree) size increases. This pattern makes them very efficient for large datasets because the growth of branch size becomes exponentially less as the number of files in the folder rises.
+The number of hashes required for a Merkle proof in a Classic Merkle Tree grows logarithmically with the number of files, meaning the growth rate slows as the input (tree) size increases. This pattern makes them very efficient for large datasets because the growth of the Merkle branch size becomes exponentially less as the number of chunks rise.
 
 ### ***Scionic Merkle Trees v.s IPFS Merkle DAGs***
 
@@ -55,9 +55,9 @@ These statistics underline the substantial efficiency improvements made by Scion
 
 ## Understanding Growth Patterns: Logarithmic vs Linear
 
-In the case of Scionic Merkle Trees, which incorporate Classic Merkle Trees within their structure, they exhibit logarithmic growth. This means that as the size of the input (the number of files in a folder) increases, the growth rate of the Classic Merkle Tree branches decreases. This makes Scionic Merkle Trees an efficient structure for managing large datasets, ***as the branches become exponentially smaller with the increasing number of files in the folder.***
+In the case of Scionic Merkle Trees, which incorporate Classic Merkle Trees within their structure, they exhibit logarithmic growth. This means that as the size of the input (the number of files in a folder) increases, the growth rate of the Classic Merkle Tree branches decreases. This makes Scionic Merkle Trees an efficient structure for tranmissing large files ***because the growth of the Merkle branch size becomes exponentially less*** as the number of file chunks rise.
 
-In stark contrast, the number of hashes required to validate a single folder in a Merkle DAG exhibits linear growth. If there are more children (files) in the folder, you must download the hash of each one to retrieve any individual file from the folder. This constant requirement can lead to overly large Merkle branches. The amount of hashes needed to validate a single file increases in direct proportion to the number of files in the folder, making it less efficient for large datasets.
+In stark contrast, the number of hashes required to validate a single file chunk in an IPFS Merkle DAG exhibits linear growth. If there are more children (file chunks) in the folder, you must download the hash of each file chunk to retrieve any individual file chunk from the folder. This requirement can lead to large, bloated Merkle branches. The amount of hashes needed to validate a single file chunk increases in direct proportion to the number of file chunks in the folder, making it less efficient for large datasets.
 
 ## Syncing Scionic Merkle Trees by Requesting a Range of Leaf Numbers
 
