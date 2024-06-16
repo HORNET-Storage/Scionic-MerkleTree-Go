@@ -16,13 +16,13 @@ Scionic Merkle Trees maintain the advantages of IPFS Merkle DAGs with the slim M
 
 ### ***Classic Merkle Trees***
 
- Merkle Trees are cryptographic structures used to manage and securely verify large amounts of data. However, they have a significant drawback: they cannot store folders or files.
+ Merkle Trees are cryptographic structures used to manage and securely verify large amounts of data. However, there's a significant drawback: they cannot store folders of files.
 
 The number of hashes required for a Merkle proof in a Classic Merkle Tree grows logarithmically with the number of files, meaning the growth rate slows as the input (tree) size increases. This pattern makes them very efficient for large datasets because the branches become exponentially smaller as the number of files in the folder rises.
 
 ### ***Scionic Merkle Trees v.s IPFS Merkle DAGs***
 
-Merkle DAGs were developed as a solution to incorporate folders and files, addressing a key limitation of Classic Merkle Trees. However, this structure has its own challenge: to securely download a single file, you must download the hash of every other file chunk inside the folder its stored in. This means that each parent leaf can continue to grow if the number of file chunks in the folder grow, even though the size of each Merkle chunk should always remain the same! This flaw of IPFS Merkle DAGs is resolved by Scionic Merkle Trees because each parent leaf is chunked using a Classic Merkle Tree, ensuring every part of the Scionic Merkle Tree is uniformly chunked. In the most extreme cases of P2P decentralization, a user could retrieve each Merkle branch from a different source without needing to download the entire parent leaf first.
+Merkle DAGs were developed as a solution to incorporate folders of files, addressing a key limitation of Classic Merkle Trees. However, this structure has its own challenge: to securely download a single file chunk, you must download the hash of every other file chunk inside the folder its stored in. This means that each parent leaf can continue to grow if the number of file chunks in the folder grow, even though the size of each Merkle chunk should always remain the same! This flaw of parent leaves in IPFS Merkle DAGs is resolved by Scionic Merkle Trees because each Scionic parent leaf is chunked using a Classic Merkle Tree, ensuring every part of the Scionic Merkle Tree is uniformly chunked. In the most extreme cases of P2P decentralization, a user could retrieve each Merkle branch from a different source without needing to download the entire parent leaf first.
 
 ### ***Folders and Subfolders of Files:***
 
