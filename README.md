@@ -55,7 +55,7 @@ These statistics underline the substantial efficiency improvements made by Scion
 
 ## Understanding Growth Patterns: Logarithmic vs Linear
 
-Scionic Merkle Trees, which incorporate Classic Merkle Trees within their structure, exhibit Merkle branches that grow logarithmically. This means that as the size of the input (the number of file chunks in a folder) increases, the growth rate of the Classic Merkle Tree branches within them decreases. This makes Scionic Merkle Trees an efficient structure for tranmissing large files ***because the growth of the Scionic Merkle branch becomes exponentially less*** as the number of file chunks increase.
+Scionic Merkle Trees, which incorporate Classic Merkle Trees within their structure, exhibit Merkle branches that grow logarithmically; this means that as the size of the input (the number of file chunks in a folder) increases, the growth rate of its Classic Merkle Tree branches decrease. This makes Scionic Merkle Trees an efficient structure for tranmissing large files ***because the growth of the Scionic Merkle branch becomes exponentially less*** as the number of file chunks increase, thanks to the Classic Merkle Trees nested within them.
 
 In stark contrast, the number of hashes required to validate a single file chunk in an IPFS Merkle DAG exhibits linear growth. The hash of each file chunk in the folder must be downloaded in order to retrieve any individual file chunk from the folder. If the number of file chunks grow, then the parent leaf in the Merkle branch grows linearly in size as well; this requirement can lead to overly large Merkle branches that make IPFS Merkle DAGs less efficient for large datasets when compared to Scionic Merkle Trees.
 
