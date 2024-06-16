@@ -4,15 +4,15 @@
 
 # Scionic Merkle Trees
 
-## Combining Merkle DAGs and Merkle Trees
+## Combining Merkle Trees and Merkle DAGs
 
-We've designed a [new type of Merkle DAG-Tree hybrid](https://www.hornetstorage.com/dag-trees). Scionic Merkle Trees have small branches like Classic Merkle Trees, the file/folder storage ability of Merkle DAGs, and numbered leaves so relays can request a range of missing leaf numbers to sync quickly. They are an innovative model that merge the advantages of Classic Merkle Trees and Merkle DAGs while addressing several of their limitations.
+We've designed a [new type of Merkle DAG/Merkle Tree hybrid](https://www.hornet.storage/) named Scionic Merkle Trees. Scionic Merkle Trees contain small branches like Classic Merkle Trees, the folder storage ability of Merkle DAGs, and numbered Merkle leaves so anyone can request a range of missing file chunks by listing the range of leaf numbers that correspond to those missing file chunks. LeafSync is the name used for requesting a range of leaf numbers in order to retrieve a batch of missing file chunks. 
 
-In plant grafting, the scion is the upper part of the plant, chosen for its desirable fruits or flowers. It's grafted onto another plant's base to grow together. In a similar vein, the Scionic Merkle DAG-Tree was born from grafting together Merkle DAGs and Classic Merkle Trees. This process emphasizes why we use the term "scion" for the Scionic Merkle DAG-Trees… it symbolizes the digital grafting of these two similar data structures, combining their strengths into one piece.
+![Tree Comparison Diagram](https://static.wixstatic.com/media/e9326a_f216fe97ddb94abaaf204c6e2675684a~mv2.png)
 
-![Tree Comparison Diagram](https://static.wixstatic.com/media/e9326a_b761315944af43f993b01b00b2ac11b5~mv2.png/v1/fill/w_1718,h_431,al_c,q_90,usm_0.66_1.00_0.01,enc_auto/Comparsion_Diagram_Yellow.png)
+Scionic Merkle Trees maintain the advantages of IPFS Merkle DAGs with the slim Merkle Branches of Classic Merkle Trees, while providing LeafSync as a new feature that complements any set reconciliation system (IBLTs, negentropy, et al.). In plant grafting, the "Scion" is the upper part of the plant, chosen for its desirable fruits or flowers; it's grafted onto another plant's base to grow together. In a similar vein, the Scionic Merkle Tree was born from grafting together Merkle Trees and Merkle DAGs. This process emphasizes why we use the term "Scion" for the Scionic Merkle Trees: it symbolizes the digital grafting of these two similar data structures, combining their strengths into one piece of software.
 
-## Classic Merkle Trees and Merkle DAGs: A Comparison
+## Scionic Merkle Trees: The Best of Both Worlds
 
 ### ***Classic Merkle Trees***
 
@@ -20,29 +20,23 @@ In plant grafting, the scion is the upper part of the plant, chosen for its desi
 
 The number of hashes required for a Merkle proof in a Classic Merkle Tree grows logarithmically with the number of files, meaning the growth rate slows as the input (tree) size increases. This pattern makes them very efficient for large datasets because the branches become exponentially smaller as the number of files in the folder rises.
 
-### ***Merkle DAGs (Directed Acyclic Graphs)***
+### ***Scionic Merkle Trees v.s IPFS Merkle DAGs***
 
-Merkle DAGs were developed as a solution to incorporate folders and files, addressing a key limitation of Classic Merkle Trees. However, this structure has its own challenge: to securely download a single file, you must download the hash of every other file inside the folder its stored in. This requirement can be slow and costly for users when dealing with folders that contain a large number of files.
+Merkle DAGs were developed as a solution to incorporate folders and files, addressing a key limitation of Classic Merkle Trees. However, this structure has its own challenge: to securely download a single file, you must download the hash of every other file chunk inside the folder its stored in. This means that each parent leaf can continue to grow if the number of file chunks in the folder grow, even though the size of each Merkle chunk should always remain the same! This flaw of IPFS Merkle DAGs is resolved by Scionic Merkle Trees because each parent leaf is chunked using a Classic Merkle Tree, ensuring every part of the Scionic Merkle Tree is uniformly chunked. In the most extreme cases of P2P decentralization, a user could retrieve each Merkle branch from a different source without needing to download the entire parent leaf first.
 
-## The Strengths of Scionic Merkle Trees
+### ***Folders and Subfolders of Files:***
 
-### ***Folders and Files:***
+Like Merkle DAGs, Scionic Merkle Trees can accommodate storing folders of files. This means an entire directory of files and subfolders can be converted into a Scionic Merkle Tree.
 
-Like Merkle DAGs, Scionic Merkle Trees can accommodate folders and files. However, they also maintain the efficiency of Classic Merkle Trees.
+### ***Chunked Parent Leaves:***
 
-### ***Internal Arrangement:***
-
-The unique feature of Scionic Merkle Trees is their internal structure. Within each folder (parent leaf) across the tree, its list of files (children) are organized as a Classic Merkle tree rather than a plaintext list.
+Within each parent leaf (folder), its list of hashes (chunks/children) are organized as a Classic Merkle Tree rather than a potentially large plaintext list of hashes. Large files or folders lead to many chunks, which can eventually lead to an extremely large lists of hashes. By ensuring the parent leaf is chunked with a Classic Merkle Tree, this scaling problem that emerges from large files can be avoided.
 
 ### ***Efficient File Download and Branch Verification:***
 
-If a user wants a specific file from a folder on the tree, they no longer need to download every hash in the folder. Instead, they download a Classic Merkle branch linked to the folder (parent leaf) they're downloading the file from. This process allows the user to verify that the file is part of the tree without needing to download every hash of all other files in the folder.
+If a user wants a specific file from a folder on the tree, they no longer need to download every file chunk hash in the folder. Instead, they download a Classic Merkle branch linked to the folder (parent leaf) they're downloading the file from. This process allows the user to verify that the file is part of the tree without needing to download every hash of all other files in the folder.
 
-### ***Improved Scalability for Users with Large Datasets:***
-
-This streamlined process significantly improves efficiency, especially with large datasets. Scionic Merkle Trees are a powerful tool for handling folders with numerous files, combining the directory-friendly nature of Merkle DAGs and the compact efficiency of Classic Merkle Trees.
-
-### ***Scionic Merkle DAG-Tree:***
+### ***Scionic Merkle Tree:***
 ![Scionic Merkle Tree Diagram](https://i.ibb.co/XJjbwmP/Scionic-Merkle-Tree.jpg)
 
 ### ***Scionic Merkle Branch:***
@@ -65,13 +59,9 @@ In the case of Scionic Merkle Trees, which incorporate Classic Merkle Trees with
 
 In stark contrast, the number of hashes required to validate a single folder in a Merkle DAG exhibits linear growth. If there are more children (files) in the folder, you must download the hash of each one to retrieve any individual file from the folder. This constant requirement can lead to overly large Merkle branches. The amount of hashes needed to validate a single file increases in direct proportion to the number of files in the folder, making it less efficient for large datasets.
 
-## Syncing Trees Across Relays by Requesting a Range of Leaves
+## Syncing Scionic Merkle Trees by Requesting a Range of Leaf Numbers
 
-To further enhance the functionality of Scionic Merkle Trees and support efficient data retrieval, each leaf in the tree is labeled with a sequenced number. This method facilitates the [request for a range of Merkle leaves](https://www.hornetstorage.com/forest), much like what GraphSync attempts to accomplish, but without the complexity of using complex graph selectors and large request sizes.
-
-The total number of leaves is recorded at the root of the tree. By doing so, users can request a range of leaves from a given folder and receive it as a small Scionic Merkle branch, reducing the bandwidth overhead and computational workload required to access multiple files in the same folder.
-
-This approach provides the structural advantages of Scionic Merkle Trees, such as logarithmic growth of branches and efficient file download and verification, and also provides enhanced support for ranged requests, contributing to their practicality in large-scale data management scenarios.
+To further enhance the functionality of Scionic Merkle Trees and support efficient data retrieval, each leaf in the tree is labeled with a sequenced number. The total number of leaves are listed within the Merkle root of the tree, meaning it must be downloaded first before the leaves can be retrieved. This method facilitates [LeafSync Messages, which are requests for a range of Merkle leaves](https://www.hornet.storage/negentropy-leafsync) that correspond to file chunks the requestor is missing.
 
 # Documentation
 
@@ -233,5 +223,5 @@ func (leaf *DagLeaf) Clone() *DagLeaf
 func (leaf *DagLeaf) SetLabel(label string)
 ```
 
-The trees are now in beta and the data structure of the trees will no longer change
+The trees are now in beta and the data structure of the trees will no longer change.
 #
