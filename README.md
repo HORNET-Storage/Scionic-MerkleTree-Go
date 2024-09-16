@@ -6,7 +6,7 @@
 
 ## Combining Merkle Trees and Merkle DAGs
 
-We've designed a [new type of Merkle DAG/Merkle Tree hybrid](https://www.hornet.storage/) named Scionic Merkle Trees. Scionic Merkle Trees contain small branches like Classic Merkle Trees, the folder storage support of Merkle DAGs, and numbered Merkle leaves so anyone can sync by requesting a range of missing leaf numbers that correspond to missing file chunks. LeafSync is the name of the simple protocol used to request a range of leaf numbers in order to retrieve a batch of missing file chunks corresponding to the leaf numbers.
+We've designed a [new type of Merkle DAG/Merkle Tree hybrid](https://www.hornet.storage/) known as Scionic Merkle Trees. Scionic Merkle Trees contain small branches like Classic Merkle Trees, the folder storage support of Merkle DAGs, and numbered Merkle leaves so anyone can sync by requesting a range of missing leaf numbers that correspond to missing file chunks. LeafSync is the name of the simple protocol used to request a range of leaf numbers in order to retrieve a batch of missing file chunks corresponding to the leaf numbers.
 
 ![Tree Comparison Diagram](https://static.wixstatic.com/media/e9326a_ee5ee567806d439b93eaf3ce49afe072~mv2.png)
 
