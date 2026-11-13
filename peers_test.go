@@ -85,17 +85,6 @@ func (w *wire) framesOf(kind FrameKind) int {
 	return count
 }
 
-// requestsOf gives how many requests of one kind were asked.
-func (w *wire) requestsOf(kind RequestKind) int {
-	count := 0
-	for _, request := range w.requests {
-		if len(request) > 0 && RequestKind(request[0]) == kind {
-			count++
-		}
-	}
-	return count
-}
-
 // testPeer answers from a store, as an honest peer does, and lets a test
 // see and change what goes over the wire.
 type testPeer struct {

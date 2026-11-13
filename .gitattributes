@@ -3,3 +3,10 @@
 # of GitHub's Windows runners) rewrites the committed LF bytes to CRLF on disk
 # and breaks that comparison, so no file under spec/ is ever converted.
 spec/** -text
+
+# Go source is formatted with line feeds, and gofmt reports a file that has
+# anything else. So the source is checked out with line feeds on every system,
+# Windows among them.
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf

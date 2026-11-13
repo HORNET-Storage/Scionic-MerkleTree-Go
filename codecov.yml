@@ -8,11 +8,6 @@ coverage:
       default:
         target: auto
 
-ignore:
-  - "testutil/**"       # Test fixtures and helpers
-  - "tests/**"          # Test files (already excluded by Go but explicit)
-  - "dag/types.go"      # Type definitions and trivial setters - tested indirectly
-
 comment:
   layout: "reach,diff,flags,files"
   behavior: default
