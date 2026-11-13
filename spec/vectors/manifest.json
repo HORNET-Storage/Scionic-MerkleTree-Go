@@ -1,478 +1,1485 @@
 {
-  "chunk_size": 4096,
-  "batch_size": 8192,
-  "cases": [
+  "format": "scionic-vectors-1",
+  "bytes": "A part of a file is made from its seed: block k is SHA-256(seed + k), with k as 8 bytes, big-endian, from 0. The blocks are joined and cut to the length. A file is its parts joined.",
+  "trees": [
     {
-      "name": "deep_hierarchy",
-      "root_kind": "directory",
-      "root_input_path": "deep_hierarchy",
-      "root_hash": "bafireifzuzba5kihvbxfl5ygrse5pca6aamzumemmrjm32yyl5j4cjdj3u",
-      "additional_data": [],
-      "leaf_count": 11,
-      "file_leaves": 5,
-      "directory_leaves": 6,
-      "chunk_leaves": 0,
-      "full_dag": "cases/deep_hierarchy/full/dag.cbor",
-      "full_dag_json": "cases/deep_hierarchy/full/dag.json",
-      "partial_dags": [
-        "cases/deep_hierarchy/partial/0/dag.cbor",
-        "cases/deep_hierarchy/partial/1/dag.cbor"
-      ],
-      "partial_dags_json": [
-        "cases/deep_hierarchy/partial/0/dag.json",
-        "cases/deep_hierarchy/partial/1/dag.json"
-      ],
-      "transmission_packets": [
-        "cases/deep_hierarchy/transmission/packet-000.cbor",
-        "cases/deep_hierarchy/transmission/packet-001.cbor",
-        "cases/deep_hierarchy/transmission/packet-002.cbor",
-        "cases/deep_hierarchy/transmission/packet-003.cbor",
-        "cases/deep_hierarchy/transmission/packet-004.cbor",
-        "cases/deep_hierarchy/transmission/packet-005.cbor",
-        "cases/deep_hierarchy/transmission/packet-006.cbor",
-        "cases/deep_hierarchy/transmission/packet-007.cbor",
-        "cases/deep_hierarchy/transmission/packet-008.cbor",
-        "cases/deep_hierarchy/transmission/packet-009.cbor",
-        "cases/deep_hierarchy/transmission/packet-010.cbor"
-      ],
-      "transmission_packets_json": [
-        "cases/deep_hierarchy/transmission/packet-000.json",
-        "cases/deep_hierarchy/transmission/packet-001.json",
-        "cases/deep_hierarchy/transmission/packet-002.json",
-        "cases/deep_hierarchy/transmission/packet-003.json",
-        "cases/deep_hierarchy/transmission/packet-004.json",
-        "cases/deep_hierarchy/transmission/packet-005.json",
-        "cases/deep_hierarchy/transmission/packet-006.json",
-        "cases/deep_hierarchy/transmission/packet-007.json",
-        "cases/deep_hierarchy/transmission/packet-008.json",
-        "cases/deep_hierarchy/transmission/packet-009.json",
-        "cases/deep_hierarchy/transmission/packet-010.json"
-      ],
-      "batched_packets": [
-        "cases/deep_hierarchy/batched/batch-000.cbor"
-      ],
-      "batched_packets_json": [
-        "cases/deep_hierarchy/batched/batch-000.json"
-      ],
-      "negative_vectors": [
+      "name": "empty-file",
+      "cutting": "fixed-16",
+      "extra": {},
+      "top": {
+        "file": []
+      },
+      "root": "bafkreiecc6eejhk5eyzbsucs3bklfbxto3i2f43532r4noxedakzkbdtga",
+      "root_hash": "821788449d5d2632195052d854b286f376d1a2f37ddea3c6bae4181595047330",
+      "record": "20010000000000000000492e35bd5a6d4e785b157a2edaabe989d7be2f05fed40b68057b5de8d5014b62000000000000000000000000000000000000000000000000000100086368756e6b696e67000866697865642d3136",
+      "size": 0,
+      "pieces": 0,
+      "piece_bytes": 0,
+      "list_bytes": 0,
+      "lists": [
         {
-          "path": "cases/deep_hierarchy/negative/tampered_content/dag.cbor",
-          "path_json": "cases/deep_hierarchy/negative/tampered_content/dag.json",
-          "kind": "tampered_content",
-          "description": "one leaf's content byte flipped; its CID no longer matches the content"
-        },
-        {
-          "path": "cases/deep_hierarchy/negative/tampered_item_name/dag.cbor",
-          "path_json": "cases/deep_hierarchy/negative/tampered_item_name/dag.json",
-          "kind": "tampered_item_name",
-          "description": "one leaf's ItemName altered while its content and stored CID are left alone"
-        },
-        {
-          "path": "cases/deep_hierarchy/negative/tampered_link/dag.cbor",
-          "path_json": "cases/deep_hierarchy/negative/tampered_link/dag.json",
-          "kind": "tampered_link",
-          "description": "one link retargeted at the root CID; every leaf is still present and individually well formed, only the relationship is wrong"
+          "kind": "file",
+          "hash": "492e35bd5a6d4e785b157a2edaabe989d7be2f05fed40b68057b5de8d5014b62",
+          "size": 0,
+          "bytes": ""
         }
+      ],
+      "piece_list": [],
+      "bundle_length": 105,
+      "bundle_sha256": "1ef39d1f7dd18e744cdcffb572de7b572866ef7e1f4f03fd674c7e50950553ba"
+    },
+    {
+      "name": "one-piece",
+      "cutting": "fixed-16",
+      "extra": {},
+      "top": {
+        "file": [
+          {
+            "seed": "one",
+            "length": 5
+          }
+        ]
+      },
+      "root": "bafkreib4ki4yzdya4l633zmujnu6uyizv6jsm5q25dsimt4pdgv4vm4ify",
+      "root_hash": "3c52398c8f00e2fdbde5944b69ea6119af9326761ae8e4864f8f19abcab3882e",
+      "record": "200100000000000000052c0e7cc9661414c1388b3a9cac22b347848b18be2cf32ca9407734a7713a9269000000000000000100000000000000050000000000000024000100086368756e6b696e67000866697865642d3136",
+      "size": 5,
+      "pieces": 1,
+      "piece_bytes": 5,
+      "list_bytes": 36,
+      "lists": [
+        {
+          "kind": "file",
+          "hash": "2c0e7cc9661414c1388b3a9cac22b347848b18be2cf32ca9407734a7713a9269",
+          "size": 5,
+          "bytes": "28703dda6760eacf57a77bd5954ebc9c4d9a05069ecf036edaeadbfc05ed606100000005"
+        }
+      ],
+      "piece_list": [
+        {
+          "hash": "28703dda6760eacf57a77bd5954ebc9c4d9a05069ecf036edaeadbfc05ed6061",
+          "length": 5
+        }
+      ],
+      "bundle_length": 151,
+      "bundle_sha256": "056bd591b5915e3290f1a7976db6910fd5a38e7623ba52af3ddd320302a66d5a"
+    },
+    {
+      "name": "three-pieces",
+      "cutting": "fixed-16",
+      "extra": {},
+      "top": {
+        "file": [
+          {
+            "seed": "three",
+            "length": 40
+          }
+        ]
+      },
+      "root": "bafkreifwmrtv7eq244dgtbszy6c3ztynk4amwbadrppytzgjin3vd6o564",
+      "root_hash": "b664675f921ae706698659c785bccf0d5700cb04038bdf89e4c9437751f9ddf7",
+      "record": "20010000000000000028bbc05bade3cb02afce2ed8ed45e0dd6fbf34ff0166cb2001909598c856d3efcb00000000000000030000000000000028000000000000006c000100086368756e6b696e67000866697865642d3136",
+      "size": 40,
+      "pieces": 3,
+      "piece_bytes": 40,
+      "list_bytes": 108,
+      "lists": [
+        {
+          "kind": "file",
+          "hash": "bbc05bade3cb02afce2ed8ed45e0dd6fbf34ff0166cb2001909598c856d3efcb",
+          "size": 40,
+          "bytes": "32e5d7c5f9d87ca09f79f56044f4a1da592a01279d807843436b636e77ddf72b00000010befb523224a6be4fe8a25ab75308def30d839a5e02eacc0099bd018711da954100000010e54e879a7c578d1cca0456f870e578dd1c8086d7bb6b6d186e97c13ae464a93400000008"
+        }
+      ],
+      "piece_list": [
+        {
+          "hash": "32e5d7c5f9d87ca09f79f56044f4a1da592a01279d807843436b636e77ddf72b",
+          "length": 16
+        },
+        {
+          "hash": "befb523224a6be4fe8a25ab75308def30d839a5e02eacc0099bd018711da9541",
+          "length": 16
+        },
+        {
+          "hash": "e54e879a7c578d1cca0456f870e578dd1c8086d7bb6b6d186e97c13ae464a934",
+          "length": 8
+        }
+      ],
+      "bundle_length": 268,
+      "bundle_sha256": "f8c6957db32c414d65cce7c36b5eb49f5c765bf2f4ab2a4a780463b928d3c865"
+    },
+    {
+      "name": "a-piece-twice",
+      "cutting": "fixed-16",
+      "extra": {},
+      "top": {
+        "file": [
+          {
+            "seed": "x",
+            "length": 16
+          },
+          {
+            "seed": "y",
+            "length": 16
+          },
+          {
+            "seed": "x",
+            "length": 16
+          }
+        ]
+      },
+      "root": "bafkreihrkmdom7z27d4z7bs5nv6nxnrgnxfstzawf4eds3dwzyfbrjybbm",
+      "root_hash": "f15306e67f3af8f99f865d6d7cdbb6266dcb29e4162f08396c76ce0a18a7010b",
+      "record": "2001000000000000003027441ecf759cf63d78d8cbd3f584be0853814b904dc0165849ade65d20cd248100000000000000020000000000000020000000000000006c000100086368756e6b696e67000866697865642d3136",
+      "size": 48,
+      "pieces": 2,
+      "piece_bytes": 32,
+      "list_bytes": 108,
+      "lists": [
+        {
+          "kind": "file",
+          "hash": "27441ecf759cf63d78d8cbd3f584be0853814b904dc0165849ade65d20cd2481",
+          "size": 48,
+          "bytes": "521cddad54e8feea353ff3f93d94994aa486a98ddb348f8268055fe16f76374600000010d4c3d62124a89e3c33db3cda13476d3140acda4adce7155c0b9321aecd1b775b00000010521cddad54e8feea353ff3f93d94994aa486a98ddb348f8268055fe16f76374600000010"
+        }
+      ],
+      "piece_list": [
+        {
+          "hash": "521cddad54e8feea353ff3f93d94994aa486a98ddb348f8268055fe16f763746",
+          "length": 16
+        },
+        {
+          "hash": "d4c3d62124a89e3c33db3cda13476d3140acda4adce7155c0b9321aecd1b775b",
+          "length": 16
+        }
+      ],
+      "bundle_length": 255,
+      "bundle_sha256": "71d1c0a4ffaa836c317eaff5d1081d0ebefbed96197ede2656effb4955081eb9"
+    },
+    {
+      "name": "empty-folder",
+      "cutting": "fixed-16",
+      "extra": {},
+      "top": {
+        "folder": []
+      },
+      "root": "bafkreicoqv2t3ayjidtcxjgsbg6isj3wyhlsn73x3rnh6afmjfust6ougq",
+      "root_hash": "4e85753d830940e62ba4d209bc892776c1d726ff77dc5a7f00ac496929f9d434",
+      "record": "20020000000000000000b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985000000000000000000000000000000000000000000000000000100086368756e6b696e67000866697865642d3136",
+      "size": 0,
+      "pieces": 0,
+      "piece_bytes": 0,
+      "list_bytes": 0,
+      "lists": [
+        {
+          "kind": "folder",
+          "hash": "b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985",
+          "size": 0,
+          "bytes": ""
+        }
+      ],
+      "piece_list": [],
+      "bundle_length": 105,
+      "bundle_sha256": "e0c1e8b4a4e2fcbce17de9c3bbebe9d5348301bd29d909095d48d36a442ee8ef"
+    },
+    {
+      "name": "folder",
+      "cutting": "fixed-16",
+      "extra": {
+        "name": "a sample"
+      },
+      "top": {
+        "folder": [
+          {
+            "name": "data",
+            "folder": [
+              {
+                "name": "exactly-two-pieces.bin",
+                "file": [
+                  {
+                    "seed": "two",
+                    "length": 32
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "empty.bin",
+            "file": []
+          },
+          {
+            "name": "nothing-here",
+            "folder": []
+          },
+          {
+            "name": "readme.txt",
+            "file": [
+              {
+                "seed": "readme",
+                "length": 12
+              }
+            ],
+            "extra": {
+              "type": "text/plain"
+            }
+          },
+          {
+            "name": "weights",
+            "folder": [
+              {
+                "name": "copy-of-model.bin",
+                "file": [
+                  {
+                    "seed": "model",
+                    "length": 1000
+                  }
+                ]
+              },
+              {
+                "name": "model.bin",
+                "file": [
+                  {
+                    "seed": "model",
+                    "length": 1000
+                  }
+                ]
+              },
+              {
+                "name": "shards",
+                "folder": [
+                  {
+                    "name": "a.bin",
+                    "file": [
+                      {
+                        "seed": "shard-a",
+                        "length": 100
+                      }
+                    ]
+                  },
+                  {
+                    "name": "b.bin",
+                    "file": [
+                      {
+                        "seed": "shard-b",
+                        "length": 33
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "extra": {
+              "note": "the weights"
+            }
+          }
+        ]
+      },
+      "root": "bafkreifsbse5k6kig36627htj27mb4qtidoy5iqhljd2ytastv7jqeel2q",
+      "root_hash": "b20c89d5794836fded7cf34ebec0f21340dd8ea2075a47ac4c129d7e98108bd4",
+      "record": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000200086368756e6b696e67000866697865642d313600046e616d650008612073616d706c65",
+      "size": 2177,
+      "pieces": 76,
+      "piece_bytes": 1177,
+      "list_bytes": 3374,
+      "lists": [
+        {
+          "kind": "folder",
+          "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+          "size": 2177,
+          "bytes": "020000000000000020db62775c4fd14ef7df7250fc31114a571ef9b0557abf1437c075615cce4696cf0004646174610000010000000000000000492e35bd5a6d4e785b157a2edaabe989d7be2f05fed40b68057b5de8d5014b620009656d7074792e62696e0000020000000000000000b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985000c6e6f7468696e672d68657265000001000000000000000cc1c440976e8944ccd5bbcc39d4756410db638a86bf66f200d5689a565c304b60000a726561646d652e7478740001000474797065000a746578742f706c61696e0200000000000008555d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959000777656967687473000100046e6f7465000b7468652077656967687473"
+        },
+        {
+          "kind": "folder",
+          "hash": "db62775c4fd14ef7df7250fc31114a571ef9b0557abf1437c075615cce4696cf",
+          "size": 32,
+          "bytes": "010000000000000020a98c0714d023f7e10bae9588a20bfc83c5753980009105696442a9c5f8538cfc001665786163746c792d74776f2d7069656365732e62696e0000"
+        },
+        {
+          "kind": "file",
+          "hash": "a98c0714d023f7e10bae9588a20bfc83c5753980009105696442a9c5f8538cfc",
+          "size": 32,
+          "bytes": "538fc28c1b41493f35d6866e2c5c441b7d6c797cc7d8f0dfd116087412b1bec8000000104d0fd32d15f92017d2cb73c177441585f00b9972257e41eb592fc57b585a794300000010"
+        },
+        {
+          "kind": "file",
+          "hash": "492e35bd5a6d4e785b157a2edaabe989d7be2f05fed40b68057b5de8d5014b62",
+          "size": 0,
+          "bytes": ""
+        },
+        {
+          "kind": "folder",
+          "hash": "b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985",
+          "size": 0,
+          "bytes": ""
+        },
+        {
+          "kind": "file",
+          "hash": "c1c440976e8944ccd5bbcc39d4756410db638a86bf66f200d5689a565c304b60",
+          "size": 12,
+          "bytes": "43a6c4f416857ce17d3e1e2e9b136d95d695c13c9f455151633b02e2750530620000000c"
+        },
+        {
+          "kind": "folder",
+          "hash": "5d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959",
+          "size": 2133,
+          "bytes": "0100000000000003e8b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e0944350011636f70792d6f662d6d6f64656c2e62696e00000100000000000003e8b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e09443500096d6f64656c2e62696e00000200000000000000857360afc9a35349c72b487181fcb33d35ea5d3429d5063b1f57e3be91fb60c34e00067368617264730000"
+        },
+        {
+          "kind": "file",
+          "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+          "size": 1000,
+          "bytes": "6dce74fa10473bb925d26e48a8e5fedb74e9708172d2696ab22a32fbb2c79a93000000109247b3cda21b33fb9aaeda3e7584d96ef5fc9b696e1589de8bcdee100572d2d800000010caaf81dae4ab2c9ed459c166808f012d850ef7bef254c3d559676782ce6ace5900000010a4072c7817696c9d78ca7391efef2f6d955a222880392868a2110946219b760a0000001066223b41a1a2eaf69a110e6ac24d90dcafee43a2fb562f18376e143c97188919000000100262278366db33db933303781e18b6829c186bf791d36d54e5a3fbc645fac1ed000000106b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc623400000010cfa50a8cbf1aeb19d216a4e11e8164d6256ab1dbed2b5971a771f4535e30369200000010035f0ee0ec94cf508f2db9e8c0d7f9623657e97b0b8225f4fc5fad47344fc9a60000001028d84f44ba16ece879b492e6b53b087d18887b85afe184964962897ca8e0119b00000010a3926a4ad7688e1ede590b0ef745406d56df98c06551741f739cecffc47c0d9d00000010bdf4710588785b156387b93d99a857c309ce2b3cc600962948bff06b773a306700000010f8936bebe23341ad830575bc2300ea9e0c55a887c9a7c40b64522c1ba36573c200000010eb5598ddce2194b31897a6a9aefd6ef863ebfd78a22f5625323bb193ec397b9600000010b8664032519237ae2a63b9e96fc92c93987b1479161a630cfb721f6d660386b00000001036866ef03ef229fa6b8ea1b391200f02111d0e7fb049fcd680ab302bb1a9c89c00000010871f6c6c4540c9baed6028aa069935e6a3251b15cb45a7f49f338c456dc5996e0000001032d6bb9fc8144a75f35a08f1f696dc6f3bfb822098a613c440447db53e6764f100000010e47b58e58e2ff99e05f9894d5afa3a7b4097592c43fbb9ff310aa23747d0ff14000000107848961520697dc0ffd4b09f4b0e4354c28cf1a6ed0806a31295bc301f331b3a00000010d8c3069a7f77ffc3d3d842626d7f48a1d98deb727d4467f74198737aac16c6120000001061f240ef884469499a5b06ddc37205bbfc8086082f95fd8110be17433b973d4a00000010defc5b9c4291d47f387f7b79031809bf2281cf6f8f97731e7798f41eed5d36e2000000108a711b1167a776d825535388ac834ad98211cc8756e29e3fa6a175105b3759fb00000010042a0d764f7e105b1beba11a6f2ddce15466b1117fcd940c8b9f0cb5b01681760000001037598728bee240fe90e1ac8394b821098d2255aef596e7495a04bff3f69954e100000010382a3737f996df4a45c076d1c531022d2152f6baffd416566140eb6952d333cc0000001007409630b9d6e56546da9ef6668cb3ad847babb6790d0d171df335da864e104a0000001021adf6ecfc46a8821f884059e5f44392b9e54d78d90855110d49057f9b4486f100000010316ef559e7f109b1a92145e6ada6f9365815a9561a550be981f8a900ea6d669b000000100b3ea803ca032d710e0c8d05cd84012897c4e729a8cac062b52472f921d4089e000000100be39878904daaf707994fa314ea1e2dbb8ea1585e02038574380d68bf8bf65d00000010698fa48ac3497f4c14e9c80d9a10467ed9d892dad1b5446dead9eaf62622dad50000001091dd4844d6880a34d30317692cd4b8f500e86b21a57e93854a8bc467d85ea44300000010771954858fc1a08e714f369db4ae40744e533f285e84b149f0ae4dce6759082600000010f11490179c9a0f4bb2423c333fbaf6f5ec5b388ea857309c64985b631a2e4f3d00000010ac21858aef20ff32a67571c43736d788b6cf547225e9290068cd198c0268c0ae000000107f6015f4273064d3c951b366e1dd29ba1466e29672db9f260a56ffc921f43e4000000010b6dc647bd7763318da0d9ace346db6277823b231896787c297b19307ea406b8a000000101ffd5954c50a2711885244650c6f7e70b6711402b629d4afd0701aeb308b1e0500000010185779160eec1075cf7e3f48db5dce5412c29855b3b3ff52787f4cca4b3578b80000001062d43e4b789d3672f24cbb44b296c1ae7805b9c59a26a6c36b84b13cbfe995d200000010ae358f30001e81700d75416e4e082c2cea769b5e467486e3c2a44175eea599c2000000106e09f58a42bf132f3677ea7a4fa9a173031b8660f1fca9fc972b4ca45233331c000000104968e5c797655e6f2d2fc437ab8ed049c8434b662e592098b939962652ae6bf500000010d3a080e71b8b260b5903df74d92ad2d83f945c2f2a5d600d16f9fcd0f4220a5100000010f003c21ef4df88a1000d1b327db0aaa11f35aa434012b6491a0ed7c213160f4800000010fc5368274a2e83c63c4726be14b3a4bbd58e74aeba367c283a4919576e43316f000000107c0ea0406232c1416933699d38e12c2f6ce29b42ed3b217893cee9722398ea8400000010b76657d5f71e8662c9e85b52df783274b171a19b49e1770d3e72465176189f34000000107a200502492d4cd5e31a5ef9c0aa2cd8f37b61971c5b02fe077058f892fdce3a00000010bcd521e1c2ecd9c268095943d509a7e97039ffa0359f99d4e2bea50e4338a2a1000000107ffbbdc19d6fc05a79bce070829e90cc397de9c5b4396869c326a901b144dee90000001077ca94553e6a62db94907fb4207d5dd89e9f579776b07dd107972f345a48645d00000010a8e4d30378c7524a84825f231660584857f52a79094eb10173ed4ba5c8fe9c880000001006488f0e3510ec628b951369af8c1898bff6fae24ac3d093fdeb54cce1b2ca6300000010d2962c618eab0c269bd039d077b33b128d508c33111e68dfe3042a732ead0b2900000010ca0f07d764c44dd253343c243fe8ab083de0b12303c247235a5cf146c1457a790000001022530a1859cbbdf32f1d7e00b3c6a56184fc9225101d8cc433925b58bec4160800000010ebac55b70aff47f9e5664761cdecc31f2b6f3436a31fd8f759d21a778d515a6900000010f9c78e8a11b41e86ac174281d76eb87127420d921d1b43ab4d2ea90948f4dbc400000008"
+        },
+        {
+          "kind": "folder",
+          "hash": "7360afc9a35349c72b487181fcb33d35ea5d3429d5063b1f57e3be91fb60c34e",
+          "size": 133,
+          "bytes": "010000000000000064cc40fe30afdc6f26ca9c994faf144285db0e41bfb897fff1f7e4a359193cc8800005612e62696e000001000000000000002149ba70170645c6128471c79cfbe18144ebb78d2374b04320b2f4fdb94bc886930005622e62696e0000"
+        },
+        {
+          "kind": "file",
+          "hash": "cc40fe30afdc6f26ca9c994faf144285db0e41bfb897fff1f7e4a359193cc880",
+          "size": 100,
+          "bytes": "af9c0e766d25c9c3a4fa94559fc96ba561c3dd06f8e60d31dffcaa612cd311660000001048f90f00c066d345052633919cc6714cdec1e9c118c16c6b7c90c3716bea82a700000010e056a8007ffe8334d020919544154d1860828d6aa466ae1257649a44da0a44a300000010e9eae6c0361af0d24424940daa205a850b5deafba2e2bd03fdd4270ccbbee5e900000010f1ac734e43c818bb77aa21a6384b20059737c018f49bcf2328f53e48cdaede94000000101c0294a348b4bf9c94a66012602807ccc3fdd8e6faf5394389cd68a626b88e1a00000010b97fca77cd1f57e7659d850e4d8dbf60dc08ddbaffa5209bba397011eed8467600000004"
+        },
+        {
+          "kind": "file",
+          "hash": "49ba70170645c6128471c79cfbe18144ebb78d2374b04320b2f4fdb94bc88693",
+          "size": 33,
+          "bytes": "cdb9d6d2a18151f12371f5aa9bb106a31f8fb1858d599f02c34ee2bae6ae72b000000010f65de86e40d42450f18d3bc70e5e72fb281daac70f1b73f7b6177b4a236d2c31000000105e1effe9b7bab73dce628ccd9f0cbbb16c1e6efc6c4f311e59992a467bc119fd00000001"
+        }
+      ],
+      "piece_list": [
+        {
+          "hash": "538fc28c1b41493f35d6866e2c5c441b7d6c797cc7d8f0dfd116087412b1bec8",
+          "length": 16
+        },
+        {
+          "hash": "4d0fd32d15f92017d2cb73c177441585f00b9972257e41eb592fc57b585a7943",
+          "length": 16
+        },
+        {
+          "hash": "43a6c4f416857ce17d3e1e2e9b136d95d695c13c9f455151633b02e275053062",
+          "length": 12
+        },
+        {
+          "hash": "6dce74fa10473bb925d26e48a8e5fedb74e9708172d2696ab22a32fbb2c79a93",
+          "length": 16
+        },
+        {
+          "hash": "9247b3cda21b33fb9aaeda3e7584d96ef5fc9b696e1589de8bcdee100572d2d8",
+          "length": 16
+        },
+        {
+          "hash": "caaf81dae4ab2c9ed459c166808f012d850ef7bef254c3d559676782ce6ace59",
+          "length": 16
+        },
+        {
+          "hash": "a4072c7817696c9d78ca7391efef2f6d955a222880392868a2110946219b760a",
+          "length": 16
+        },
+        {
+          "hash": "66223b41a1a2eaf69a110e6ac24d90dcafee43a2fb562f18376e143c97188919",
+          "length": 16
+        },
+        {
+          "hash": "0262278366db33db933303781e18b6829c186bf791d36d54e5a3fbc645fac1ed",
+          "length": 16
+        },
+        {
+          "hash": "6b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d0195",
+          "length": 16
+        },
+        {
+          "hash": "e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262",
+          "length": 16
+        },
+        {
+          "hash": "1fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc6234",
+          "length": 16
+        },
+        {
+          "hash": "cfa50a8cbf1aeb19d216a4e11e8164d6256ab1dbed2b5971a771f4535e303692",
+          "length": 16
+        },
+        {
+          "hash": "035f0ee0ec94cf508f2db9e8c0d7f9623657e97b0b8225f4fc5fad47344fc9a6",
+          "length": 16
+        },
+        {
+          "hash": "28d84f44ba16ece879b492e6b53b087d18887b85afe184964962897ca8e0119b",
+          "length": 16
+        },
+        {
+          "hash": "a3926a4ad7688e1ede590b0ef745406d56df98c06551741f739cecffc47c0d9d",
+          "length": 16
+        },
+        {
+          "hash": "bdf4710588785b156387b93d99a857c309ce2b3cc600962948bff06b773a3067",
+          "length": 16
+        },
+        {
+          "hash": "f8936bebe23341ad830575bc2300ea9e0c55a887c9a7c40b64522c1ba36573c2",
+          "length": 16
+        },
+        {
+          "hash": "eb5598ddce2194b31897a6a9aefd6ef863ebfd78a22f5625323bb193ec397b96",
+          "length": 16
+        },
+        {
+          "hash": "b8664032519237ae2a63b9e96fc92c93987b1479161a630cfb721f6d660386b0",
+          "length": 16
+        },
+        {
+          "hash": "36866ef03ef229fa6b8ea1b391200f02111d0e7fb049fcd680ab302bb1a9c89c",
+          "length": 16
+        },
+        {
+          "hash": "871f6c6c4540c9baed6028aa069935e6a3251b15cb45a7f49f338c456dc5996e",
+          "length": 16
+        },
+        {
+          "hash": "32d6bb9fc8144a75f35a08f1f696dc6f3bfb822098a613c440447db53e6764f1",
+          "length": 16
+        },
+        {
+          "hash": "e47b58e58e2ff99e05f9894d5afa3a7b4097592c43fbb9ff310aa23747d0ff14",
+          "length": 16
+        },
+        {
+          "hash": "7848961520697dc0ffd4b09f4b0e4354c28cf1a6ed0806a31295bc301f331b3a",
+          "length": 16
+        },
+        {
+          "hash": "d8c3069a7f77ffc3d3d842626d7f48a1d98deb727d4467f74198737aac16c612",
+          "length": 16
+        },
+        {
+          "hash": "61f240ef884469499a5b06ddc37205bbfc8086082f95fd8110be17433b973d4a",
+          "length": 16
+        },
+        {
+          "hash": "defc5b9c4291d47f387f7b79031809bf2281cf6f8f97731e7798f41eed5d36e2",
+          "length": 16
+        },
+        {
+          "hash": "8a711b1167a776d825535388ac834ad98211cc8756e29e3fa6a175105b3759fb",
+          "length": 16
+        },
+        {
+          "hash": "042a0d764f7e105b1beba11a6f2ddce15466b1117fcd940c8b9f0cb5b0168176",
+          "length": 16
+        },
+        {
+          "hash": "37598728bee240fe90e1ac8394b821098d2255aef596e7495a04bff3f69954e1",
+          "length": 16
+        },
+        {
+          "hash": "382a3737f996df4a45c076d1c531022d2152f6baffd416566140eb6952d333cc",
+          "length": 16
+        },
+        {
+          "hash": "07409630b9d6e56546da9ef6668cb3ad847babb6790d0d171df335da864e104a",
+          "length": 16
+        },
+        {
+          "hash": "21adf6ecfc46a8821f884059e5f44392b9e54d78d90855110d49057f9b4486f1",
+          "length": 16
+        },
+        {
+          "hash": "316ef559e7f109b1a92145e6ada6f9365815a9561a550be981f8a900ea6d669b",
+          "length": 16
+        },
+        {
+          "hash": "0b3ea803ca032d710e0c8d05cd84012897c4e729a8cac062b52472f921d4089e",
+          "length": 16
+        },
+        {
+          "hash": "0be39878904daaf707994fa314ea1e2dbb8ea1585e02038574380d68bf8bf65d",
+          "length": 16
+        },
+        {
+          "hash": "698fa48ac3497f4c14e9c80d9a10467ed9d892dad1b5446dead9eaf62622dad5",
+          "length": 16
+        },
+        {
+          "hash": "91dd4844d6880a34d30317692cd4b8f500e86b21a57e93854a8bc467d85ea443",
+          "length": 16
+        },
+        {
+          "hash": "771954858fc1a08e714f369db4ae40744e533f285e84b149f0ae4dce67590826",
+          "length": 16
+        },
+        {
+          "hash": "f11490179c9a0f4bb2423c333fbaf6f5ec5b388ea857309c64985b631a2e4f3d",
+          "length": 16
+        },
+        {
+          "hash": "ac21858aef20ff32a67571c43736d788b6cf547225e9290068cd198c0268c0ae",
+          "length": 16
+        },
+        {
+          "hash": "7f6015f4273064d3c951b366e1dd29ba1466e29672db9f260a56ffc921f43e40",
+          "length": 16
+        },
+        {
+          "hash": "b6dc647bd7763318da0d9ace346db6277823b231896787c297b19307ea406b8a",
+          "length": 16
+        },
+        {
+          "hash": "1ffd5954c50a2711885244650c6f7e70b6711402b629d4afd0701aeb308b1e05",
+          "length": 16
+        },
+        {
+          "hash": "185779160eec1075cf7e3f48db5dce5412c29855b3b3ff52787f4cca4b3578b8",
+          "length": 16
+        },
+        {
+          "hash": "62d43e4b789d3672f24cbb44b296c1ae7805b9c59a26a6c36b84b13cbfe995d2",
+          "length": 16
+        },
+        {
+          "hash": "ae358f30001e81700d75416e4e082c2cea769b5e467486e3c2a44175eea599c2",
+          "length": 16
+        },
+        {
+          "hash": "6e09f58a42bf132f3677ea7a4fa9a173031b8660f1fca9fc972b4ca45233331c",
+          "length": 16
+        },
+        {
+          "hash": "4968e5c797655e6f2d2fc437ab8ed049c8434b662e592098b939962652ae6bf5",
+          "length": 16
+        },
+        {
+          "hash": "d3a080e71b8b260b5903df74d92ad2d83f945c2f2a5d600d16f9fcd0f4220a51",
+          "length": 16
+        },
+        {
+          "hash": "f003c21ef4df88a1000d1b327db0aaa11f35aa434012b6491a0ed7c213160f48",
+          "length": 16
+        },
+        {
+          "hash": "fc5368274a2e83c63c4726be14b3a4bbd58e74aeba367c283a4919576e43316f",
+          "length": 16
+        },
+        {
+          "hash": "7c0ea0406232c1416933699d38e12c2f6ce29b42ed3b217893cee9722398ea84",
+          "length": 16
+        },
+        {
+          "hash": "b76657d5f71e8662c9e85b52df783274b171a19b49e1770d3e72465176189f34",
+          "length": 16
+        },
+        {
+          "hash": "7a200502492d4cd5e31a5ef9c0aa2cd8f37b61971c5b02fe077058f892fdce3a",
+          "length": 16
+        },
+        {
+          "hash": "bcd521e1c2ecd9c268095943d509a7e97039ffa0359f99d4e2bea50e4338a2a1",
+          "length": 16
+        },
+        {
+          "hash": "7ffbbdc19d6fc05a79bce070829e90cc397de9c5b4396869c326a901b144dee9",
+          "length": 16
+        },
+        {
+          "hash": "77ca94553e6a62db94907fb4207d5dd89e9f579776b07dd107972f345a48645d",
+          "length": 16
+        },
+        {
+          "hash": "a8e4d30378c7524a84825f231660584857f52a79094eb10173ed4ba5c8fe9c88",
+          "length": 16
+        },
+        {
+          "hash": "06488f0e3510ec628b951369af8c1898bff6fae24ac3d093fdeb54cce1b2ca63",
+          "length": 16
+        },
+        {
+          "hash": "d2962c618eab0c269bd039d077b33b128d508c33111e68dfe3042a732ead0b29",
+          "length": 16
+        },
+        {
+          "hash": "ca0f07d764c44dd253343c243fe8ab083de0b12303c247235a5cf146c1457a79",
+          "length": 16
+        },
+        {
+          "hash": "22530a1859cbbdf32f1d7e00b3c6a56184fc9225101d8cc433925b58bec41608",
+          "length": 16
+        },
+        {
+          "hash": "ebac55b70aff47f9e5664761cdecc31f2b6f3436a31fd8f759d21a778d515a69",
+          "length": 16
+        },
+        {
+          "hash": "f9c78e8a11b41e86ac174281d76eb87127420d921d1b43ab4d2ea90948f4dbc4",
+          "length": 8
+        },
+        {
+          "hash": "af9c0e766d25c9c3a4fa94559fc96ba561c3dd06f8e60d31dffcaa612cd31166",
+          "length": 16
+        },
+        {
+          "hash": "48f90f00c066d345052633919cc6714cdec1e9c118c16c6b7c90c3716bea82a7",
+          "length": 16
+        },
+        {
+          "hash": "e056a8007ffe8334d020919544154d1860828d6aa466ae1257649a44da0a44a3",
+          "length": 16
+        },
+        {
+          "hash": "e9eae6c0361af0d24424940daa205a850b5deafba2e2bd03fdd4270ccbbee5e9",
+          "length": 16
+        },
+        {
+          "hash": "f1ac734e43c818bb77aa21a6384b20059737c018f49bcf2328f53e48cdaede94",
+          "length": 16
+        },
+        {
+          "hash": "1c0294a348b4bf9c94a66012602807ccc3fdd8e6faf5394389cd68a626b88e1a",
+          "length": 16
+        },
+        {
+          "hash": "b97fca77cd1f57e7659d850e4d8dbf60dc08ddbaffa5209bba397011eed84676",
+          "length": 4
+        },
+        {
+          "hash": "cdb9d6d2a18151f12371f5aa9bb106a31f8fb1858d599f02c34ee2bae6ae72b0",
+          "length": 16
+        },
+        {
+          "hash": "f65de86e40d42450f18d3bc70e5e72fb281daac70f1b73f7b6177b4a236d2c31",
+          "length": 16
+        },
+        {
+          "hash": "5e1effe9b7bab73dce628ccd9f0cbbb16c1e6efc6c4f311e59992a467bc119fd",
+          "length": 1
+        }
+      ],
+      "bundle_length": 5102,
+      "bundle_sha256": "f9c87991c4ec90f172fc12b7f18f5987f8d5047326bf620e8f15f77577e125e4"
+    },
+    {
+      "name": "cut-by-content",
+      "cutting": "fastcdc-v1",
+      "extra": {},
+      "top": {
+        "file": [
+          {
+            "seed": "scionic-fastcdc-v1:corpus:random_3mib",
+            "length": 3145728
+          }
+        ]
+      },
+      "root": "bafkreicnqfslnffi5hyy3nzreevydf7gz72lllll52ztszewx3xzoy45l4",
+      "root_hash": "4d8164b694a8e9f18db731212b8197e6cff4b5ad6beeb3396496beef97639d5f",
+      "record": "200100000000003000006c182d880924bafc6d1b790f596350dcc80e5d898c993049fb7d8ca40bf4e292000000000000000200000000003000000000000000000048000100086368756e6b696e67000a666173746364632d7631",
+      "size": 3145728,
+      "pieces": 2,
+      "piece_bytes": 3145728,
+      "list_bytes": 72,
+      "lists": [
+        {
+          "kind": "file",
+          "hash": "6c182d880924bafc6d1b790f596350dcc80e5d898c993049fb7d8ca40bf4e292",
+          "size": 3145728,
+          "bytes": "22e348ffa477d20cf9528fc6bc919b231f79f5364def98cb6025b45e9010ae6400205359bb5aeb22bef315158581e4deff7b541d0cc4e2b7b062d287a1ae30a84d854689000faca7"
+        }
+      ],
+      "piece_list": [
+        {
+          "hash": "22e348ffa477d20cf9528fc6bc919b231f79f5364def98cb6025b45e9010ae64",
+          "length": 2118489
+        },
+        {
+          "hash": "bb5aeb22bef315158581e4deff7b541d0cc4e2b7b062d287a1ae30a84d854689",
+          "length": 1027239
+        }
+      ],
+      "bundle_length": 3145917,
+      "bundle_sha256": "a71cd537b4255c3b7ae47f034f35c896d6893c41868e7e71459a29bbbee46c7d"
+    }
+  ],
+  "runs": [
+    {
+      "tree": "folder",
+      "path": "weights/model.bin",
+      "of": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      },
+      "start": 0,
+      "end": 1,
+      "starts_at_byte": 0,
+      "frame": "23000000000000003f0000000000000000000000016dce74fa10473bb925d26e48a8e5fedb74e9708172d2696ab22a32fbb2c79a9300000010000676b11625bd1159a05e59d2820b2f16f6036b51dfacd8e0a5321c21bb85891ff20000000000000010048dfdd6b3348715f2afdbaeb74ceb117489990618f16eccd68f20727148e13600000000000000209169203c4dd6bc42515f3fce28ca4e3ee7590aa06faab20cb0be5fcb34a90f510000000000000040e3b05f563ab2e91fef6afc042e00fb072e1a565793676f55e55d80bdfb49df86000000000000008061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8"
+    },
+    {
+      "tree": "folder",
+      "path": "weights/model.bin",
+      "of": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      },
+      "start": 0,
+      "end": 63,
+      "starts_at_byte": 0,
+      "frame": "23000000000000003f00000000000000000000003f6dce74fa10473bb925d26e48a8e5fedb74e9708172d2696ab22a32fbb2c79a93000000109247b3cda21b33fb9aaeda3e7584d96ef5fc9b696e1589de8bcdee100572d2d800000010caaf81dae4ab2c9ed459c166808f012d850ef7bef254c3d559676782ce6ace5900000010a4072c7817696c9d78ca7391efef2f6d955a222880392868a2110946219b760a0000001066223b41a1a2eaf69a110e6ac24d90dcafee43a2fb562f18376e143c97188919000000100262278366db33db933303781e18b6829c186bf791d36d54e5a3fbc645fac1ed000000106b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc623400000010cfa50a8cbf1aeb19d216a4e11e8164d6256ab1dbed2b5971a771f4535e30369200000010035f0ee0ec94cf508f2db9e8c0d7f9623657e97b0b8225f4fc5fad47344fc9a60000001028d84f44ba16ece879b492e6b53b087d18887b85afe184964962897ca8e0119b00000010a3926a4ad7688e1ede590b0ef745406d56df98c06551741f739cecffc47c0d9d00000010bdf4710588785b156387b93d99a857c309ce2b3cc600962948bff06b773a306700000010f8936bebe23341ad830575bc2300ea9e0c55a887c9a7c40b64522c1ba36573c200000010eb5598ddce2194b31897a6a9aefd6ef863ebfd78a22f5625323bb193ec397b9600000010b8664032519237ae2a63b9e96fc92c93987b1479161a630cfb721f6d660386b00000001036866ef03ef229fa6b8ea1b391200f02111d0e7fb049fcd680ab302bb1a9c89c00000010871f6c6c4540c9baed6028aa069935e6a3251b15cb45a7f49f338c456dc5996e0000001032d6bb9fc8144a75f35a08f1f696dc6f3bfb822098a613c440447db53e6764f100000010e47b58e58e2ff99e05f9894d5afa3a7b4097592c43fbb9ff310aa23747d0ff14000000107848961520697dc0ffd4b09f4b0e4354c28cf1a6ed0806a31295bc301f331b3a00000010d8c3069a7f77ffc3d3d842626d7f48a1d98deb727d4467f74198737aac16c6120000001061f240ef884469499a5b06ddc37205bbfc8086082f95fd8110be17433b973d4a00000010defc5b9c4291d47f387f7b79031809bf2281cf6f8f97731e7798f41eed5d36e2000000108a711b1167a776d825535388ac834ad98211cc8756e29e3fa6a175105b3759fb00000010042a0d764f7e105b1beba11a6f2ddce15466b1117fcd940c8b9f0cb5b01681760000001037598728bee240fe90e1ac8394b821098d2255aef596e7495a04bff3f69954e100000010382a3737f996df4a45c076d1c531022d2152f6baffd416566140eb6952d333cc0000001007409630b9d6e56546da9ef6668cb3ad847babb6790d0d171df335da864e104a0000001021adf6ecfc46a8821f884059e5f44392b9e54d78d90855110d49057f9b4486f100000010316ef559e7f109b1a92145e6ada6f9365815a9561a550be981f8a900ea6d669b000000100b3ea803ca032d710e0c8d05cd84012897c4e729a8cac062b52472f921d4089e000000100be39878904daaf707994fa314ea1e2dbb8ea1585e02038574380d68bf8bf65d00000010698fa48ac3497f4c14e9c80d9a10467ed9d892dad1b5446dead9eaf62622dad50000001091dd4844d6880a34d30317692cd4b8f500e86b21a57e93854a8bc467d85ea44300000010771954858fc1a08e714f369db4ae40744e533f285e84b149f0ae4dce6759082600000010f11490179c9a0f4bb2423c333fbaf6f5ec5b388ea857309c64985b631a2e4f3d00000010ac21858aef20ff32a67571c43736d788b6cf547225e9290068cd198c0268c0ae000000107f6015f4273064d3c951b366e1dd29ba1466e29672db9f260a56ffc921f43e4000000010b6dc647bd7763318da0d9ace346db6277823b231896787c297b19307ea406b8a000000101ffd5954c50a2711885244650c6f7e70b6711402b629d4afd0701aeb308b1e0500000010185779160eec1075cf7e3f48db5dce5412c29855b3b3ff52787f4cca4b3578b80000001062d43e4b789d3672f24cbb44b296c1ae7805b9c59a26a6c36b84b13cbfe995d200000010ae358f30001e81700d75416e4e082c2cea769b5e467486e3c2a44175eea599c2000000106e09f58a42bf132f3677ea7a4fa9a173031b8660f1fca9fc972b4ca45233331c000000104968e5c797655e6f2d2fc437ab8ed049c8434b662e592098b939962652ae6bf500000010d3a080e71b8b260b5903df74d92ad2d83f945c2f2a5d600d16f9fcd0f4220a5100000010f003c21ef4df88a1000d1b327db0aaa11f35aa434012b6491a0ed7c213160f4800000010fc5368274a2e83c63c4726be14b3a4bbd58e74aeba367c283a4919576e43316f000000107c0ea0406232c1416933699d38e12c2f6ce29b42ed3b217893cee9722398ea8400000010b76657d5f71e8662c9e85b52df783274b171a19b49e1770d3e72465176189f34000000107a200502492d4cd5e31a5ef9c0aa2cd8f37b61971c5b02fe077058f892fdce3a00000010bcd521e1c2ecd9c268095943d509a7e97039ffa0359f99d4e2bea50e4338a2a1000000107ffbbdc19d6fc05a79bce070829e90cc397de9c5b4396869c326a901b144dee90000001077ca94553e6a62db94907fb4207d5dd89e9f579776b07dd107972f345a48645d00000010a8e4d30378c7524a84825f231660584857f52a79094eb10173ed4ba5c8fe9c880000001006488f0e3510ec628b951369af8c1898bff6fae24ac3d093fdeb54cce1b2ca6300000010d2962c618eab0c269bd039d077b33b128d508c33111e68dfe3042a732ead0b2900000010ca0f07d764c44dd253343c243fe8ab083de0b12303c247235a5cf146c1457a790000001022530a1859cbbdf32f1d7e00b3c6a56184fc9225101d8cc433925b58bec4160800000010ebac55b70aff47f9e5664761cdecc31f2b6f3436a31fd8f759d21a778d515a6900000010f9c78e8a11b41e86ac174281d76eb87127420d921d1b43ab4d2ea90948f4dbc4000000080000"
+    },
+    {
+      "tree": "folder",
+      "path": "weights/model.bin",
+      "of": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      },
+      "start": 62,
+      "end": 63,
+      "starts_at_byte": 992,
+      "frame": "23000000000000003f000000000000003e00000001f9c78e8a11b41e86ac174281d76eb87127420d921d1b43ab4d2ea90948f4dbc400000008000573c3d4d0bc1c4faa90faadf21157026d769f66abfd3bb70c0e0a10724701143d0000000000000200d53cbba0114edbfd5ea0153223a8d9f2877c58e83ab1801561f7427de93d90260000000000000100e4bd82380c51ae8dd4ccc17cbc2905666f0021f050325716eb9fff1d442ad5130000000000000080ecaa91789e958c3d317de05a15ea4899d38d5e388914d401bcbdc4fa4bbc48e300000000000000408011d0c704494f50388b4ad4c2aa78ba81dd0d241bdc9c5fb7532f4f06e6577a0000000000000020"
+    },
+    {
+      "tree": "folder",
+      "path": "weights/model.bin",
+      "of": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      },
+      "start": 6,
+      "end": 28,
+      "starts_at_byte": 96,
+      "frame": "23000000000000003f0000000000000006000000166b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc623400000010cfa50a8cbf1aeb19d216a4e11e8164d6256ab1dbed2b5971a771f4535e30369200000010035f0ee0ec94cf508f2db9e8c0d7f9623657e97b0b8225f4fc5fad47344fc9a60000001028d84f44ba16ece879b492e6b53b087d18887b85afe184964962897ca8e0119b00000010a3926a4ad7688e1ede590b0ef745406d56df98c06551741f739cecffc47c0d9d00000010bdf4710588785b156387b93d99a857c309ce2b3cc600962948bff06b773a306700000010f8936bebe23341ad830575bc2300ea9e0c55a887c9a7c40b64522c1ba36573c200000010eb5598ddce2194b31897a6a9aefd6ef863ebfd78a22f5625323bb193ec397b9600000010b8664032519237ae2a63b9e96fc92c93987b1479161a630cfb721f6d660386b00000001036866ef03ef229fa6b8ea1b391200f02111d0e7fb049fcd680ab302bb1a9c89c00000010871f6c6c4540c9baed6028aa069935e6a3251b15cb45a7f49f338c456dc5996e0000001032d6bb9fc8144a75f35a08f1f696dc6f3bfb822098a613c440447db53e6764f100000010e47b58e58e2ff99e05f9894d5afa3a7b4097592c43fbb9ff310aa23747d0ff14000000107848961520697dc0ffd4b09f4b0e4354c28cf1a6ed0806a31295bc301f331b3a00000010d8c3069a7f77ffc3d3d842626d7f48a1d98deb727d4467f74198737aac16c6120000001061f240ef884469499a5b06ddc37205bbfc8086082f95fd8110be17433b973d4a00000010defc5b9c4291d47f387f7b79031809bf2281cf6f8f97731e7798f41eed5d36e2000000108a711b1167a776d825535388ac834ad98211cc8756e29e3fa6a175105b3759fb00000010042a0d764f7e105b1beba11a6f2ddce15466b1117fcd940c8b9f0cb5b01681760000001037598728bee240fe90e1ac8394b821098d2255aef596e7495a04bff3f69954e10000001000044a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda500000000000000200544dbb3102e4ec3c42238e76c0c86caa773e825c5be98c184dcac03030cd8c1000000000000004013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8"
+    },
+    {
+      "tree": "folder",
+      "path": "weights/model.bin",
+      "of": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      },
+      "start": 31,
+      "end": 33,
+      "starts_at_byte": 496,
+      "frame": "23000000000000003f000000000000001f00000002316ef559e7f109b1a92145e6ada6f9365815a9561a550be981f8a900ea6d669b000000100b3ea803ca032d710e0c8d05cd84012897c4e729a8cac062b52472f921d4089e00000010000aa29ac1cc7fdb14e9f0de3a79522fd4e93c6ad4d2d1e816a94cc47aa29730a4810000000000000100502bda2268de37330a5ec818819f94aa13cf00b5355b94c770d57abfecee6d8c000000000000008087b46e11afadcc90be3fc85a4bfa9dbea9284f518bbca987cc7b2623ec4ce6550000000000000040a819818fbc8b4de4cee313f64305746d560dfa8e384eea1f2038adac46d69832000000000000002031b61135199794b1f62e8c4e7d61b12b71aace89d08520f0d88f2b4fe584aabe0000000000000010a4222ecc14e76e646ffafa25bec5e05db3d8ea67c98dae1c33e1174182d59930000000000000001028586d49ee9cf32b1861a53a7b22bbae4f62d1f43518946c2e3ab50c1b6c411f00000000000000202214b8b02c18ff8e75cab4ca75de3e9bb06fd8207bb9a52b77e445b43134fb930000000000000040c811edbd6a08718f4b29f7224304c79a2e021b4c2754a596358c91f8120082090000000000000080404e2f5d3b04891a31b97a09b731d408bfa774c0913bc25fdea3c254964b8e8500000000000000e8"
+    },
+    {
+      "tree": "folder",
+      "path": "",
+      "of": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "start": 0,
+      "end": 5,
+      "frame": "240000000000000005000000000000000000000005020000000000000020db62775c4fd14ef7df7250fc31114a571ef9b0557abf1437c075615cce4696cf0004646174610000010000000000000000492e35bd5a6d4e785b157a2edaabe989d7be2f05fed40b68057b5de8d5014b620009656d7074792e62696e0000020000000000000000b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985000c6e6f7468696e672d68657265000001000000000000000cc1c440976e8944ccd5bbcc39d4756410db638a86bf66f200d5689a565c304b60000a726561646d652e7478740001000474797065000a746578742f706c61696e0200000000000008555d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959000777656967687473000100046e6f7465000b74686520776569676874730000"
+    },
+    {
+      "tree": "folder",
+      "path": "",
+      "of": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "start": 2,
+      "end": 3,
+      "frame": "240000000000000005000000000000000200000001020000000000000000b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985000c6e6f7468696e672d6865726500000003f86bba72c6858d66a8e92f1ce9076fbf11e9c993f99e8745a010a52d11c22a9100000000000000200004646174611e1b9f2766c7681ea5aec158cfadaf9c236b98b805e88b6c73cfe7479e0ed814000000000000000c000a726561646d652e747874edf380afbfb93c17ad9cdd0a832fcb3bc7aac2a804e17e2019a5aef6113677fe0000000000000855000777656967687473"
+    },
+    {
+      "tree": "folder",
+      "path": "",
+      "of": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "start": 4,
+      "end": 5,
+      "frame": "2400000000000000050000000000000004000000010200000000000008555d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959000777656967687473000100046e6f7465000b74686520776569676874730001969b5629253da19cf3b905478385536288f0e563dde205d63eb961c741bef332000000000000002c000464617461"
+    },
+    {
+      "tree": "folder",
+      "path": "weights",
+      "of": {
+        "kind": "folder",
+        "hash": "5d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959",
+        "size": 2133
+      },
+      "start": 0,
+      "end": 2,
+      "frame": "2400000000000000030000000000000000000000020100000000000003e8b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e0944350011636f70792d6f662d6d6f64656c2e62696e00000100000000000003e8b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e09443500096d6f64656c2e62696e00000001ac2a9d5b21b58d4524adc51e8540a20934c5d54ba400cdc855a8aa92f02ac46300000000000000850006736861726473"
+    }
+  ],
+  "names": [
+    {
+      "tree": "folder",
+      "path": "",
+      "of": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "name": "readme.txt",
+      "found": true,
+      "frame": "24000000000000000500000000000000030000000101000000000000000cc1c440976e8944ccd5bbcc39d4756410db638a86bf66f200d5689a565c304b60000a726561646d652e7478740001000474797065000a746578742f706c61696e0003f86bba72c6858d66a8e92f1ce9076fbf11e9c993f99e8745a010a52d11c22a910000000000000020000464617461d19aab7ce055813cbbfc19d52d1a43e92bdf1065ae7bcc4ce67ba54ca246acb80000000000000000000c6e6f7468696e672d68657265edf380afbfb93c17ad9cdd0a832fcb3bc7aac2a804e17e2019a5aef6113677fe0000000000000855000777656967687473"
+    },
+    {
+      "tree": "folder",
+      "path": "",
+      "of": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "name": "weights",
+      "found": true,
+      "frame": "2400000000000000050000000000000004000000010200000000000008555d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959000777656967687473000100046e6f7465000b74686520776569676874730001969b5629253da19cf3b905478385536288f0e563dde205d63eb961c741bef332000000000000002c000464617461"
+    },
+    {
+      "tree": "folder",
+      "path": "",
+      "of": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "name": "a",
+      "found": false,
+      "frame": "240000000000000005000000000000000000000001020000000000000020db62775c4fd14ef7df7250fc31114a571ef9b0557abf1437c075615cce4696cf00046461746100000003b6398bf0fa7da3bdeff4cd64b205f412d947a2e2ad1241c2a2c5e20d0403d06a00000000000000000009656d7074792e62696ed5525a929ccfe11065c4951ff6dc78816b4ea22f50c1118aec341b04dab91c6a000000000000000c000c6e6f7468696e672d68657265edf380afbfb93c17ad9cdd0a832fcb3bc7aac2a804e17e2019a5aef6113677fe0000000000000855000777656967687473"
+    },
+    {
+      "tree": "folder",
+      "path": "",
+      "of": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "name": "readme.txs",
+      "found": false,
+      "frame": "240000000000000005000000000000000200000001020000000000000000b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985000c6e6f7468696e672d6865726500000003f86bba72c6858d66a8e92f1ce9076fbf11e9c993f99e8745a010a52d11c22a9100000000000000200004646174611e1b9f2766c7681ea5aec158cfadaf9c236b98b805e88b6c73cfe7479e0ed814000000000000000c000a726561646d652e747874edf380afbfb93c17ad9cdd0a832fcb3bc7aac2a804e17e2019a5aef6113677fe0000000000000855000777656967687473"
+    },
+    {
+      "tree": "folder",
+      "path": "",
+      "of": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "name": "zzz",
+      "found": false,
+      "frame": "2400000000000000050000000000000004000000010200000000000008555d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959000777656967687473000100046e6f7465000b74686520776569676874730001969b5629253da19cf3b905478385536288f0e563dde205d63eb961c741bef332000000000000002c000464617461"
+    },
+    {
+      "tree": "folder",
+      "path": "weights",
+      "of": {
+        "kind": "folder",
+        "hash": "5d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959",
+        "size": 2133
+      },
+      "name": "model.bin",
+      "found": true,
+      "frame": "2400000000000000030000000000000001000000010100000000000003e8b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e09443500096d6f64656c2e62696e000000027b406c875b2858c0b4cb55d7c110ee0cc3a455ef277834c94c4e6c5d5917f5cd00000000000003e80011636f70792d6f662d6d6f64656c2e62696eac2a9d5b21b58d4524adc51e8540a20934c5d54ba400cdc855a8aa92f02ac46300000000000000850006736861726473"
+    },
+    {
+      "tree": "folder",
+      "path": "weights",
+      "of": {
+        "kind": "folder",
+        "hash": "5d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959",
+        "size": 2133
+      },
+      "name": "absent",
+      "found": false,
+      "frame": "2400000000000000030000000000000000000000010100000000000003e8b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e0944350011636f70792d6f662d6d6f64656c2e62696e000000022ec92ed927631a6e42b54e6237fcc355f92b6679dd0939d610a2eedecf6619ec00000000000003e800096d6f64656c2e62696eac2a9d5b21b58d4524adc51e8540a20934c5d54ba400cdc855a8aa92f02ac46300000000000000850006736861726473"
+    },
+    {
+      "tree": "folder",
+      "path": "nothing-here",
+      "of": {
+        "kind": "folder",
+        "hash": "b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985",
+        "size": 0
+      },
+      "name": "anything",
+      "found": false,
+      "frame": "2400000000000000000000000000000000000000000000"
+    }
+  ],
+  "answers": [
+    {
+      "tree": "folder",
+      "what": "the record",
+      "request": "30b20c89d5794836fded7cf34ebec0f21340dd8ea2075a47ac4c129d7e98108bd4",
+      "frames": [
+        "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000200086368756e6b696e67000866697865642d313600046e616d650008612073616d706c65"
       ]
     },
     {
-      "name": "flat_directory",
-      "root_kind": "directory",
-      "root_input_path": "flat_directory",
-      "root_hash": "bafireigd6awocke3nmagbspbkv2rfiqqai455eimle27u36ljeytyqdb4u",
-      "additional_data": [],
-      "leaf_count": 6,
-      "file_leaves": 5,
-      "directory_leaves": 1,
-      "chunk_leaves": 0,
-      "full_dag": "cases/flat_directory/full/dag.cbor",
-      "full_dag_json": "cases/flat_directory/full/dag.json",
-      "partial_dags": [
-        "cases/flat_directory/partial/0/dag.cbor",
-        "cases/flat_directory/partial/1/dag.cbor"
-      ],
-      "partial_dags_json": [
-        "cases/flat_directory/partial/0/dag.json",
-        "cases/flat_directory/partial/1/dag.json"
-      ],
-      "transmission_packets": [
-        "cases/flat_directory/transmission/packet-000.cbor",
-        "cases/flat_directory/transmission/packet-001.cbor",
-        "cases/flat_directory/transmission/packet-002.cbor",
-        "cases/flat_directory/transmission/packet-003.cbor",
-        "cases/flat_directory/transmission/packet-004.cbor",
-        "cases/flat_directory/transmission/packet-005.cbor"
-      ],
-      "transmission_packets_json": [
-        "cases/flat_directory/transmission/packet-000.json",
-        "cases/flat_directory/transmission/packet-001.json",
-        "cases/flat_directory/transmission/packet-002.json",
-        "cases/flat_directory/transmission/packet-003.json",
-        "cases/flat_directory/transmission/packet-004.json",
-        "cases/flat_directory/transmission/packet-005.json"
-      ],
-      "batched_packets": [
-        "cases/flat_directory/batched/batch-000.cbor"
-      ],
-      "batched_packets_json": [
-        "cases/flat_directory/batched/batch-000.json"
-      ],
-      "negative_vectors": [
-        {
-          "path": "cases/flat_directory/negative/tampered_content/dag.cbor",
-          "path_json": "cases/flat_directory/negative/tampered_content/dag.json",
-          "kind": "tampered_content",
-          "description": "one leaf's content byte flipped; its CID no longer matches the content"
-        },
-        {
-          "path": "cases/flat_directory/negative/tampered_item_name/dag.cbor",
-          "path_json": "cases/flat_directory/negative/tampered_item_name/dag.json",
-          "kind": "tampered_item_name",
-          "description": "one leaf's ItemName altered while its content and stored CID are left alone"
-        },
-        {
-          "path": "cases/flat_directory/negative/tampered_link/dag.cbor",
-          "path_json": "cases/flat_directory/negative/tampered_link/dag.json",
-          "kind": "tampered_link",
-          "description": "one link retargeted at the root CID; every leaf is still present and individually well formed, only the relationship is wrong"
-        }
+      "tree": "folder",
+      "what": "the top folder's list",
+      "request": "31c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+      "frames": [
+        "22020000000000000020db62775c4fd14ef7df7250fc31114a571ef9b0557abf1437c075615cce4696cf0004646174610000010000000000000000492e35bd5a6d4e785b157a2edaabe989d7be2f05fed40b68057b5de8d5014b620009656d7074792e62696e0000020000000000000000b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985000c6e6f7468696e672d68657265000001000000000000000cc1c440976e8944ccd5bbcc39d4756410db638a86bf66f200d5689a565c304b60000a726561646d652e7478740001000474797065000a746578742f706c61696e0200000000000008555d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959000777656967687473000100046e6f7465000b7468652077656967687473"
       ]
     },
     {
-      "name": "json_metadata_probe",
-      "root_kind": "directory",
-      "root_input_path": "json_metadata_probe",
-      "root_hash": "bafireida236i245qs6mlr4al4edkgo4p4jwpcpmbafetlqvjuabosam6qu",
-      "additional_data": [
-        {
-          "key": "aaa-probe",
-          "value": "9-byte key"
-        },
-        {
-          "key": "m",
-          "value": "1-byte key"
-        },
-        {
-          "key": "zz-probe",
-          "value": "8-byte key"
-        }
-      ],
-      "leaf_count": 7,
-      "file_leaves": 3,
-      "directory_leaves": 2,
-      "chunk_leaves": 2,
-      "full_dag": "cases/json_metadata_probe/full/dag.cbor",
-      "full_dag_json": "cases/json_metadata_probe/full/dag.json",
-      "partial_dags": [
-        "cases/json_metadata_probe/partial/0/dag.cbor",
-        "cases/json_metadata_probe/partial/1/dag.cbor"
-      ],
-      "partial_dags_json": [
-        "cases/json_metadata_probe/partial/0/dag.json",
-        "cases/json_metadata_probe/partial/1/dag.json"
-      ],
-      "transmission_packets": [
-        "cases/json_metadata_probe/transmission/packet-000.cbor",
-        "cases/json_metadata_probe/transmission/packet-001.cbor",
-        "cases/json_metadata_probe/transmission/packet-002.cbor",
-        "cases/json_metadata_probe/transmission/packet-003.cbor",
-        "cases/json_metadata_probe/transmission/packet-004.cbor",
-        "cases/json_metadata_probe/transmission/packet-005.cbor",
-        "cases/json_metadata_probe/transmission/packet-006.cbor"
-      ],
-      "transmission_packets_json": [
-        "cases/json_metadata_probe/transmission/packet-000.json",
-        "cases/json_metadata_probe/transmission/packet-001.json",
-        "cases/json_metadata_probe/transmission/packet-002.json",
-        "cases/json_metadata_probe/transmission/packet-003.json",
-        "cases/json_metadata_probe/transmission/packet-004.json",
-        "cases/json_metadata_probe/transmission/packet-005.json",
-        "cases/json_metadata_probe/transmission/packet-006.json"
-      ],
-      "batched_packets": [
-        "cases/json_metadata_probe/batched/batch-000.cbor"
-      ],
-      "batched_packets_json": [
-        "cases/json_metadata_probe/batched/batch-000.json"
-      ],
-      "negative_vectors": [
-        {
-          "path": "cases/json_metadata_probe/negative/tampered_content/dag.cbor",
-          "path_json": "cases/json_metadata_probe/negative/tampered_content/dag.json",
-          "kind": "tampered_content",
-          "description": "one leaf's content byte flipped; its CID no longer matches the content"
-        },
-        {
-          "path": "cases/json_metadata_probe/negative/tampered_item_name/dag.cbor",
-          "path_json": "cases/json_metadata_probe/negative/tampered_item_name/dag.json",
-          "kind": "tampered_item_name",
-          "description": "one leaf's ItemName altered while its content and stored CID are left alone"
-        },
-        {
-          "path": "cases/json_metadata_probe/negative/tampered_link/dag.cbor",
-          "path_json": "cases/json_metadata_probe/negative/tampered_link/dag.json",
-          "kind": "tampered_link",
-          "description": "one link retargeted at the root CID; every leaf is still present and individually well formed, only the relationship is wrong"
-        }
+      "tree": "folder",
+      "what": "two entries of weights, from the second",
+      "request": "325d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959000000000000000100000002",
+      "frames": [
+        "2400000000000000030000000000000001000000020100000000000003e8b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e09443500096d6f64656c2e62696e00000200000000000000857360afc9a35349c72b487181fcb33d35ea5d3429d5063b1f57e3be91fb60c34e0006736861726473000000017b406c875b2858c0b4cb55d7c110ee0cc3a455ef277834c94c4e6c5d5917f5cd00000000000003e80011636f70792d6f662d6d6f64656c2e62696e"
       ]
     },
     {
-      "name": "mixed_sizes",
-      "root_kind": "directory",
-      "root_input_path": "mixed_sizes",
-      "root_hash": "bafireibrvfd6b3unpr27mq72pdsksj26y6hq32ahjmy6i7omfresfleloq",
-      "additional_data": [],
-      "leaf_count": 11,
-      "file_leaves": 5,
-      "directory_leaves": 1,
-      "chunk_leaves": 5,
-      "full_dag": "cases/mixed_sizes/full/dag.cbor",
-      "full_dag_json": "cases/mixed_sizes/full/dag.json",
-      "partial_dags": [
-        "cases/mixed_sizes/partial/0/dag.cbor",
-        "cases/mixed_sizes/partial/1/dag.cbor"
-      ],
-      "partial_dags_json": [
-        "cases/mixed_sizes/partial/0/dag.json",
-        "cases/mixed_sizes/partial/1/dag.json"
-      ],
-      "transmission_packets": [
-        "cases/mixed_sizes/transmission/packet-000.cbor",
-        "cases/mixed_sizes/transmission/packet-001.cbor",
-        "cases/mixed_sizes/transmission/packet-002.cbor",
-        "cases/mixed_sizes/transmission/packet-003.cbor",
-        "cases/mixed_sizes/transmission/packet-004.cbor",
-        "cases/mixed_sizes/transmission/packet-005.cbor",
-        "cases/mixed_sizes/transmission/packet-006.cbor",
-        "cases/mixed_sizes/transmission/packet-007.cbor",
-        "cases/mixed_sizes/transmission/packet-008.cbor",
-        "cases/mixed_sizes/transmission/packet-009.cbor",
-        "cases/mixed_sizes/transmission/packet-010.cbor"
-      ],
-      "transmission_packets_json": [
-        "cases/mixed_sizes/transmission/packet-000.json",
-        "cases/mixed_sizes/transmission/packet-001.json",
-        "cases/mixed_sizes/transmission/packet-002.json",
-        "cases/mixed_sizes/transmission/packet-003.json",
-        "cases/mixed_sizes/transmission/packet-004.json",
-        "cases/mixed_sizes/transmission/packet-005.json",
-        "cases/mixed_sizes/transmission/packet-006.json",
-        "cases/mixed_sizes/transmission/packet-007.json",
-        "cases/mixed_sizes/transmission/packet-008.json",
-        "cases/mixed_sizes/transmission/packet-009.json",
-        "cases/mixed_sizes/transmission/packet-010.json"
-      ],
-      "batched_packets": [
-        "cases/mixed_sizes/batched/batch-000.cbor",
-        "cases/mixed_sizes/batched/batch-001.cbor",
-        "cases/mixed_sizes/batched/batch-002.cbor",
-        "cases/mixed_sizes/batched/batch-003.cbor"
-      ],
-      "batched_packets_json": [
-        "cases/mixed_sizes/batched/batch-000.json",
-        "cases/mixed_sizes/batched/batch-001.json",
-        "cases/mixed_sizes/batched/batch-002.json",
-        "cases/mixed_sizes/batched/batch-003.json"
-      ],
-      "negative_vectors": [
-        {
-          "path": "cases/mixed_sizes/negative/tampered_content/dag.cbor",
-          "path_json": "cases/mixed_sizes/negative/tampered_content/dag.json",
-          "kind": "tampered_content",
-          "description": "one leaf's content byte flipped; its CID no longer matches the content"
-        },
-        {
-          "path": "cases/mixed_sizes/negative/tampered_item_name/dag.cbor",
-          "path_json": "cases/mixed_sizes/negative/tampered_item_name/dag.json",
-          "kind": "tampered_item_name",
-          "description": "one leaf's ItemName altered while its content and stored CID are left alone"
-        },
-        {
-          "path": "cases/mixed_sizes/negative/tampered_link/dag.cbor",
-          "path_json": "cases/mixed_sizes/negative/tampered_link/dag.json",
-          "kind": "tampered_link",
-          "description": "one link retargeted at the root CID; every leaf is still present and individually well formed, only the relationship is wrong"
-        }
+      "tree": "folder",
+      "what": "one name of the top folder",
+      "request": "33c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000a726561646d652e747874",
+      "frames": [
+        "24000000000000000500000000000000030000000101000000000000000cc1c440976e8944ccd5bbcc39d4756410db638a86bf66f200d5689a565c304b60000a726561646d652e7478740001000474797065000a746578742f706c61696e0003f86bba72c6858d66a8e92f1ce9076fbf11e9c993f99e8745a010a52d11c22a910000000000000020000464617461d19aab7ce055813cbbfc19d52d1a43e92bdf1065ae7bcc4ce67ba54ca246acb80000000000000000000c6e6f7468696e672d68657265edf380afbfb93c17ad9cdd0a832fcb3bc7aac2a804e17e2019a5aef6113677fe0000000000000855000777656967687473"
       ]
     },
     {
-      "name": "nested_directory",
-      "root_kind": "directory",
-      "root_input_path": "nested_directory",
-      "root_hash": "bafireiekzu7qss4gcgk3ochl3ehk3ee3rmsqjdh7bin4twzdhkgsfw2kme",
-      "additional_data": [],
-      "leaf_count": 7,
-      "file_leaves": 4,
-      "directory_leaves": 3,
-      "chunk_leaves": 0,
-      "full_dag": "cases/nested_directory/full/dag.cbor",
-      "full_dag_json": "cases/nested_directory/full/dag.json",
-      "partial_dags": [
-        "cases/nested_directory/partial/0/dag.cbor",
-        "cases/nested_directory/partial/1/dag.cbor"
-      ],
-      "partial_dags_json": [
-        "cases/nested_directory/partial/0/dag.json",
-        "cases/nested_directory/partial/1/dag.json"
-      ],
-      "transmission_packets": [
-        "cases/nested_directory/transmission/packet-000.cbor",
-        "cases/nested_directory/transmission/packet-001.cbor",
-        "cases/nested_directory/transmission/packet-002.cbor",
-        "cases/nested_directory/transmission/packet-003.cbor",
-        "cases/nested_directory/transmission/packet-004.cbor",
-        "cases/nested_directory/transmission/packet-005.cbor",
-        "cases/nested_directory/transmission/packet-006.cbor"
-      ],
-      "transmission_packets_json": [
-        "cases/nested_directory/transmission/packet-000.json",
-        "cases/nested_directory/transmission/packet-001.json",
-        "cases/nested_directory/transmission/packet-002.json",
-        "cases/nested_directory/transmission/packet-003.json",
-        "cases/nested_directory/transmission/packet-004.json",
-        "cases/nested_directory/transmission/packet-005.json",
-        "cases/nested_directory/transmission/packet-006.json"
-      ],
-      "batched_packets": [
-        "cases/nested_directory/batched/batch-000.cbor"
-      ],
-      "batched_packets_json": [
-        "cases/nested_directory/batched/batch-000.json"
-      ],
-      "negative_vectors": [
-        {
-          "path": "cases/nested_directory/negative/tampered_content/dag.cbor",
-          "path_json": "cases/nested_directory/negative/tampered_content/dag.json",
-          "kind": "tampered_content",
-          "description": "one leaf's content byte flipped; its CID no longer matches the content"
-        },
-        {
-          "path": "cases/nested_directory/negative/tampered_item_name/dag.cbor",
-          "path_json": "cases/nested_directory/negative/tampered_item_name/dag.json",
-          "kind": "tampered_item_name",
-          "description": "one leaf's ItemName altered while its content and stored CID are left alone"
-        },
-        {
-          "path": "cases/nested_directory/negative/tampered_link/dag.cbor",
-          "path_json": "cases/nested_directory/negative/tampered_link/dag.json",
-          "kind": "tampered_link",
-          "description": "one link retargeted at the root CID; every leaf is still present and individually well formed, only the relationship is wrong"
-        }
+      "tree": "folder",
+      "what": "a file's list",
+      "request": "3449ba70170645c6128471c79cfbe18144ebb78d2374b04320b2f4fdb94bc88693",
+      "frames": [
+        "21cdb9d6d2a18151f12371f5aa9bb106a31f8fb1858d599f02c34ee2bae6ae72b000000010f65de86e40d42450f18d3bc70e5e72fb281daac70f1b73f7b6177b4a236d2c31000000105e1effe9b7bab73dce628ccd9f0cbbb16c1e6efc6c4f311e59992a467bc119fd00000001"
       ]
     },
     {
-      "name": "single_large_file",
-      "root_kind": "directory",
-      "root_input_path": "single_large_file",
-      "root_hash": "bafireiel7coatk47jhcsatc4xdjxx3jx7fdqteplhtlxb7y27bzwnstvwy",
-      "additional_data": [],
-      "leaf_count": 5,
-      "file_leaves": 1,
-      "directory_leaves": 1,
-      "chunk_leaves": 3,
-      "full_dag": "cases/single_large_file/full/dag.cbor",
-      "full_dag_json": "cases/single_large_file/full/dag.json",
-      "partial_dags": [
-        "cases/single_large_file/partial/0/dag.cbor"
-      ],
-      "partial_dags_json": [
-        "cases/single_large_file/partial/0/dag.json"
-      ],
-      "transmission_packets": [
-        "cases/single_large_file/transmission/packet-000.cbor",
-        "cases/single_large_file/transmission/packet-001.cbor",
-        "cases/single_large_file/transmission/packet-002.cbor",
-        "cases/single_large_file/transmission/packet-003.cbor",
-        "cases/single_large_file/transmission/packet-004.cbor"
-      ],
-      "transmission_packets_json": [
-        "cases/single_large_file/transmission/packet-000.json",
-        "cases/single_large_file/transmission/packet-001.json",
-        "cases/single_large_file/transmission/packet-002.json",
-        "cases/single_large_file/transmission/packet-003.json",
-        "cases/single_large_file/transmission/packet-004.json"
-      ],
-      "batched_packets": [
-        "cases/single_large_file/batched/batch-000.cbor",
-        "cases/single_large_file/batched/batch-001.cbor"
-      ],
-      "batched_packets_json": [
-        "cases/single_large_file/batched/batch-000.json",
-        "cases/single_large_file/batched/batch-001.json"
-      ],
-      "negative_vectors": [
-        {
-          "path": "cases/single_large_file/negative/tampered_content/dag.cbor",
-          "path_json": "cases/single_large_file/negative/tampered_content/dag.json",
-          "kind": "tampered_content",
-          "description": "one leaf's content byte flipped; its CID no longer matches the content"
-        },
-        {
-          "path": "cases/single_large_file/negative/tampered_item_name/dag.cbor",
-          "path_json": "cases/single_large_file/negative/tampered_item_name/dag.json",
-          "kind": "tampered_item_name",
-          "description": "one leaf's ItemName altered while its content and stored CID are left alone"
-        },
-        {
-          "path": "cases/single_large_file/negative/tampered_link/dag.cbor",
-          "path_json": "cases/single_large_file/negative/tampered_link/dag.json",
-          "kind": "tampered_link",
-          "description": "one link retargeted at the root CID; every leaf is still present and individually well formed, only the relationship is wrong"
-        }
+      "tree": "folder",
+      "what": "four items of a file's list, from the fourth",
+      "request": "35b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435000000000000000300000004",
+      "frames": [
+        "23000000000000003f000000000000000300000004a4072c7817696c9d78ca7391efef2f6d955a222880392868a2110946219b760a0000001066223b41a1a2eaf69a110e6ac24d90dcafee43a2fb562f18376e143c97188919000000100262278366db33db933303781e18b6829c186bf791d36d54e5a3fbc645fac1ed000000106b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d01950000001000061b8eb007fa78217d4b842a677a3373248c51645badc286d07c2c98ce98e0f22f000000000000002083dfa798965caa01de2d9b7613f3116b9b937e53ac36242e6650db56d70613a20000000000000010cd14f23bb453e4b406a4da5260aafd46df76bd7db51a82f37bbcacfe75b3c1f30000000000000010e3b05f563ab2e91fef6afc042e00fb072e1a565793676f55e55d80bdfb49df86000000000000008061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8"
       ]
     },
     {
-      "name": "single_small_file",
-      "root_kind": "directory",
-      "root_input_path": "single_small_file",
-      "root_hash": "bafireiabahlly4rktdhsvhzgd2prjurwuupjo5shdsefkpayhfqefhcvpe",
-      "additional_data": [],
-      "leaf_count": 2,
-      "file_leaves": 1,
-      "directory_leaves": 1,
-      "chunk_leaves": 0,
-      "full_dag": "cases/single_small_file/full/dag.cbor",
-      "full_dag_json": "cases/single_small_file/full/dag.json",
-      "partial_dags": [
-        "cases/single_small_file/partial/0/dag.cbor"
-      ],
-      "partial_dags_json": [
-        "cases/single_small_file/partial/0/dag.json"
-      ],
-      "transmission_packets": [
-        "cases/single_small_file/transmission/packet-000.cbor",
-        "cases/single_small_file/transmission/packet-001.cbor"
-      ],
-      "transmission_packets_json": [
-        "cases/single_small_file/transmission/packet-000.json",
-        "cases/single_small_file/transmission/packet-001.json"
-      ],
-      "batched_packets": [
-        "cases/single_small_file/batched/batch-000.cbor"
-      ],
-      "batched_packets_json": [
-        "cases/single_small_file/batched/batch-000.json"
-      ],
-      "negative_vectors": [
-        {
-          "path": "cases/single_small_file/negative/tampered_content/dag.cbor",
-          "path_json": "cases/single_small_file/negative/tampered_content/dag.json",
-          "kind": "tampered_content",
-          "description": "one leaf's content byte flipped; its CID no longer matches the content"
-        },
-        {
-          "path": "cases/single_small_file/negative/tampered_item_name/dag.cbor",
-          "path_json": "cases/single_small_file/negative/tampered_item_name/dag.json",
-          "kind": "tampered_item_name",
-          "description": "one leaf's ItemName altered while its content and stored CID are left alone"
-        },
-        {
-          "path": "cases/single_small_file/negative/tampered_link/dag.cbor",
-          "path_json": "cases/single_small_file/negative/tampered_link/dag.json",
-          "kind": "tampered_link",
-          "description": "one link retargeted at the root CID; every leaf is still present and individually well formed, only the relationship is wrong"
-        }
+      "tree": "folder",
+      "what": "the run that holds 40 bytes of a file, from byte 100",
+      "request": "36b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e09443500000000000000640000000000000028",
+      "frames": [
+        "23000000000000003f0000000000000006000000036b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc62340000001000074a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda5000000000000002025ec74d64a2315d3fb1a2cb18bde6b9f81df27485c53efa103caaabc7d1422230000000000000010b47ab4ef26da91d64d6146ff64309a21c5895cc51e163518f12c3374daa21c5400000000000000203ee004ed0055d5e53f6a881afed2c11d2e84bdeffcc600078131284a8e596b66000000000000004061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8"
       ]
+    },
+    {
+      "tree": "folder",
+      "what": "ten pieces of a file that has three",
+      "request": "3749ba70170645c6128471c79cfbe18144ebb78d2374b04320b2f4fdb94bc8869300000000000000000000000a",
+      "frames": [
+        "25fe245733078f7151bd0093b355ac82f4",
+        "25031516aa0166fe7fa4cb23e87b1f5d01",
+        "25e4"
+      ]
+    },
+    {
+      "tree": "folder",
+      "what": "one piece",
+      "request": "3843a6c4f416857ce17d3e1e2e9b136d95d695c13c9f455151633b02e275053062",
+      "frames": [
+        "258de921ca9b420f24eb9fbdcf"
+      ]
+    },
+    {
+      "tree": "folder",
+      "what": "which pieces of a file are held",
+      "request": "39b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+      "frames": [
+        "26000000000000003ffffffffffffffffe"
+      ]
+    },
+    {
+      "tree": "folder",
+      "what": "a file that is not held",
+      "request": "34825abd71c015167b9ed5e83463678c7d785c7c2a448b8d0e7b2c8fc9cdc4ce9d",
+      "frames": [
+        "2701"
+      ]
+    },
+    {
+      "tree": "folder",
+      "what": "pieces beyond a file's last",
+      "request": "3749ba70170645c6128471c79cfbe18144ebb78d2374b04320b2f4fdb94bc88693000000000000000300000001",
+      "frames": [
+        "2702"
+      ]
+    }
+  ],
+  "connection": {
+    "tree": "folder",
+    "sent": "0000002130b20c89d5794836fded7cf34ebec0f21340dd8ea2075a47ac4c129d7e98108bd40000002d3749ba70170645c6128471c79cfbe18144ebb78d2374b04320b2f4fdb94bc8869300000000000000000000000a0000002134825abd71c015167b9ed5e83463678c7d785c7c2a448b8d0e7b2c8fc9cdc4ce9d",
+    "received": "0000006820020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000200086368756e6b696e67000866697865642d313600046e616d650008612073616d706c65000000000000001125fe245733078f7151bd0093b355ac82f40000001125031516aa0166fe7fa4cb23e87b1f5d010000000225e40000000000000002270100000000"
+  },
+  "refused": [
+    {
+      "as": "record",
+      "what": "another first byte",
+      "bytes": "21020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000200086368756e6b696e67000866697865642d313600046e616d650008612073616d706c65"
+    },
+    {
+      "as": "record",
+      "what": "a byte after its end",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000200086368756e6b696e67000866697865642d313600046e616d650008612073616d706c6500"
+    },
+    {
+      "as": "record",
+      "what": "cut short by a byte",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000200086368756e6b696e67000866697865642d313600046e616d650008612073616d706c"
+    },
+    {
+      "as": "record",
+      "what": "it does not say how the tree was cut",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e0000"
+    },
+    {
+      "as": "record",
+      "what": "a way of cutting that is not known: \"fastcdc-v2\"",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000100086368756e6b696e67000a666173746364632d7632"
+    },
+    {
+      "as": "record",
+      "what": "a way of cutting that is not known: \"fixed-016\"",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000100086368756e6b696e67000966697865642d303136"
+    },
+    {
+      "as": "record",
+      "what": "a way of cutting that is not known: \"fixed-0\"",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000100086368756e6b696e67000766697865642d30"
+    },
+    {
+      "as": "record",
+      "what": "a way of cutting that is not known: \"fixed-8388609\"",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000100086368756e6b696e67000d66697865642d38333838363039"
+    },
+    {
+      "as": "record",
+      "what": "a way of cutting that is not known: \"fixed-\"",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000100086368756e6b696e67000666697865642d"
+    },
+    {
+      "as": "record",
+      "what": "a way of cutting that is not known: \"\"",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000100086368756e6b696e670000"
+    },
+    {
+      "as": "record",
+      "what": "a kind that is neither a file nor a folder",
+      "bytes": "20030000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000100086368756e6b696e67000866697865642d3136"
+    },
+    {
+      "as": "record",
+      "what": "more pieces than piece bytes",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000049a00000000000004990000000000020f30000100086368756e6b696e67000866697865642d3136"
+    },
+    {
+      "as": "record",
+      "what": "more piece bytes than the tree's size",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000008820000000000000d2e000100086368756e6b696e67000866697865642d3136"
+    },
+    {
+      "as": "record",
+      "what": "fewer list bytes than 36 a piece",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000aaf000100086368756e6b696e67000866697865642d3136"
+    },
+    {
+      "as": "record",
+      "what": "extra values out of order",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000200046e616d6500017800086368756e6b696e67000866697865642d3136"
+    },
+    {
+      "as": "record",
+      "what": "an extra value's name twice",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e000200086368756e6b696e67000866697865642d313600086368756e6b696e67000866697865642d3136"
+    },
+    {
+      "as": "record",
+      "what": "an extra value with no name",
+      "bytes": "20020000000000000881c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b000000000000004c00000000000004990000000000000d2e0002000000017800086368756e6b696e67000866697865642d3136"
+    },
+    {
+      "as": "file-list",
+      "what": "35 bytes",
+      "bytes": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb000000"
+    },
+    {
+      "as": "file-list",
+      "what": "a piece of no bytes",
+      "bytes": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb00000000"
+    },
+    {
+      "as": "file-list",
+      "what": "a piece of more than 8 MiB",
+      "bytes": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb00800001"
+    },
+    {
+      "as": "file-list-cut",
+      "what": "a piece in the middle that is shorter than the tree's pieces",
+      "bytes": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb000000103e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d000000092e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc600000010",
+      "cutting": "fixed-16"
+    },
+    {
+      "as": "file-list-cut",
+      "what": "a last piece that is longer than the tree's pieces",
+      "bytes": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb000000103e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d00000011",
+      "cutting": "fixed-16"
+    },
+    {
+      "as": "file-list-cut",
+      "what": "a piece that is not the last and holds exactly 512 KiB",
+      "bytes": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb000800003e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d00000001",
+      "cutting": "fastcdc-v1"
+    },
+    {
+      "as": "file-list-cut",
+      "what": "small pieces in a tree that is cut by content",
+      "bytes": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb000000103e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d00000010",
+      "cutting": "fastcdc-v1"
+    },
+    {
+      "as": "folder-list",
+      "what": "two names out of order",
+      "bytes": "010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a0001620000010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a0001610000"
+    },
+    {
+      "as": "folder-list",
+      "what": "one name twice",
+      "bytes": "010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a0001610000010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a0001610000"
+    },
+    {
+      "as": "folder-list",
+      "what": "a name with a slash",
+      "bytes": "010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a0003612f620000"
+    },
+    {
+      "as": "folder-list",
+      "what": "the name of one dot",
+      "bytes": "010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a00012e0000"
+    },
+    {
+      "as": "folder-list",
+      "what": "the name of two dots",
+      "bytes": "010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a00022e2e0000"
+    },
+    {
+      "as": "folder-list",
+      "what": "an empty name",
+      "bytes": "010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a00000000"
+    },
+    {
+      "as": "folder-list",
+      "what": "a name with a zero byte",
+      "bytes": "010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a00036100620000"
+    },
+    {
+      "as": "folder-list",
+      "what": "a name that is not UTF-8",
+      "bytes": "010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a000361ff620000"
+    },
+    {
+      "as": "folder-list",
+      "what": "a name of 256 bytes",
+      "bytes": "010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a0100616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161610000"
+    },
+    {
+      "as": "folder-list",
+      "what": "a kind that is neither a file nor a folder",
+      "bytes": "000000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a0001610000"
+    },
+    {
+      "as": "folder-list",
+      "what": "cut short by a byte",
+      "bytes": "010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a0001610000010000000000000001d6263b517a1aea16e28e9aaa6a201bfa2413cf2f287a3cc890722bc9cd2e5a8a00016200"
+    },
+    {
+      "as": "file-run",
+      "what": "under a count that is one more",
+      "bytes": "00000000000000400000000000000006000000036b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc62340000001000074a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda5000000000000002025ec74d64a2315d3fb1a2cb18bde6b9f81df27485c53efa103caaabc7d1422230000000000000010b47ab4ef26da91d64d6146ff64309a21c5895cc51e163518f12c3374daa21c5400000000000000203ee004ed0055d5e53f6a881afed2c11d2e84bdeffcc600078131284a8e596b66000000000000004061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8",
+      "against": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      }
+    },
+    {
+      "as": "file-run",
+      "what": "at a place that is one further",
+      "bytes": "000000000000003f0000000000000007000000036b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc62340000001000074a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda5000000000000002025ec74d64a2315d3fb1a2cb18bde6b9f81df27485c53efa103caaabc7d1422230000000000000010b47ab4ef26da91d64d6146ff64309a21c5895cc51e163518f12c3374daa21c5400000000000000203ee004ed0055d5e53f6a881afed2c11d2e84bdeffcc600078131284a8e596b66000000000000004061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8",
+      "against": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      }
+    },
+    {
+      "as": "file-run",
+      "what": "an item with another length",
+      "bytes": "000000000000003f0000000000000006000000036b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000011e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc62340000001000074a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda5000000000000002025ec74d64a2315d3fb1a2cb18bde6b9f81df27485c53efa103caaabc7d1422230000000000000010b47ab4ef26da91d64d6146ff64309a21c5895cc51e163518f12c3374daa21c5400000000000000203ee004ed0055d5e53f6a881afed2c11d2e84bdeffcc600078131284a8e596b66000000000000004061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8",
+      "against": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      }
+    },
+    {
+      "as": "file-run",
+      "what": "an item with another hash",
+      "bytes": "000000000000003f0000000000000006000000036c160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc62340000001000074a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda5000000000000002025ec74d64a2315d3fb1a2cb18bde6b9f81df27485c53efa103caaabc7d1422230000000000000010b47ab4ef26da91d64d6146ff64309a21c5895cc51e163518f12c3374daa21c5400000000000000203ee004ed0055d5e53f6a881afed2c11d2e84bdeffcc600078131284a8e596b66000000000000004061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8",
+      "against": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      }
+    },
+    {
+      "as": "file-run",
+      "what": "a carried node with another size",
+      "bytes": "000000000000003f0000000000000006000000036b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc62340000001000074a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda5000000000000002025ec74d64a2315d3fb1a2cb18bde6b9f81df27485c53efa103caaabc7d1422230000000000000010b47ab4ef26da91d64d6146ff64309a21c5895cc51e163518f12c3374daa21c5400000000000000203ee004ed0055d5e53f6a881afed2c11d2e84bdeffcc600078131284a8e596b66000000000000004061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e9",
+      "against": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      }
+    },
+    {
+      "as": "file-run",
+      "what": "a carried node left out",
+      "bytes": "000000000000003f0000000000000006000000036b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc62340000001000064a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda5000000000000002025ec74d64a2315d3fb1a2cb18bde6b9f81df27485c53efa103caaabc7d1422230000000000000010b47ab4ef26da91d64d6146ff64309a21c5895cc51e163518f12c3374daa21c5400000000000000203ee004ed0055d5e53f6a881afed2c11d2e84bdeffcc600078131284a8e596b66000000000000004061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a420000000000000100",
+      "against": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      }
+    },
+    {
+      "as": "file-run",
+      "what": "a carried node too many",
+      "bytes": "000000000000003f0000000000000006000000036b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc62340000001000084a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda5000000000000002025ec74d64a2315d3fb1a2cb18bde6b9f81df27485c53efa103caaabc7d1422230000000000000010b47ab4ef26da91d64d6146ff64309a21c5895cc51e163518f12c3374daa21c5400000000000000203ee004ed0055d5e53f6a881afed2c11d2e84bdeffcc600078131284a8e596b66000000000000004061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e813301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8",
+      "against": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      }
+    },
+    {
+      "as": "file-run",
+      "what": "a run that shows nothing",
+      "bytes": "000000000000003f0000000000000006000000000000",
+      "against": {
+        "kind": "file",
+        "hash": "b61835af70790806c385348662f18d6c143d0cc48e6406b06a190cc25e094435",
+        "size": 1000
+      }
+    },
+    {
+      "as": "file-run",
+      "what": "a run of another file",
+      "bytes": "000000000000003f0000000000000006000000036b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc62340000001000074a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda5000000000000002025ec74d64a2315d3fb1a2cb18bde6b9f81df27485c53efa103caaabc7d1422230000000000000010b47ab4ef26da91d64d6146ff64309a21c5895cc51e163518f12c3374daa21c5400000000000000203ee004ed0055d5e53f6a881afed2c11d2e84bdeffcc600078131284a8e596b66000000000000004061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8",
+      "against": {
+        "kind": "file",
+        "hash": "49ba70170645c6128471c79cfbe18144ebb78d2374b04320b2f4fdb94bc88693",
+        "size": 33
+      }
+    },
+    {
+      "as": "file-run",
+      "what": "a file's run held against a folder",
+      "bytes": "000000000000003f0000000000000006000000036b160c50b2e16535f16a465a8fb5b77ba02ee9f98c3181d34f2b3bac6d4d019500000010e858545de2276803a99150cbfc85d133e09d85d6aa7f4913cf1cedf68db48262000000101fda9d6dc22b6efc622ca213dffdbf5ff1237139ca97795c0bc6f4a87dcc62340000001000074a43102f49fc942706dd8ca5dddd8c04c1d54ed19e7ecbf53a9b4a211eff0af500000000000000407f7e71d6c6df2c7306a19a6b784058be926d8fbfa2cb976e468ced848beadda5000000000000002025ec74d64a2315d3fb1a2cb18bde6b9f81df27485c53efa103caaabc7d1422230000000000000010b47ab4ef26da91d64d6146ff64309a21c5895cc51e163518f12c3374daa21c5400000000000000203ee004ed0055d5e53f6a881afed2c11d2e84bdeffcc600078131284a8e596b66000000000000004061f1317f988fb1ea2b6d2a4abdd5f0d019c3db235e8e32343899423d462d3a42000000000000010013301551f33b6416d762c50fc31ba584252862170292f62e6e944c91759dc6e300000000000001e8",
+      "against": {
+        "kind": "folder",
+        "hash": "5d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959",
+        "size": 2133
+      }
+    },
+    {
+      "as": "folder-run",
+      "what": "a folder shown as a file",
+      "bytes": "0000000000000005000000000000000200000001010000000000000000b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985000c6e6f7468696e672d6865726500000003f86bba72c6858d66a8e92f1ce9076fbf11e9c993f99e8745a010a52d11c22a9100000000000000200004646174611e1b9f2766c7681ea5aec158cfadaf9c236b98b805e88b6c73cfe7479e0ed814000000000000000c000a726561646d652e747874edf380afbfb93c17ad9cdd0a832fcb3bc7aac2a804e17e2019a5aef6113677fe0000000000000855000777656967687473",
+      "against": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      }
+    },
+    {
+      "as": "folder-run",
+      "what": "an entry with another name",
+      "bytes": "0000000000000005000000000000000200000001020000000000000000b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985000c6f6f7468696e672d6865726500000003f86bba72c6858d66a8e92f1ce9076fbf11e9c993f99e8745a010a52d11c22a9100000000000000200004646174611e1b9f2766c7681ea5aec158cfadaf9c236b98b805e88b6c73cfe7479e0ed814000000000000000c000a726561646d652e747874edf380afbfb93c17ad9cdd0a832fcb3bc7aac2a804e17e2019a5aef6113677fe0000000000000855000777656967687473",
+      "against": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      }
+    },
+    {
+      "as": "folder-run",
+      "what": "a run of another folder",
+      "bytes": "0000000000000005000000000000000200000001020000000000000000b0638963235fa6e9fd1d1d55f0d03b95f541efa40911055ec1900a6cbfb73985000c6e6f7468696e672d6865726500000003f86bba72c6858d66a8e92f1ce9076fbf11e9c993f99e8745a010a52d11c22a9100000000000000200004646174611e1b9f2766c7681ea5aec158cfadaf9c236b98b805e88b6c73cfe7479e0ed814000000000000000c000a726561646d652e747874edf380afbfb93c17ad9cdd0a832fcb3bc7aac2a804e17e2019a5aef6113677fe0000000000000855000777656967687473",
+      "against": {
+        "kind": "folder",
+        "hash": "5d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959",
+        "size": 2133
+      }
+    },
+    {
+      "as": "folder-run",
+      "what": "an empty folder's run for a folder that has entries",
+      "bytes": "00000000000000000000000000000000000000000000",
+      "against": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      }
+    },
+    {
+      "as": "folder-name",
+      "what": "the entry of one name as the answer for another",
+      "bytes": "000000000000000500000000000000030000000101000000000000000cc1c440976e8944ccd5bbcc39d4756410db638a86bf66f200d5689a565c304b60000a726561646d652e7478740001000474797065000a746578742f706c61696e0003f86bba72c6858d66a8e92f1ce9076fbf11e9c993f99e8745a010a52d11c22a910000000000000020000464617461d19aab7ce055813cbbfc19d52d1a43e92bdf1065ae7bcc4ce67ba54ca246acb80000000000000000000c6e6f7468696e672d68657265edf380afbfb93c17ad9cdd0a832fcb3bc7aac2a804e17e2019a5aef6113677fe0000000000000855000777656967687473",
+      "against": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "name": "weights"
+    },
+    {
+      "as": "folder-name",
+      "what": "an entry that is not where a search for the name ends",
+      "bytes": "000000000000000500000000000000030000000101000000000000000cc1c440976e8944ccd5bbcc39d4756410db638a86bf66f200d5689a565c304b60000a726561646d652e7478740001000474797065000a746578742f706c61696e0003f86bba72c6858d66a8e92f1ce9076fbf11e9c993f99e8745a010a52d11c22a910000000000000020000464617461d19aab7ce055813cbbfc19d52d1a43e92bdf1065ae7bcc4ce67ba54ca246acb80000000000000000000c6e6f7468696e672d68657265edf380afbfb93c17ad9cdd0a832fcb3bc7aac2a804e17e2019a5aef6113677fe0000000000000855000777656967687473",
+      "against": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "name": "zzz"
+    },
+    {
+      "as": "folder-name",
+      "what": "two entries as the answer for one name",
+      "bytes": "000000000000000500000000000000030000000201000000000000000cc1c440976e8944ccd5bbcc39d4756410db638a86bf66f200d5689a565c304b60000a726561646d652e7478740001000474797065000a746578742f706c61696e0200000000000008555d9e4ebd3c1de85271d97f6e986ddd1f94c3c51320a0530ab3694760f9bef959000777656967687473000100046e6f7465000b74686520776569676874730002f86bba72c6858d66a8e92f1ce9076fbf11e9c993f99e8745a010a52d11c22a910000000000000020000464617461d19aab7ce055813cbbfc19d52d1a43e92bdf1065ae7bcc4ce67ba54ca246acb80000000000000000000c6e6f7468696e672d68657265",
+      "against": {
+        "kind": "folder",
+        "hash": "c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b",
+        "size": 2177
+      },
+      "name": "readme.txt"
+    },
+    {
+      "as": "request",
+      "what": "no bytes",
+      "bytes": ""
+    },
+    {
+      "as": "request",
+      "what": "a first byte that asks for nothing",
+      "bytes": "3ab20c89d5794836fded7cf34ebec0f21340dd8ea2075a47ac4c129d7e98108bd4"
+    },
+    {
+      "as": "request",
+      "what": "cut short by a byte",
+      "bytes": "30b20c89d5794836fded7cf34ebec0f21340dd8ea2075a47ac4c129d7e98108b"
+    },
+    {
+      "as": "request",
+      "what": "a byte after its end",
+      "bytes": "30b20c89d5794836fded7cf34ebec0f21340dd8ea2075a47ac4c129d7e98108bd400"
+    },
+    {
+      "as": "request",
+      "what": "a name with a slash",
+      "bytes": "33c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b0003612f62"
+    },
+    {
+      "as": "request",
+      "what": "a name shorter than its length says",
+      "bytes": "33c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b0004616263"
+    },
+    {
+      "as": "request",
+      "what": "an empty name",
+      "bytes": "33c7c8de1a8a417ec17e326edf220de773eaa6706d93eb190a0279043bfdd3270b0000"
+    },
+    {
+      "as": "frame",
+      "what": "no bytes",
+      "bytes": ""
+    },
+    {
+      "as": "frame",
+      "what": "a first byte that is no frame's",
+      "bytes": "2800"
+    },
+    {
+      "as": "frame",
+      "what": "a spare bit set in what a peer holds",
+      "bytes": "26000000000000003fffffffffffffffff"
+    },
+    {
+      "as": "frame",
+      "what": "fewer bytes than what a peer holds needs",
+      "bytes": "26000000000000003fffffffffffffff"
+    },
+    {
+      "as": "frame",
+      "what": "a refusal that says nothing",
+      "bytes": "27"
+    },
+    {
+      "as": "frame",
+      "what": "a refusal for no reason that there is",
+      "bytes": "2700"
+    },
+    {
+      "as": "frame",
+      "what": "a refusal for a reason that there is not",
+      "bytes": "2703"
+    },
+    {
+      "as": "frame",
+      "what": "a piece of no bytes",
+      "bytes": "25"
+    },
+    {
+      "as": "root",
+      "what": "in capital letters",
+      "text": "BAFKREIFSBSE5K6KIG36627HTJ27MB4QTIDOY5IQHLJD2YTASTV7JQEEL2Q"
+    },
+    {
+      "as": "root",
+      "what": "a letter short",
+      "text": "bafkreifsbse5k6kig36627htj27mb4qtidoy5iqhljd2ytastv7jqeel2"
+    },
+    {
+      "as": "root",
+      "what": "a letter more",
+      "text": "bafkreifsbse5k6kig36627htj27mb4qtidoy5iqhljd2ytastv7jqeel2qa"
+    },
+    {
+      "as": "root",
+      "what": "another first letter",
+      "text": "zafkreifsbse5k6kig36627htj27mb4qtidoy5iqhljd2ytastv7jqeel2q"
+    },
+    {
+      "as": "root",
+      "what": "the hash as hex",
+      "text": "b20c89d5794836fded7cf34ebec0f21340dd8ea2075a47ac4c129d7e98108bd4"
+    },
+    {
+      "as": "root",
+      "what": "a CID of another kind of content",
+      "text": "bafybeifsbse5k6kig36627htj27mb4qtidoy5iqhljd2ytastv7jqeel2q"
+    },
+    {
+      "as": "root",
+      "what": "nothing",
+      "text": ""
     }
   ]
 }

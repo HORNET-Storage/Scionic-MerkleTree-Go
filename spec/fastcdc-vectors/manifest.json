@@ -12,9 +12,7 @@
       "chunk_sha256": [
         "a8ca98d333676bfbf4e60c7c07605961afc650a3529c4f704219689b1f1d6fd7"
       ],
-      "root_hash": "bafireigdq7qpxs3qmt5uldfmrqtdyzitu2ivwphvrrn4f5ipmvabjttx7i",
-      "leaf_count": 1,
-      "chunk_leaves": 0
+      "file_hash": "799eff42c7705056a347c09841d706e1561699e17970b87d70c4a44103375d9f"
     },
     {
       "name": "exactly_min_512kib",
@@ -27,9 +25,7 @@
       "chunk_sha256": [
         "1667d8c564d7583673ee274bfe8d254d1e790bffd4e506bbdefbe7e4ddb27ebd"
       ],
-      "root_hash": "bafireiddqqo5p2xhpovlw5gm5dof7oukxldqojlxgurn22qy46bipfhgsi",
-      "leaf_count": 1,
-      "chunk_leaves": 0
+      "file_hash": "cc75fce3d2b5c53356082119cb9c56144e6ed5725bbd332c7b9e49c79d9b47d5"
     },
     {
       "name": "min_plus_one",
@@ -42,9 +38,7 @@
       "chunk_sha256": [
         "0e0c2f6bdcf661ea2d694f72399b1658eaa3cf1179b7f15ea9be249f2e8a48eb"
       ],
-      "root_hash": "bafireigdf7krunznsldglqi7gbv7g7u2zueaawjejx27tyh77z7opnmyfe",
-      "leaf_count": 1,
-      "chunk_leaves": 0
+      "file_hash": "778f8f4ca03a446f5a4ad1b3a1a913b608fab30bcb78f96a1486e05936ae567f"
     },
     {
       "name": "random_3mib",
@@ -59,9 +53,7 @@
         "22e348ffa477d20cf9528fc6bc919b231f79f5364def98cb6025b45e9010ae64",
         "bb5aeb22bef315158581e4deff7b541d0cc4e2b7b062d287a1ae30a84d854689"
       ],
-      "root_hash": "bafireih77xcl6pd575sytn34eshvkxmflpdskhz6xfqetcttuser3vp7pe",
-      "leaf_count": 3,
-      "chunk_leaves": 2
+      "file_hash": "6c182d880924bafc6d1b790f596350dcc80e5d898c993049fb7d8ca40bf4e292"
     },
     {
       "name": "random_16mib",
@@ -84,9 +76,7 @@
         "f09345d6651de295a63df57fcfd36f3bbc6356807fe3e68b7c7aa9651b90fc99",
         "b01ab9d76c0fca0add26bafa164dadb107fbb25a6b7e877d2a12cf05fa28489f"
       ],
-      "root_hash": "bafireigbimiattbdsii5j4htfq2nrmvfzagso7ahfyw2hql4wpma65r3au",
-      "leaf_count": 7,
-      "chunk_leaves": 6
+      "file_hash": "68335793a6861534080049241ef9f5ac1f8e500160d9712d130dda59e7bf28c0"
     },
     {
       "name": "random_40mib",
@@ -131,9 +121,7 @@
         "d209175f900f2b320ae3f8f8686fc97e1d5e39f9c3c2961b665f63d9809679a4",
         "9af02fe027977dd4f23349f4afd0b690f4a0d6417c4b0c6cfb743540b9f7196f"
       ],
-      "root_hash": "bafireihutawkamobtq5qyfh2v7ywuhswgkqdn432gwsknn3oauk4gsye2i",
-      "leaf_count": 18,
-      "chunk_leaves": 17
+      "file_hash": "a0503c0dbfa894126d728b4aeb1557026dac1c364467462273a77bf2f192cfa6"
     },
     {
       "name": "zeros_20mib",
@@ -149,9 +137,7 @@
         "2daeb1f36095b44b318410b3f4e8b5d989dcc7bb023d1426c492dab0a3053e74",
         "bb9f8df61474d25e71fa00722318cd387396ca1736605e1248821cc0de3d3af8"
       ],
-      "root_hash": "bafireihn5zsshbvvy253h5tuwpur6mtuysmwr4sutxbt3aq2xpdihavwau",
-      "leaf_count": 4,
-      "chunk_leaves": 3
+      "file_hash": "d16d5957ad0aa38f165c7b11844880652fa85472850289fb1ead3090b4dabbf4"
     },
     {
       "name": "edit_insert_4kib_mid",
@@ -186,9 +172,7 @@
         true,
         true
       ],
-      "root_hash": "bafireianjziaup4qyf3lrwm5zzuxvogmlep7wyfh3sj4fwsswylx7mdf6i",
-      "leaf_count": 7,
-      "chunk_leaves": 6
+      "file_hash": "84d75db62db73c00d3d5ff28dd39f90dd28552cd7825fb0bfb634743fc763b4c"
     },
     {
       "name": "edit_delete_64kib_mid",
@@ -222,9 +206,7 @@
         false,
         true
       ],
-      "root_hash": "bafireieedsfqr54ma5s5oogromlf7lhep6b3fffauvcg4g3hzqokebjhke",
-      "leaf_count": 7,
-      "chunk_leaves": 6
+      "file_hash": "d226f516eb66f6d2a51ac689fc29a7a400763dd3200bcf435df22950bb1bb5d9"
     },
     {
       "name": "edit_prepend_4kib",
@@ -258,9 +240,7 @@
         true,
         true
       ],
-      "root_hash": "bafireiaownkvoh72zsf5rly7hzq727n54kzmaijyx3s623a6o6xlpqj6jq",
-      "leaf_count": 7,
-      "chunk_leaves": 6
+      "file_hash": "be9eb873c4c225853195f60d4a5b292365507fdb34ead79a1936e1a775df0f47"
     },
     {
       "name": "edit_append_4kib",
@@ -295,9 +275,7 @@
         true,
         false
       ],
-      "root_hash": "bafireibdqkj6fdb2vkiyh3uu7mumql5lnzhs2mnm5cqguqikcujt2lf5ha",
-      "leaf_count": 7,
-      "chunk_leaves": 6
+      "file_hash": "3be2d8a1ceb170346b89aa2b340e732afd6637102d142115825c399264e34401"
     }
   ]
 }
