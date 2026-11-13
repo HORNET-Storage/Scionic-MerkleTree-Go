@@ -192,6 +192,14 @@ func buildListTree(kind listKind, leaves []leaf) (*listTree, error) {
 	if err := checkList(kind, leaves); err != nil {
 		return nil, err
 	}
+	return listTreeOf(kind, leaves)
+}
+
+// listTreeOf is the tree of a list as it is given, whatever order its names
+// are in. The library builds no tree this way: a list is checked first. An
+// author is free to hash any list, though, so the tests build such trees to
+// see that nothing of them can be shown that a search would not find.
+func listTreeOf(kind listKind, leaves []leaf) (*listTree, error) {
 	tree := &listTree{kind: kind, leaves: make([]node, len(leaves))}
 	for at := range leaves {
 		tree.leaves[at] = leaves[at].node
