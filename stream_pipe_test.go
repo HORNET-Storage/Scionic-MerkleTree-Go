@@ -20,7 +20,7 @@ import (
 func manySmallFiles(t *testing.T, count int) (*MemoryStore, Root) {
 	t.Helper()
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	var entries []Entry
 	for index := range count {
 		file := must[Target](t)(builder.FileFromBytes(corpusBytes(fmt.Sprintf("small-%d", index), 20)))
@@ -189,7 +189,7 @@ func TestRequestsCanBeSentOneAtATime(t *testing.T) {
 		}
 		return most
 	}
-	// A request for a list takes 37 bytes, and one for pieces 49.
+	// A request for a list takes 37 bytes, and one for chunks 49.
 	if most := longest(sent(0)); most != 49 {
 		t.Fatalf("with nothing sent ahead, %d bytes went out at once", most)
 	}

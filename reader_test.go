@@ -59,12 +59,12 @@ func (r *idleReader) Read([]byte) (int, error) {
 }
 
 func TestAFileIsTheSameHoweverItsReaderHandsItOver(t *testing.T) {
-	for _, cutting := range []Cutting{smallPieces(t), FastCDCV1} {
+	for _, chunking := range []Chunking{smallChunks(t), FastCDCV1} {
 		data := corpusBytes("readers", 100_000)
-		if cutting == FastCDCV1 {
+		if chunking == FastCDCV1 {
 			data = corpusBytes("readers-by-content", 5<<20)
 		}
-		want := must[Target](t)(NewBuilder(NewMemoryStore(), cutting).FileFromBytes(data))
+		want := must[Target](t)(NewBuilder(NewMemoryStore(), chunking).FileFromBytes(data))
 		// Bytes with nothing between them, and the same with reads that give
 		// nothing in between, as a reader may when it has nothing yet.
 		var withPauses []readStep
@@ -82,23 +82,23 @@ func TestAFileIsTheSameHoweverItsReaderHandsItOver(t *testing.T) {
 			"99 reads of nothing before each": &scriptedReader{steps: withPauses},
 			"its end told with its only read": &scriptedReader{steps: []readStep{{give: data, err: io.EOF}}},
 		}
-		if cutting != FastCDCV1 {
+		if chunking != FastCDCV1 {
 			readers["a byte at a time"] = iotest.OneByteReader(bytes.NewReader(data))
 		}
 		for what, reader := range readers {
 			store := NewMemoryStore()
-			got, err := NewBuilder(store, cutting).File(reader)
+			got, err := NewBuilder(store, chunking).File(reader)
 			if err != nil || got != want {
-				t.Fatalf("%s, %s: another file (%v)", cutting.Tag(), what, err)
+				t.Fatalf("%s, %s: another file (%v)", chunking.Tag(), what, err)
 			}
 			if read := must[[]byte](t)(ReadFileBytes(store, got)); !bytes.Equal(read, data) {
-				t.Fatalf("%s, %s: the file does not read back", cutting.Tag(), what)
+				t.Fatalf("%s, %s: the file does not read back", chunking.Tag(), what)
 			}
 		}
 	}
 	// A reader that has ended is not asked again.
 	once := &scriptedReader{steps: []readStep{{give: []byte("the whole file"), err: io.EOF}}}
-	must[Target](t)(NewBuilder(NewMemoryStore(), smallPieces(t)).File(once))
+	must[Target](t)(NewBuilder(NewMemoryStore(), smallChunks(t)).File(once))
 	if once.calls != 1 {
 		t.Fatalf("a reader that had ended was read %d times", once.calls)
 	}
@@ -112,12 +112,12 @@ func TestAReaderThatFailsIsNeverTakenForAShorterFile(t *testing.T) {
 		"with later bytes":       {{give: data[:300]}, {give: data[300:600], err: failed}},
 		"with no bytes":          {{give: data[:500]}, {err: failed}},
 		"before any byte":        {{err: failed}},
-		"with one piece exactly": {{give: data[:16], err: failed}},
+		"with one chunk exactly": {{give: data[:16], err: failed}},
 		"after reads of nothing": {{give: data[:100]}, {}, {}, {}, {err: failed}},
 	} {
 		store := NewMemoryStore()
 		reader := &scriptedReader{steps: steps}
-		_, err := NewBuilder(store, smallPieces(t)).File(reader)
+		_, err := NewBuilder(store, smallChunks(t)).File(reader)
 		var told *Error
 		if !errors.Is(err, ErrStream) || !errors.Is(err, failed) || !errors.As(err, &told) || told.Operation != "read a file's bytes" {
 			t.Fatalf("a reader that fails %s: %v", what, err)
@@ -130,21 +130,21 @@ func TestAReaderThatFailsIsNeverTakenForAShorterFile(t *testing.T) {
 }
 
 func TestAReaderThatNeverGivesAByteIsGivenUp(t *testing.T) {
-	for _, cutting := range []Cutting{smallPieces(t), FastCDCV1} {
+	for _, chunking := range []Chunking{smallChunks(t), FastCDCV1} {
 		store := NewMemoryStore()
 		reader := &idleReader{}
-		_, err := NewBuilder(store, cutting).File(reader)
+		_, err := NewBuilder(store, chunking).File(reader)
 		if !errors.Is(err, ErrStream) || !errors.Is(err, io.ErrNoProgress) {
-			t.Fatalf("%s: a reader that never gives a byte: %v", cutting.Tag(), err)
+			t.Fatalf("%s: a reader that never gives a byte: %v", chunking.Tag(), err)
 		}
 		if reader.calls > 200 || store.Count(StoredFileList) != 0 {
-			t.Fatalf("%s: the reader was asked %d times", cutting.Tag(), reader.calls)
+			t.Fatalf("%s: the reader was asked %d times", chunking.Tag(), reader.calls)
 		}
 	}
 	// The same after some bytes: what came is not kept as a file.
 	store := NewMemoryStore()
 	thenIdle := io.MultiReader(bytes.NewReader(corpusBytes("readers-idle", 100)), &idleReader{})
-	if _, err := NewBuilder(store, smallPieces(t)).File(thenIdle); !errors.Is(err, io.ErrNoProgress) || store.Count(StoredFileList) != 0 {
+	if _, err := NewBuilder(store, smallChunks(t)).File(thenIdle); !errors.Is(err, io.ErrNoProgress) || store.Count(StoredFileList) != 0 {
 		t.Fatalf("a reader that stops giving bytes: %v", err)
 	}
 }

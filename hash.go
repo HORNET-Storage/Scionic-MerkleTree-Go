@@ -95,7 +95,7 @@ func hexValue(letter byte) (byte, bool) {
 	return 0, false
 }
 
-// Hash is a SHA-256 hash: of a piece's bytes, or of the bytes that describe
+// Hash is a SHA-256 hash: of a chunk's bytes, or of the bytes that describe
 // a file, a folder or a tree.
 type Hash [32]byte
 

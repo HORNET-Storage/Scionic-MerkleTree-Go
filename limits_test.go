@@ -37,15 +37,15 @@ func TestEveryRequestSaysHowLongItsAnswerMayBe(t *testing.T) {
 			}
 		case AskFile:
 			// A file's list: no longer than the file's size allows. These
-			// files are cut into pieces of 16 bytes, so it is known exactly.
+			// files are split into chunks of 16 bytes, so it is known exactly.
 			list := keptIn(t, source, StoredFileList, asked.Hash)
 			if limit != max(len(list)+1, 2) {
 				t.Fatalf("a file's list of %d bytes may be %d bytes long", len(list), limit)
 			}
-		case AskPieces:
-			// A piece: no longer than the tree's way of cutting allows.
+		case AskChunks:
+			// A chunk: no longer than the tree's way of chunking allows.
 			if limit != 17 {
-				t.Fatalf("a piece may be %d bytes long", limit)
+				t.Fatalf("a chunk may be %d bytes long", limit)
 			}
 		default:
 			t.Fatalf("%+v", asked)
@@ -57,7 +57,7 @@ func TestAnAnswerThatIsTooLongIsRefusedByItsLength(t *testing.T) {
 	source, root := sampleTree(t)
 	// The first answer to each kind of request, with bytes added to it. A
 	// connection refuses such a frame by the length that comes before it.
-	for _, asked := range []RequestKind{AskRecord, AskFolder, AskFile, AskPieces} {
+	for _, asked := range []RequestKind{AskRecord, AskFolder, AskFile, AskChunks} {
 		done := false
 		_, err := fetchTampered(t, source, root, func(request []byte, frames [][]byte) [][]byte {
 			if RequestKind(request[0]) == asked && !done {
@@ -73,7 +73,7 @@ func TestAnAnswerThatIsTooLongIsRefusedByItsLength(t *testing.T) {
 	// The same for one who reads parts of a tree and keeps nothing.
 	weights := targetAt(t, source, root, "weights")
 	model := targetAt(t, source, root, "weights/model.bin")
-	for _, asked := range []RequestKind{AskRecord, AskFolderRun, AskFolderName, AskFileBytes, AskPieces, AskHave} {
+	for _, asked := range []RequestKind{AskRecord, AskFolderBranch, AskFolderName, AskFileBytes, AskChunks, AskHave} {
 		peer := tamperingPeer(source, func(request []byte, frames [][]byte) [][]byte {
 			if RequestKind(request[0]) == asked {
 				frames[0] = joined(frames[0], make([]byte, 200_000))
@@ -103,17 +103,17 @@ func TestAnAnswerThatIsTooLongIsRefusedByItsLength(t *testing.T) {
 		}
 	}
 	// What such a reader lets through for a stretch of a file is small: the
-	// run of the list that holds the stretch, and pieces no longer than the
-	// run says they are.
+	// branch of the list that holds the stretch, and chunks no longer than the
+	// branch says they are.
 	peer := newTestPeer(source)
 	remote := must[*Remote](t)(OpenRemote(peer, root))
 	if err := remote.Read(model, 100, 300, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	must[*HaveMap](t)(remote.Have(model))
-	// 300 bytes lie in 20 pieces of 16 bytes at the most, the two at the
-	// ends counted: 23 bytes, 20 items, and 80 nodes of 40 bytes. A piece
-	// may be 17 bytes long. And 63 pieces are 63 bits: 8 bytes, after the
+	// 300 bytes lie in 20 chunks of 16 bytes at the most, the two at the
+	// ends counted: 23 bytes, 20 items, and 80 nodes of 40 bytes. A chunk
+	// may be 17 bytes long. And 63 chunks are 63 bits: 8 bytes, after the
 	// frame's first byte and the count.
 	if want := []int{MaxRecordBytes, 23 + 20*36 + 80*40, 17, 17}; !slices.Equal(peer.wire.limits, want) {
 		t.Fatalf("the limits were %v", peer.wire.limits)
@@ -162,29 +162,29 @@ func TestALongFrameThatNeverComesCostsLittle(t *testing.T) {
 	}
 }
 
-// treeWithAPieceOfTwoLengths is a tree that is wrong in itself: two of its
-// files list the same piece, the one with 16 bytes and the other with 15.
+// treeWithAChunkOfTwoLengths is a tree that is wrong in itself: two of its
+// files list the same chunk, the one with 16 bytes and the other with 15.
 // Every list of it is well formed and has the hash its parent gives it.
-func treeWithAPieceOfTwoLengths(t *testing.T) (record *Record, folder *FolderList, right, wrong *FileList, whole []byte) {
+func treeWithAChunkOfTwoLengths(t *testing.T) (record *Record, folder *FolderList, right, wrong *FileList, whole []byte) {
 	t.Helper()
 	whole = corpusBytes("whole", 16)
-	item := must[PieceRef](t)(PieceRefOf(whole))
-	right = must[*FileList](t)(NewFileList([]PieceRef{item}))
-	wrong = must[*FileList](t)(NewFileList([]PieceRef{{Hash: item.Hash, Length: 15}}))
+	item := must[ChunkRef](t)(ChunkRefOf(whole))
+	right = must[*FileList](t)(NewFileList([]ChunkRef{item}))
+	wrong = must[*FileList](t)(NewFileList([]ChunkRef{{Hash: item.Hash, Length: 15}}))
 	folder = must[*FolderList](t)(NewFolderList([]Entry{plainEntry(t, "a", right.Target()), plainEntry(t, "b", wrong.Target())}))
-	totals := Totals{Pieces: 1, PieceBytes: 16, ListBytes: 72 + folder.EncodedLen()}
-	record = must[*Record](t)(NewRecord(folder.Target(), totals, smallPieces(t), ExtraData{}))
+	totals := Totals{Chunks: 1, ChunkBytes: 16, ListBytes: 72 + folder.EncodedLen()}
+	record = must[*Record](t)(NewRecord(folder.Target(), totals, smallChunks(t), ExtraData{}))
 	return record, folder, right, wrong, whole
 }
 
 func TestAnIntakeThatRefusedAPartOfItsTreeIsDone(t *testing.T) {
-	record, folder, right, wrong, whole := treeWithAPieceOfTwoLengths(t)
+	record, folder, right, wrong, whole := treeWithAChunkOfTwoLengths(t)
 	root := record.Root()
 	dest := NewMemoryStore()
 	intake := must[*Intake](t)(NewIntake(dest, root))
 	must[Accepted](t)(intake.Accept(record.Encode()))
 	// A frame that is refused at the door leaves the intake as it was.
-	if _, err := intake.Accept(PieceFrame([]byte("nothing names this"))); !errors.Is(err, ErrNotWanted) {
+	if _, err := intake.Accept(ChunkFrame([]byte("nothing names this"))); !errors.Is(err, ErrNotWanted) {
 		t.Fatal(err)
 	}
 	if _, err := intake.Accept([]byte{0x25}); err == nil || errors.Is(err, ErrIntakeFailed) {
@@ -202,7 +202,7 @@ func TestAnIntakeThatRefusedAPartOfItsTreeIsDone(t *testing.T) {
 	}
 	// From here on the intake takes nothing, asks for nothing, and never
 	// says that the tree is whole.
-	if _, err := intake.Accept(PieceFrame(whole)); !errors.Is(err, ErrIntakeFailed) {
+	if _, err := intake.Accept(ChunkFrame(whole)); !errors.Is(err, ErrIntakeFailed) {
 		t.Fatal(err)
 	}
 	if _, err := intake.Accept(FileListFrame(right.Encode())); !errors.Is(err, ErrIntakeFailed) {
@@ -214,13 +214,13 @@ func TestAnIntakeThatRefusedAPartOfItsTreeIsDone(t *testing.T) {
 	if _, err := intake.Finish(); !errors.Is(err, ErrIntakeFailed) {
 		t.Fatal(err)
 	}
-	if held, _ := dest.Has(StoredPiece, HashOf(whole)); held {
-		t.Fatal("a piece was kept after the tree was found to be wrong")
+	if held, _ := dest.Has(StoredChunk, HashOf(whole)); held {
+		t.Fatal("a chunk was kept after the tree was found to be wrong")
 	}
 	// A new intake goes on from what the store holds, and finds the same.
 	again := must[*Intake](t)(NewIntake(dest, root))
 	if again.Outstanding() != 2 {
-		t.Fatalf("%d things are outstanding, and it is one list and one piece", again.Outstanding())
+		t.Fatalf("%d things are outstanding, and it is one list and one chunk", again.Outstanding())
 	}
 	if _, err := again.Accept(FileListFrame(wrong.Encode())); err == nil {
 		t.Fatal("the list that is wrong was taken the second time")
@@ -235,7 +235,7 @@ func TestAnIntakeThatRefusedAPartOfItsTreeIsDone(t *testing.T) {
 	must[Accepted](t)(intake.Accept(FolderListFrame(folder.Encode())))
 	must[Accepted](t)(intake.Accept(FileListFrame(wrong.Encode())))
 	if _, err := intake.Accept(FileListFrame(right.Encode())); err == nil {
-		t.Fatal("two lists that give one piece two lengths were both taken")
+		t.Fatal("two lists that give one chunk two lengths were both taken")
 	}
 	if held, _ := fresh.Has(StoredFileList, right.Hash()); held {
 		t.Fatal("a list that failed its checks was kept")
@@ -249,14 +249,14 @@ func TestATreeNeverTakesMoreRoomThanItsRecordSays(t *testing.T) {
 	source, root := sampleTree(t)
 	record := must[*Record](t)(RecordOf(source, root))
 	right := record.Totals()
-	// Records that say less than the tree holds: of lists, of pieces, and
-	// of the pieces' bytes.
+	// Records that say less than the tree holds: of lists, of chunks, and
+	// of the chunks' bytes.
 	for _, totals := range []Totals{
-		{right.Pieces, right.PieceBytes, right.ListBytes - 1},
-		{right.Pieces - 1, right.PieceBytes, right.ListBytes},
-		{right.Pieces, right.PieceBytes - 1, right.ListBytes},
+		{right.Chunks, right.ChunkBytes, right.ListBytes - 1},
+		{right.Chunks - 1, right.ChunkBytes, right.ListBytes},
+		{right.Chunks, right.ChunkBytes - 1, right.ListBytes},
 	} {
-		forged := must[*Record](t)(NewRecord(record.Top(), totals, record.Cutting(), ExtraData{}))
+		forged := must[*Record](t)(NewRecord(record.Top(), totals, record.Chunking(), ExtraData{}))
 		source.Put(StoredRecord, forged.Root().Hash(), forged.Encode())
 		dest := NewMemoryStore()
 		if _, err := Fetch(dest, forged.Root(), newTestPeer(source)); !errors.Is(err, ErrTotalsMismatch) {
@@ -265,7 +265,7 @@ func TestATreeNeverTakesMoreRoomThanItsRecordSays(t *testing.T) {
 		// The fetch stopped at the list that went over. That list is not
 		// kept, so what is kept fits in what the record said.
 		lists := dest.Bytes(StoredFileList) + dest.Bytes(StoredFolderList)
-		if lists > totals.ListBytes || uint64(dest.Count(StoredPiece)) > totals.Pieces || dest.Bytes(StoredPiece) > totals.PieceBytes {
+		if lists > totals.ListBytes || uint64(dest.Count(StoredChunk)) > totals.Chunks || dest.Bytes(StoredChunk) > totals.ChunkBytes {
 			t.Fatalf("%+v: more was kept than the record says the tree holds", totals)
 		}
 	}

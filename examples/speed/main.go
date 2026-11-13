@@ -3,9 +3,9 @@
 //
 //	go run ./examples/speed [MiB [folder]]
 //
-// It prints, for a file of that many MiB of bytes that look random: cutting
+// It prints, for a file of that many MiB of bytes that look random: chunking
 // alone, hashing alone, building the file into a store in memory, and
-// checking every piece of it again. Without a number, the file is 1 GiB.
+// checking every chunk of it again. Without a number, the file is 1 GiB.
 //
 // With a folder, it also builds that folder from disk into a store in
 // memory, and prints the best of five runs: by then the system holds the
@@ -52,14 +52,14 @@ func speed(megabytes int, folder string, out io.Writer) (scionic.Root, error) {
 	data := filler(megabytes << 20)
 
 	started := time.Now()
-	pieces := scionic.FastCDCV1.Cut(data)
-	report(out, "cut", started, len(data))
-	fmt.Fprintf(out, "%-22s %d pieces\n", "", len(pieces))
+	chunks := scionic.FastCDCV1.Cut(data)
+	report(out, "chunked", started, len(data))
+	fmt.Fprintf(out, "%-22s %d chunks\n", "", len(chunks))
 
 	started = time.Now()
 	var mixed byte
-	for _, piece := range pieces {
-		hash := scionic.HashOf(piece)
+	for _, chunk := range chunks {
+		hash := scionic.HashOf(chunk)
 		mixed ^= hash[0]
 	}
 	report(out, "hashed", started, len(data))

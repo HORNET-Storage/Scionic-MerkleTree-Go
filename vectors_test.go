@@ -17,16 +17,16 @@ import (
 // spec/vectors/manifest.json is made by the Rust library, whose tests fail
 // when the file and that library disagree. Here the Go library builds the
 // same trees from the same descriptions, and has to arrive at the same
-// bytes: every root, record, list, piece, run, answer and exchange. And it
+// bytes: every root, record, list, chunk, branch, answer and exchange. And it
 // has to refuse every input that the manifest says must be refused.
 
-const vectorsManifestSHA256 = "2bdf12f2f0db4c83e9f8156ca6322222d31920c32a52898ed969c1d6fe2e020e"
+const vectorsManifestSHA256 = "b10f53a722468ee53c69952f2b9ba1421a02608528be6ae4df753a35d0a5cba8"
 
 type vectorsManifest struct {
 	Format     string           `json:"format"`
 	Bytes      string           `json:"bytes"`
 	Trees      []vectorTree     `json:"trees"`
-	Runs       []vectorRun      `json:"runs"`
+	Branches   []vectorBranch   `json:"branches"`
 	Names      []vectorName     `json:"names"`
 	Answers    []vectorAnswer   `json:"answers"`
 	Connection vectorConnection `json:"connection"`
@@ -50,18 +50,18 @@ type vectorPart struct {
 
 type vectorTree struct {
 	Name         string            `json:"name"`
-	Cutting      string            `json:"cutting"`
+	Chunking     string            `json:"chunking"`
 	Extra        map[string]string `json:"extra"`
 	Top          vectorNode        `json:"top"`
 	Root         string            `json:"root"`
 	RootHash     string            `json:"root_hash"`
 	Record       string            `json:"record"`
 	Size         uint64            `json:"size"`
-	Pieces       uint64            `json:"pieces"`
-	PieceBytes   uint64            `json:"piece_bytes"`
+	Chunks       uint64            `json:"chunks"`
+	ChunkBytes   uint64            `json:"chunk_bytes"`
 	ListBytes    uint64            `json:"list_bytes"`
 	Lists        []vectorList      `json:"lists"`
-	PieceList    []vectorPiece     `json:"piece_list"`
+	ChunkList    []vectorChunk     `json:"chunk_list"`
 	BundleLength int               `json:"bundle_length"`
 	BundleSHA256 string            `json:"bundle_sha256"`
 }
@@ -73,7 +73,7 @@ type vectorList struct {
 	Bytes string `json:"bytes"`
 }
 
-type vectorPiece struct {
+type vectorChunk struct {
 	Hash   string `json:"hash"`
 	Length uint64 `json:"length"`
 }
@@ -84,7 +84,7 @@ type vectorTarget struct {
 	Size uint64 `json:"size"`
 }
 
-type vectorRun struct {
+type vectorBranch struct {
 	Tree         string       `json:"tree"`
 	Path         string       `json:"path"`
 	Of           vectorTarget `json:"of"`
@@ -117,13 +117,13 @@ type vectorConnection struct {
 }
 
 type vectorRefused struct {
-	As      string        `json:"as"`
-	What    string        `json:"what"`
-	Bytes   string        `json:"bytes"`
-	Cutting string        `json:"cutting"`
-	Against *vectorTarget `json:"against"`
-	Name    string        `json:"name"`
-	Text    string        `json:"text"`
+	As       string        `json:"as"`
+	What     string        `json:"what"`
+	Bytes    string        `json:"bytes"`
+	Chunking string        `json:"chunking"`
+	Against  *vectorTarget `json:"against"`
+	Name     string        `json:"name"`
+	Text     string        `json:"text"`
 }
 
 func readVectors(t *testing.T) vectorsManifest {
@@ -229,12 +229,12 @@ type builtVector struct {
 
 func buildVector(t *testing.T, described vectorTree, fromStream bool) builtVector {
 	t.Helper()
-	cutting, err := CuttingFromTag([]byte(described.Cutting))
+	chunking, err := ChunkingFromTag([]byte(described.Chunking))
 	if err != nil {
 		t.Fatal(err)
 	}
 	store := NewMemoryStore()
-	builder := NewBuilder(store, cutting)
+	builder := NewBuilder(store, chunking)
 	root, err := builder.Finish(described.Top.build(t, builder, fromStream), extraOf(t, described.Extra))
 	if err != nil {
 		t.Fatalf("%s: %v", described.Name, err)
@@ -285,14 +285,14 @@ func TestEveryTreeOfTheSharedVectorsIsBuiltByteForByte(t *testing.T) {
 			t.Fatalf("%s: the record is %s, and not %s", name, got, described.Record)
 		}
 		totals := record.Totals()
-		if record.Top().Size != described.Size || totals.Pieces != described.Pieces ||
-			totals.PieceBytes != described.PieceBytes || totals.ListBytes != described.ListBytes {
+		if record.Top().Size != described.Size || totals.Chunks != described.Chunks ||
+			totals.ChunkBytes != described.ChunkBytes || totals.ListBytes != described.ListBytes {
 			t.Fatalf("%s: the totals are %d %+v", name, record.Top().Size, totals)
 		}
-		if record.Cutting().Tag() != described.Cutting {
-			t.Fatalf("%s: the record says it was cut as %s", name, record.Cutting().Tag())
+		if record.Chunking().Tag() != described.Chunking {
+			t.Fatalf("%s: the record says it was chunked as %s", name, record.Chunking().Tag())
 		}
-		// The tree as one stream gives every list and piece once, parents
+		// The tree as one stream gives every list and chunk once, parents
 		// first.
 		var bundle bytes.Buffer
 		if err := Export(built.store, built.root, &bundle); err != nil {
@@ -303,7 +303,7 @@ func TestEveryTreeOfTheSharedVectorsIsBuiltByteForByte(t *testing.T) {
 			t.Fatalf("%s: the bundle holds %d bytes with the SHA-256 %x", name, bundle.Len(), digest)
 		}
 		var lists []vectorList
-		var pieces []vectorPiece
+		var chunks []vectorChunk
 		for rest := bundle.Bytes()[len(BundleMagic):]; len(rest) > 0; {
 			length := binary.BigEndian.Uint32(rest)
 			frame := rest[4 : 4+length]
@@ -321,18 +321,18 @@ func TestEveryTreeOfTheSharedVectorsIsBuiltByteForByte(t *testing.T) {
 					t.Fatal(err)
 				}
 				lists = append(lists, vectorList{"folder", list.Hash().Hex(), list.Size(), hex.EncodeToString(frame[1:])})
-			case FramePiece:
-				pieces = append(pieces, vectorPiece{HashOf(frame[1:]).Hex(), uint64(len(frame) - 1)})
+			case FrameChunk:
+				chunks = append(chunks, vectorChunk{HashOf(frame[1:]).Hex(), uint64(len(frame) - 1)})
 			}
 		}
 		if !slices.Equal(lists, described.Lists) {
 			t.Fatalf("%s: the lists are not the manifest's", name)
 		}
-		if !slices.Equal(pieces, described.PieceList) {
-			t.Fatalf("%s: the pieces are not the manifest's", name)
+		if !slices.Equal(chunks, described.ChunkList) {
+			t.Fatalf("%s: the chunks are not the manifest's", name)
 		}
 		// What is built passes the checks of a tree that is taken in.
-		if _, err := VerifyWith(built.store, built.root, VerifyOptions{Recut: true}); err != nil {
+		if _, err := VerifyWith(built.store, built.root, VerifyOptions{Rechunk: true}); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		// A file's bytes that come as a stream give the same tree.
@@ -380,7 +380,7 @@ func TestEveryTreeOfTheSharedVectorsIsBuiltByteForByte(t *testing.T) {
 	}
 }
 
-// sampleOf builds the tree that the runs, the names and the answers of the
+// sampleOf builds the tree that the branches, the names and the answers of the
 // manifest are taken from.
 func sampleOf(t *testing.T, manifest vectorsManifest, name string) builtVector {
 	t.Helper()
@@ -393,12 +393,12 @@ func sampleOf(t *testing.T, manifest vectorsManifest, name string) builtVector {
 	return builtVector{}
 }
 
-func TestEveryRunOfTheSharedVectorsIsShownAndCheckedByteForByte(t *testing.T) {
+func TestEveryBranchOfTheSharedVectorsIsShownAndCheckedByteForByte(t *testing.T) {
 	manifest := readVectors(t)
-	if len(manifest.Runs) < 9 {
-		t.Fatal("the manifest lists too few runs")
+	if len(manifest.Branches) < 9 {
+		t.Fatal("the manifest lists too few branches")
 	}
-	for _, shown := range manifest.Runs {
+	for _, shown := range manifest.Branches {
 		sample := sampleOf(t, manifest, shown.Tree)
 		of := shown.Of.target(t)
 		if sample.at(t, shown.Path) != of {
@@ -413,26 +413,26 @@ func TestEveryRunOfTheSharedVectorsIsShownAndCheckedByteForByte(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			run, err := list.Open(shown.Start, shown.End)
+			branch, err := list.Open(shown.Start, shown.End)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := hex.EncodeToString(FileRunFrame(run)); got != shown.Frame {
+			if got := hex.EncodeToString(FileBranchFrame(branch)); got != shown.Frame {
 				t.Fatalf("%q %d to %d: the frame is %s", shown.Path, shown.Start, shown.End, got)
 			}
-			if given.Kind != FrameFileRun || shown.StartsAtByte == nil {
-				t.Fatalf("%q: the manifest's frame is no run of a file's list", shown.Path)
+			if given.Kind != FrameFileBranch || shown.StartsAtByte == nil {
+				t.Fatalf("%q: the manifest's frame is no branch of a file's list", shown.Path)
 			}
 			for _, checked := range []func() (uint64, error){
-				func() (uint64, error) { return given.FileRun.Check(of) },
-				func() (uint64, error) { return given.FileRun.CheckWithCutting(of, smallPieces(t)) },
+				func() (uint64, error) { return given.FileBranch.Check(of) },
+				func() (uint64, error) { return given.FileBranch.CheckWithChunking(of, smallChunks(t)) },
 			} {
 				if at, err := checked(); err != nil || at != *shown.StartsAtByte {
 					t.Fatalf("%q %d to %d: starts at byte %d (%v)", shown.Path, shown.Start, shown.End, at, err)
 				}
 			}
-			if given.FileRun.Start() != shown.Start || uint64(len(given.FileRun.Items())) != shown.End-shown.Start {
-				t.Fatalf("%q: the run shows other items", shown.Path)
+			if given.FileBranch.Start() != shown.Start || uint64(len(given.FileBranch.Items())) != shown.End-shown.Start {
+				t.Fatalf("%q: the branch shows other items", shown.Path)
 			}
 			continue
 		}
@@ -440,21 +440,21 @@ func TestEveryRunOfTheSharedVectorsIsShownAndCheckedByteForByte(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		run, err := list.Open(shown.Start, shown.End)
+		branch, err := list.Open(shown.Start, shown.End)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := hex.EncodeToString(FolderRunFrame(run)); got != shown.Frame {
+		if got := hex.EncodeToString(FolderBranchFrame(branch)); got != shown.Frame {
 			t.Fatalf("%q %d to %d: the frame is %s", shown.Path, shown.Start, shown.End, got)
 		}
-		if given.Kind != FrameFolderRun {
-			t.Fatalf("%q: the manifest's frame is no run of a folder's list", shown.Path)
+		if given.Kind != FrameFolderBranch {
+			t.Fatalf("%q: the manifest's frame is no branch of a folder's list", shown.Path)
 		}
-		if err := given.FolderRun.Check(of); err != nil {
+		if err := given.FolderBranch.Check(of); err != nil {
 			t.Fatalf("%q %d to %d: %v", shown.Path, shown.Start, shown.End, err)
 		}
-		if !slices.EqualFunc(given.FolderRun.Entries(), list.Entries()[shown.Start:shown.End], Entry.Equal) {
-			t.Fatalf("%q: the run shows other entries", shown.Path)
+		if !slices.EqualFunc(given.FolderBranch.Entries(), list.Entries()[shown.Start:shown.End], Entry.Equal) {
+			t.Fatalf("%q: the branch shows other entries", shown.Path)
 		}
 	}
 }
@@ -475,18 +475,18 @@ func TestEveryNameOfTheSharedVectorsIsAnsweredByteForByte(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		run, err := list.OpenName(asked.Name)
+		branch, err := list.OpenName(asked.Name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := hex.EncodeToString(FolderRunFrame(run)); got != asked.Frame {
+		if got := hex.EncodeToString(FolderBranchFrame(branch)); got != asked.Frame {
 			t.Fatalf("%q in %q: the frame is %s", asked.Name, asked.Path, got)
 		}
 		given, err := DecodeFrame(mustHex(t, asked.Frame))
-		if err != nil || given.Kind != FrameFolderRun {
+		if err != nil || given.Kind != FrameFolderBranch {
 			t.Fatal(given.Kind, err)
 		}
-		entry, has, err := given.FolderRun.CheckName(of, asked.Name)
+		entry, has, err := given.FolderBranch.CheckName(of, asked.Name)
 		if err != nil || has != asked.Found {
 			t.Fatalf("%q in %q: found %v (%v)", asked.Name, asked.Path, has, err)
 		}
@@ -629,33 +629,33 @@ func TestEverythingTheSharedVectorsSayMustBeRefusedIsRefused(t *testing.T) {
 			_, err = DecodeRecord(content)
 		case "file-list":
 			_, err = DecodeFileList(content)
-		case "file-list-cut":
-			// The list is well formed, and does not fit a way of cutting.
+		case "file-list-chunking":
+			// The list is well formed, and does not fit a way of chunking.
 			list, readErr := DecodeFileList(content)
 			if readErr != nil {
 				t.Fatalf("%s: %s: the list does not read: %v", forged.As, forged.What, readErr)
 			}
-			cutting, readErr := CuttingFromTag([]byte(forged.Cutting))
+			chunking, readErr := ChunkingFromTag([]byte(forged.Chunking))
 			if readErr != nil {
 				t.Fatal(readErr)
 			}
-			err = list.CheckCutting(cutting)
+			err = list.CheckChunking(chunking)
 		case "folder-list":
 			_, err = DecodeFolderList(content)
-		case "file-run":
-			var run *FileRun
-			if run, err = DecodeFileRun(content); err == nil {
-				_, err = run.Check(against())
+		case "file-branch":
+			var branch *FileBranch
+			if branch, err = DecodeFileBranch(content); err == nil {
+				_, err = branch.Check(against())
 			}
-		case "folder-run":
-			var run *FolderRun
-			if run, err = DecodeFolderRun(content); err == nil {
-				err = run.Check(against())
+		case "folder-branch":
+			var branch *FolderBranch
+			if branch, err = DecodeFolderBranch(content); err == nil {
+				err = branch.Check(against())
 			}
 		case "folder-name":
-			var run *FolderRun
-			if run, err = DecodeFolderRun(content); err == nil {
-				_, _, err = run.CheckName(against(), forged.Name)
+			var branch *FolderBranch
+			if branch, err = DecodeFolderBranch(content); err == nil {
+				_, _, err = branch.CheckName(against(), forged.Name)
 			}
 		case "request":
 			_, err = DecodeRequest(content)
@@ -670,7 +670,7 @@ func TestEverythingTheSharedVectorsSayMustBeRefusedIsRefused(t *testing.T) {
 			t.Errorf("taken, and it must be refused: %s: %s", forged.As, forged.What)
 		}
 	}
-	for _, kind := range []string{"record", "file-list", "file-list-cut", "folder-list", "file-run", "folder-run", "folder-name", "request", "frame", "root"} {
+	for _, kind := range []string{"record", "file-list", "file-list-chunking", "folder-list", "file-branch", "folder-branch", "folder-name", "request", "frame", "root"} {
 		if kinds[kind] == 0 {
 			t.Errorf("the manifest offers nothing as %q", kind)
 		}

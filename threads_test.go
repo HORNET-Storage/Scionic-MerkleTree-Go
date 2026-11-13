@@ -14,14 +14,14 @@ import (
 // build that fails, or whose store falls over, ends: it is told as it
 // happened, nobody is left waiting, and no folder is left held open.
 
-func TestOneFileIsTheSameWhateverNumberOfThreadsKeepItsPieces(t *testing.T) {
-	// 6,250 pieces of 16 bytes: more than a builder hands on at a time.
+func TestOneFileIsTheSameWhateverNumberOfThreadsKeepItsChunks(t *testing.T) {
+	// 6,250 chunks of 16 bytes: more than a builder hands on at a time.
 	data := corpusBytes("threads-one-file", 100_000)
 	var roots []Root
 	var stores [][]storedThing
 	for _, threads := range []int{1, 2, 8, 0} {
 		store := NewMemoryStore()
-		builder := NewBuilder(store, smallPieces(t)).Threads(threads)
+		builder := NewBuilder(store, smallChunks(t)).Threads(threads)
 		streamed := must[Target](t)(builder.File(bytes.NewReader(data)))
 		inPlace := must[Target](t)(builder.FileFromBytes(data))
 		if streamed != inPlace {
@@ -37,7 +37,7 @@ func TestOneFileIsTheSameWhateverNumberOfThreadsKeepItsPieces(t *testing.T) {
 	}
 }
 
-func TestAFileCutByContentIsTheSameWithHelp(t *testing.T) {
+func TestAFileChunkedByContentIsTheSameWithHelp(t *testing.T) {
 	data := corpusBytes("threads-by-content", 9<<20)
 	var roots []Root
 	for _, threads := range []int{1, 4} {
@@ -47,12 +47,12 @@ func TestAFileCutByContentIsTheSameWithHelp(t *testing.T) {
 		if streamed != must[Target](t)(builder.FileFromBytes(data)) {
 			t.Fatalf("%d threads: a file from a stream is another file than the same bytes in memory", threads)
 		}
-		if store.Count(StoredPiece) <= 2 {
-			t.Fatal("the file was not cut into several pieces")
+		if store.Count(StoredChunk) <= 2 {
+			t.Fatal("the file was not split into several chunks")
 		}
 		root := must[Root](t)(builder.Finish(streamed, ExtraData{}))
 		for _, workers := range []int{1, 4} {
-			must[*Summary](t)(VerifyWith(store, root, VerifyOptions{Workers: workers, Recut: true}))
+			must[*Summary](t)(VerifyWith(store, root, VerifyOptions{Workers: workers, Rechunk: true}))
 		}
 		roots = append(roots, root)
 	}
@@ -67,7 +67,7 @@ func TestAFolderIsTheSameWhenThreadsOutnumberItsFiles(t *testing.T) {
 	var stores [][]storedThing
 	for _, workers := range []int{1, 2, 64} {
 		store := NewMemoryStore()
-		root := must[Root](t)(Build(store, folder, BuildOptions{Cutting: smallPieces(t), Workers: workers}))
+		root := must[Root](t)(Build(store, folder, BuildOptions{Chunking: smallChunks(t), Workers: workers}))
 		must[*Summary](t)(VerifyWith(store, root, VerifyOptions{Workers: workers}))
 		roots = append(roots, root)
 		stores = append(stores, contentsOf(store))
@@ -79,10 +79,10 @@ func TestAFolderIsTheSameWhenThreadsOutnumberItsFiles(t *testing.T) {
 	}
 }
 
-// errWillNotKeep is what a store says that will not keep a piece.
-var errWillNotKeep = errors.New("this store will not keep that piece")
+// errWillNotKeep is what a store says that will not keep a chunk.
+var errWillNotKeep = errors.New("this store will not keep that chunk")
 
-// refusingStore will not keep one piece. It has the three methods that a
+// refusingStore will not keep one chunk. It has the three methods that a
 // store has to have, and no others.
 type refusingStore struct {
 	inner   *MemoryStore
@@ -90,7 +90,7 @@ type refusingStore struct {
 }
 
 func (s refusingStore) Put(kind Stored, hash Hash, content []byte) error {
-	if kind == StoredPiece && hash == s.refused {
+	if kind == StoredChunk && hash == s.refused {
 		return errWillNotKeep
 	}
 	return s.inner.Put(kind, hash, content)
@@ -104,21 +104,21 @@ func (s refusingStore) Remove(kind Stored, hash Hash) error {
 	return s.inner.Remove(kind, hash)
 }
 
-func TestAPieceThatCannotBeKeptStopsTheFileWhoeverWasKeepingIt(t *testing.T) {
+func TestAChunkThatCannotBeKeptStopsTheFileWhoeverWasKeepingIt(t *testing.T) {
 	data := corpusBytes("threads-refused", 100_000)
 	refused := HashOf(data[64_000:64_016])
 	for _, threads := range []int{1, 8} {
 		store := refusingStore{inner: NewMemoryStore(), refused: refused}
-		builder := NewBuilder(store, smallPieces(t)).Threads(threads)
+		builder := NewBuilder(store, smallChunks(t)).Threads(threads)
 		if _, err := builder.File(bytes.NewReader(data)); !errors.Is(err, errWillNotKeep) {
 			t.Fatalf("%d threads, from a stream: %v", threads, err)
 		}
 		if _, err := builder.FileFromBytes(data); !errors.Is(err, errWillNotKeep) {
 			t.Fatalf("%d threads, from memory: %v", threads, err)
 		}
-		// A file whose pieces are not all kept has no list.
+		// A file whose chunks are not all kept has no list.
 		if store.inner.Count(StoredFileList) != 0 {
-			t.Fatalf("%d threads: a file whose pieces are not all kept has a list", threads)
+			t.Fatalf("%d threads: a file whose chunks are not all kept has a list", threads)
 		}
 	}
 }
@@ -134,7 +134,7 @@ func movable(folder string) error {
 }
 
 func TestTheFailureThatIsToldIsTheOneThatHappened(t *testing.T) {
-	// A folder of many files, one of which holds a piece the store refuses.
+	// A folder of many files, one of which holds a chunk the store refuses.
 	// The goroutines that stop because of it have nothing of their own to
 	// tell.
 	files := map[string][]byte{}
@@ -145,7 +145,7 @@ func TestTheFailureThatIsToldIsTheOneThatHappened(t *testing.T) {
 	refused := HashOf(corpusBytes("failure-40", 64)[:16])
 	for _, workers := range []int{1, 2, 8} {
 		store := refusingStore{inner: NewMemoryStore(), refused: refused}
-		if _, err := Build(store, folder, BuildOptions{Cutting: smallPieces(t), Workers: workers}); !errors.Is(err, errWillNotKeep) {
+		if _, err := Build(store, folder, BuildOptions{Chunking: smallChunks(t), Workers: workers}); !errors.Is(err, errWillNotKeep) {
 			t.Fatalf("%d workers: %v", workers, err)
 		}
 		if err := movable(folder); err != nil {
@@ -154,12 +154,12 @@ func TestTheFailureThatIsToldIsTheOneThatHappened(t *testing.T) {
 	}
 }
 
-// fallingStore falls over whenever it is handed a piece, as one would whose
+// fallingStore falls over whenever it is handed a chunk, as one would whose
 // own code has a fault.
 type fallingStore struct{ *MemoryStore }
 
 func (s fallingStore) Put(kind Stored, hash Hash, content []byte) error {
-	if kind == StoredPiece {
+	if kind == StoredChunk {
 		panic("this store falls over")
 	}
 	return s.MemoryStore.Put(kind, hash, content)
@@ -203,7 +203,7 @@ func endsByFalling(t *testing.T, what string, work func()) any {
 }
 
 func TestAStoreThatFallsOverDoesNotLeaveABuildWaiting(t *testing.T) {
-	// More files than the goroutines take at once: if every one that cuts
+	// More files than the goroutines take at once: if every one that chunks
 	// is gone, the one that reads the folder must not wait for them.
 	files := map[string][]byte{}
 	for number := range 400 {
@@ -214,7 +214,7 @@ func TestAStoreThatFallsOverDoesNotLeaveABuildWaiting(t *testing.T) {
 		what := fmt.Sprintf("a build with %d workers", workers)
 		// The build ends, and it ends as the store did: by falling over.
 		raised := endsByFalling(t, what, func() {
-			Build(fallingStore{NewMemoryStore()}, folder, BuildOptions{Cutting: smallPieces(t), Workers: workers})
+			Build(fallingStore{NewMemoryStore()}, folder, BuildOptions{Chunking: smallChunks(t), Workers: workers})
 		})
 		if raised != "this store falls over" {
 			t.Fatalf("%s fell over with %v", what, raised)
@@ -232,7 +232,7 @@ func TestAStoreThatFallsOverDoesNotLeaveAFileOrACheckWaiting(t *testing.T) {
 		what := fmt.Sprintf("a file with %d threads", threads)
 		for _, fromStream := range []bool{true, false} {
 			raised := endsByFalling(t, what, func() {
-				builder := NewBuilder(fallingStore{NewMemoryStore()}, smallPieces(t)).Threads(threads)
+				builder := NewBuilder(fallingStore{NewMemoryStore()}, smallChunks(t)).Threads(threads)
 				if fromStream {
 					builder.File(bytes.NewReader(data))
 				} else {
@@ -244,10 +244,10 @@ func TestAStoreThatFallsOverDoesNotLeaveAFileOrACheckWaiting(t *testing.T) {
 			}
 		}
 	}
-	// A check of a held tree, whose store falls over when a piece is asked
+	// A check of a held tree, whose store falls over when a chunk is asked
 	// for.
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	root := must[Root](t)(builder.Finish(must[Target](t)(builder.FileFromBytes(data)), ExtraData{}))
 	for _, workers := range []int{1, 2, 8} {
 		what := fmt.Sprintf("a check with %d workers", workers)
@@ -260,11 +260,11 @@ func TestAStoreThatFallsOverDoesNotLeaveAFileOrACheckWaiting(t *testing.T) {
 	}
 }
 
-// fallingOnGet falls over whenever a piece is asked for.
+// fallingOnGet falls over whenever a chunk is asked for.
 type fallingOnGet struct{ *MemoryStore }
 
 func (s fallingOnGet) Get(kind Stored, hash Hash) ([]byte, bool, error) {
-	if kind == StoredPiece {
+	if kind == StoredChunk {
 		panic("this store falls over")
 	}
 	return s.MemoryStore.Get(kind, hash)

@@ -368,7 +368,7 @@ func TestAFileThatSomethingStandsInForIsOpenedAsThatFileOrNotAtAll(t *testing.T)
 		t.Fatal(err)
 	}
 	// It is not built into a tree either, and the error names it.
-	_, err = Build(NewMemoryStore(), filepath.Join(root, "top"), BuildOptions{Cutting: smallPieces(t)})
+	_, err = Build(NewMemoryStore(), filepath.Join(root, "top"), BuildOptions{Chunking: smallChunks(t)})
 	var told *Error
 	if !errors.Is(err, ErrIO) || !errors.As(err, &told) || !strings.HasSuffix(told.Path, "stood-in") {
 		t.Fatal(err)

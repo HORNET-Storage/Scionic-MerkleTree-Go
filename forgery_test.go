@@ -91,9 +91,9 @@ func assertClean(t *testing.T, store *MemoryStore) {
 	for _, thing := range contentsOf(store) {
 		content := []byte(thing.content)
 		switch thing.kind {
-		case StoredPiece:
+		case StoredChunk:
 			if HashOf(content) != thing.hash {
-				t.Fatalf("a piece is kept under %v, which is not its hash", thing.hash)
+				t.Fatalf("a chunk is kept under %v, which is not its hash", thing.hash)
 			}
 		case StoredFileList:
 			if list, err := DecodeFileList(content); err != nil || list.Hash() != thing.hash {
@@ -181,14 +181,14 @@ func TestAnyChangedByteOfAnyFrameIsRefused(t *testing.T) {
 	}
 }
 
-func TestEveryByteOfARunIsCoveredByTheHashItIsHeldAgainst(t *testing.T) {
-	// A run shows a part of a list, and carries nodes for the rest. If one
-	// of its bytes could change and the run still pass, two different runs
+func TestEveryByteOfABranchIsCoveredByTheHashItIsHeldAgainst(t *testing.T) {
+	// A branch shows a part of a list, and carries nodes for the rest. If one
+	// of its bytes could change and the branch still pass, two different branches
 	// would show the same thing, and that byte would be nobody's to vouch
-	// for. So every byte of every run of a list of nine is changed here, one
+	// for. So every byte of every branch of a list of nine is changed here, one
 	// at a time, in its lowest bit and in its highest.
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	file := must[Target](t)(builder.FileFromBytes(corpusBytes("covered", 9*16)))
 	entries := make([]Entry, 9)
 	for index := range entries {
@@ -201,17 +201,17 @@ func TestEveryByteOfARunIsCoveredByTheHashItIsHeldAgainst(t *testing.T) {
 		t.Fatal(fileList.Count(), folderList.Count())
 	}
 	changes := 0
-	eachChange := func(run []byte, what string, taken func(run []byte) bool) {
+	eachChange := func(branch []byte, what string, taken func(branch []byte) bool) {
 		t.Helper()
-		if !taken(run) {
+		if !taken(branch) {
 			t.Fatalf("%s is refused as it was made", what)
 		}
-		for at := range run {
+		for at := range branch {
 			for _, bit := range []byte{0x01, 0x80} {
-				changed := slices.Clone(run)
+				changed := slices.Clone(branch)
 				changed[at] ^= bit
 				if taken(changed) {
-					t.Fatalf("%s: byte %d of %d was changed, and the run was taken", what, at, len(run))
+					t.Fatalf("%s: byte %d of %d was changed, and the branch was taken", what, at, len(branch))
 				}
 				changes++
 			}
@@ -219,14 +219,14 @@ func TestEveryByteOfARunIsCoveredByTheHashItIsHeldAgainst(t *testing.T) {
 	}
 	for start := range uint64(9) {
 		for end := start + 1; end <= 9; end++ {
-			run := must[*FolderRun](t)(folderList.Open(start, end)).Encode()
-			eachChange(run, fmt.Sprintf("entries %d up to %d", start, end), func(run []byte) bool {
-				read, err := DecodeFolderRun(run)
+			branch := must[*FolderBranch](t)(folderList.Open(start, end)).Encode()
+			eachChange(branch, fmt.Sprintf("entries %d up to %d", start, end), func(branch []byte) bool {
+				read, err := DecodeFolderBranch(branch)
 				return err == nil && read.Check(folder) == nil
 			})
-			run = must[*FileRun](t)(fileList.Open(start, end)).Encode()
-			eachChange(run, fmt.Sprintf("pieces %d up to %d", start, end), func(run []byte) bool {
-				read, err := DecodeFileRun(run)
+			branch = must[*FileBranch](t)(fileList.Open(start, end)).Encode()
+			eachChange(branch, fmt.Sprintf("chunks %d up to %d", start, end), func(branch []byte) bool {
+				read, err := DecodeFileBranch(branch)
 				if err != nil {
 					return false
 				}
@@ -235,11 +235,11 @@ func TestEveryByteOfARunIsCoveredByTheHashItIsHeldAgainst(t *testing.T) {
 			})
 		}
 	}
-	// The answer to a name is a run too, whether the name is there or not.
+	// The answer to a name is a branch too, whether the name is there or not.
 	for _, name := range []string{"n00", "n04", "n08", "a", "n04x", "z"} {
-		answer := must[*FolderRun](t)(folderList.OpenName(name)).Encode()
-		eachChange(answer, fmt.Sprintf("the answer for %q", name), func(run []byte) bool {
-			read, err := DecodeFolderRun(run)
+		answer := must[*FolderBranch](t)(folderList.OpenName(name)).Encode()
+		eachChange(answer, fmt.Sprintf("the answer for %q", name), func(branch []byte) bool {
+			read, err := DecodeFolderBranch(branch)
 			if err != nil {
 				return false
 			}
@@ -257,7 +257,7 @@ func TestAMadeUpChildUnderAFolderOrAFileIsRefused(t *testing.T) {
 	weights := targetAt(t, source, root, "weights")
 	model := targetAt(t, source, root, "weights/model.bin")
 	madeUp := oracleFile("zz-made-up", oracleSHA([]byte("made up")), 7)
-	madeUpItem := oracleItemOf([]byte("a made-up piece"))
+	madeUpItem := oracleItemOf([]byte("a made-up chunk"))
 	// One more entry at the end of a folder's list, one more item at the
 	// end of a file's list, and one less of each.
 	forges := []struct {
@@ -323,18 +323,18 @@ func TestAMadeUpChildUnderAFolderOrAFileIsRefused(t *testing.T) {
 	// It is another folder, and the receiver asked about this one.
 	four := append(oracleEntriesOf(folderListOf(t, source, weights).Entries()), madeUp)
 	for _, part := range [][2]int{{0, 4}, {3, 4}, {0, 1}} {
-		forged, err := DecodeFrame(oracleFolderRunFrame(four, part[0], part[1]))
-		if err != nil || forged.Kind != FrameFolderRun {
-			t.Fatalf("%v: the forgery does not read as a run: %v", part, err)
+		forged, err := DecodeFrame(oracleFolderBranchFrame(four, part[0], part[1]))
+		if err != nil || forged.Kind != FrameFolderBranch {
+			t.Fatalf("%v: the forgery does not read as a branch: %v", part, err)
 		}
-		if err := forged.FolderRun.Check(weights); err == nil {
-			t.Fatalf("%v: a run of another folder was taken", part)
+		if err := forged.FolderBranch.Check(weights); err == nil {
+			t.Fatalf("%v: a branch of another folder was taken", part)
 		}
-		if _, _, err := forged.FolderRun.CheckName(weights, "zz-made-up"); err == nil {
+		if _, _, err := forged.FolderBranch.CheckName(weights, "zz-made-up"); err == nil {
 			t.Fatalf("%v: a name of another folder was taken", part)
 		}
 	}
-	peer := tamperingPeer(source, answering(AskFolderName, oracleFolderRunFrame(four, 3, 4)))
+	peer := tamperingPeer(source, answering(AskFolderName, oracleFolderBranchFrame(four, 3, 4)))
 	remote := must[*Remote](t)(OpenRemote(peer, root))
 	if _, _, err := remote.Entry(weights, "zz-made-up"); err == nil {
 		t.Fatal("a made-up entry was shown as the folder's")
@@ -342,21 +342,21 @@ func TestAMadeUpChildUnderAFolderOrAFileIsRefused(t *testing.T) {
 	if _, _, err := remote.Lookup("weights/zz-made-up"); err == nil {
 		t.Fatal("a made-up entry was found by its path")
 	}
-	// The same for a file: a made-up list of 64 pieces that holds the real
+	// The same for a file: a made-up list of 64 chunks that holds the real
 	// 63 is another file.
 	longer := append(oracleItemsOf(fileListOf(t, source, model).Items()), madeUpItem)
 	for _, part := range [][2]int{{0, 64}, {63, 64}, {5, 6}} {
-		run, err := DecodeFileRun(oracleFileRunFrame(longer, part[0], part[1])[1:])
+		branch, err := DecodeFileBranch(oracleFileBranchFrame(longer, part[0], part[1])[1:])
 		if err != nil {
-			t.Fatalf("%v: the forgery does not read as a run: %v", part, err)
+			t.Fatalf("%v: the forgery does not read as a branch: %v", part, err)
 		}
-		if _, err := run.Check(model); err == nil {
-			t.Fatalf("%v: a run of another file was taken", part)
+		if _, err := branch.Check(model); err == nil {
+			t.Fatalf("%v: a branch of another file was taken", part)
 		}
 	}
 }
 
-func TestARealChildsOpeningDoesNotCarryAnotherChild(t *testing.T) {
+func TestARealChildsBranchDoesNotCarryAnotherChild(t *testing.T) {
 	source, root := sampleTree(t)
 	weights := targetAt(t, source, root, "weights")
 	model := targetAt(t, source, root, "weights/model.bin")
@@ -364,21 +364,21 @@ func TestARealChildsOpeningDoesNotCarryAnotherChild(t *testing.T) {
 	if place, held := list.PlaceOf("model.bin"); !held || place != 1 {
 		t.Fatal(place, held)
 	}
-	shown := must[*FolderRun](t)(list.OpenName("model.bin"))
+	shown := must[*FolderBranch](t)(list.OpenName("model.bin"))
 	if entry, found, err := shown.CheckName(weights, "model.bin"); err != nil || !found || entry.Name() != "model.bin" {
 		t.Fatal(entry, found, err)
 	}
 	honest := shown.Encode()
-	// The entry that is shown starts 20 bytes into the run: its kind, its
+	// The entry that is shown starts 20 bytes into the branch: its kind, its
 	// size, its hash, and then its name.
 	with := func(at int, value byte) error {
 		forged := bytes.Clone(honest)
 		forged[at] = value
-		run, err := DecodeFolderRun(forged)
+		branch, err := DecodeFolderBranch(forged)
 		if err != nil {
 			return err
 		}
-		_, _, err = run.CheckName(weights, "model.bin")
+		_, _, err = branch.CheckName(weights, "model.bin")
 		return err
 	}
 	for _, change := range []struct {
@@ -401,8 +401,8 @@ func TestARealChildsOpeningDoesNotCarryAnotherChild(t *testing.T) {
 			t.Fatalf("%s was taken", change.what)
 		}
 	}
-	// The neighbour's opening, with the neighbour passed off under the name
-	// that was asked for, and the opening of the wrong place as proof that
+	// The neighbour's branch, with the neighbour passed off under the name
+	// that was asked for, and the branch of the wrong place as proof that
 	// the name is not there.
 	entries := oracleEntriesOf(list.Entries())
 	leaves := oracleFolderLeaves(entries)
@@ -411,11 +411,11 @@ func TestARealChildsOpeningDoesNotCarryAnotherChild(t *testing.T) {
 		for _, name := range []string{"model.bin", "copy-of-model.bin", "shards", "absent", "a", "zz"} {
 			// As the place really is: right only when it is the name's
 			// place.
-			plain := oracleFolderRunFrame(entries, place, place+1)
+			plain := oracleFolderBranchFrame(entries, place, place+1)
 			// With the entry renamed to what was asked for.
 			renamed := entries[place]
 			renamed.name = []byte(name)
-			passedOff := oracleFolderRunFrameAs(3, uint64(place), []oracleEntry{renamed}, leaves.carried(place, place+1))
+			passedOff := oracleFolderBranchFrameAs(3, uint64(place), []oracleEntry{renamed}, leaves.carried(place, place+1))
 			truth, there := list.Get(name)
 			// A name has one place where it can be, whether it is there or
 			// not. The entry at that place is the proof, either way.
@@ -444,25 +444,25 @@ func TestARealChildsOpeningDoesNotCarryAnotherChild(t *testing.T) {
 			}
 		}
 	}
-	// A file's run with one item changed, and the run of other pieces than
+	// A file's branch with one item changed, and the branch of other chunks than
 	// those that hold the bytes asked for.
 	fileList := fileListOf(t, source, model)
-	run := must[*FileRun](t)(fileList.Open(6, 9)).Encode()
-	if at, err := must[*FileRun](t)(DecodeFileRun(run)).Check(model); err != nil || at != 96 {
+	branch := must[*FileBranch](t)(fileList.Open(6, 9)).Encode()
+	if at, err := must[*FileBranch](t)(DecodeFileBranch(branch)).Check(model); err != nil || at != 96 {
 		t.Fatal(at, err)
 	}
 	for _, at := range []int{20, 51, 52, 55} {
-		forged := bytes.Clone(run)
+		forged := bytes.Clone(branch)
 		forged[at] ^= 1
-		changed, err := DecodeFileRun(forged)
+		changed, err := DecodeFileBranch(forged)
 		if err == nil {
 			_, err = changed.Check(model)
 		}
 		if err == nil {
-			t.Fatalf("byte %d of a run was changed, and the run was taken", at)
+			t.Fatalf("byte %d of a branch was changed, and the branch was taken", at)
 		}
 	}
-	elsewhere := oracleFrame(byte(FrameFileRun), must[*FileRun](t)(fileList.Open(0, 3)).Encode())
+	elsewhere := oracleFrame(byte(FrameFileBranch), must[*FileBranch](t)(fileList.Open(0, 3)).Encode())
 	peer := tamperingPeer(source, answering(AskFileBytes, elsewhere))
 	remote := must[*Remote](t)(OpenRemote(peer, root))
 	var out bytes.Buffer
@@ -471,22 +471,22 @@ func TestARealChildsOpeningDoesNotCarryAnotherChild(t *testing.T) {
 	}
 }
 
-func TestAFileIsNeverTakenForAFolderNorAListForAPiece(t *testing.T) {
+func TestAFileIsNeverTakenForAFolderNorAListForAChunk(t *testing.T) {
 	source, root := sampleTree(t)
 	weights := targetAt(t, source, root, "weights")
 	model := targetAt(t, source, root, "weights/model.bin")
 	fileFrame := oracleFrame(byte(FrameFileList), keptIn(t, source, StoredFileList, model.Hash))
 	folderFrame := oracleFrame(byte(FrameFolderList), keptIn(t, source, StoredFolderList, weights.Hash))
-	pieceFrame := oracleFrame(byte(FramePiece), corpusBytes("model", 16))
+	chunkFrame := oracleFrame(byte(FrameChunk), corpusBytes("model", 16))
 	// Each kind of question, answered with a true part of the tree that is
 	// of another kind.
 	for _, swap := range []struct {
 		asked   RequestKind
 		answers [][]byte
 	}{
-		{AskFolder, [][]byte{fileFrame, pieceFrame}},
-		{AskFile, [][]byte{folderFrame, pieceFrame}},
-		{AskPieces, [][]byte{fileFrame, folderFrame}},
+		{AskFolder, [][]byte{fileFrame, chunkFrame}},
+		{AskFile, [][]byte{folderFrame, chunkFrame}},
+		{AskChunks, [][]byte{fileFrame, folderFrame}},
 	} {
 		for _, answer := range swap.answers {
 			done := false
@@ -519,10 +519,10 @@ func TestAFileIsNeverTakenForAFolderNorAListForAPiece(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A file whose bytes are another file's list, to the letter. It is kept
-	// as a piece, under the plain hash of its bytes, and never as a list.
+	// as a chunk, under the plain hash of its bytes, and never as a list.
 	listBytes := keptIn(t, source, StoredFileList, model.Hash)
 	store := NewMemoryStore()
-	builder := NewBuilder(store, must[Cutting](t)(FixedCutting(4096)))
+	builder := NewBuilder(store, must[Chunking](t)(FixedChunking(4096)))
 	odd := must[Target](t)(builder.FileFromBytes(listBytes))
 	oddRoot := must[Root](t)(builder.Finish(odd, ExtraData{}))
 	dest := NewMemoryStore()
@@ -530,57 +530,57 @@ func TestAFileIsNeverTakenForAFolderNorAListForAPiece(t *testing.T) {
 		t.Fatal(err)
 	}
 	plain := HashOf(listBytes)
-	asPiece, _ := dest.Has(StoredPiece, plain)
+	asChunk, _ := dest.Has(StoredChunk, plain)
 	asList, _ := dest.Has(StoredFileList, plain)
 	asModel, _ := dest.Has(StoredFileList, model.Hash)
-	if !asPiece || asList || asModel || plain == model.Hash {
+	if !asChunk || asList || asModel || plain == model.Hash {
 		t.Fatal("a file's bytes that read as a list were kept as a list")
 	}
 }
 
-func TestAFileIsNotGivenAnotherFilesPieces(t *testing.T) {
+func TestAFileIsNotGivenAnotherFilesChunks(t *testing.T) {
 	source, root := sampleTree(t)
 	model := targetAt(t, source, root, "weights/model.bin")
 	shard := targetAt(t, source, root, "weights/shards/a.bin")
-	var shardPieces [][]byte
+	var shardChunks [][]byte
 	for _, item := range fileListOf(t, source, shard).Items() {
-		shardPieces = append(shardPieces, oracleFrame(byte(FramePiece), keptIn(t, source, StoredPiece, item.Hash)))
+		shardChunks = append(shardChunks, oracleFrame(byte(FrameChunk), keptIn(t, source, StoredChunk, item.Hash)))
 	}
-	// A whole fetch: the pieces of one file, sent when another file's were
-	// asked for. They are true pieces of the tree, and they are not what
+	// A whole fetch: the chunks of one file, sent when another file's were
+	// asked for. They are true chunks of the tree, and they are not what
 	// was asked for.
 	_, err := fetchTampered(t, source, root, func(request []byte, frames [][]byte) [][]byte {
 		asked := must[Request](t)(DecodeRequest(request))
-		if asked.Kind == AskPieces && asked.Hash == model.Hash {
-			return slices.Clone(shardPieces)
+		if asked.Kind == AskChunks && asked.Hash == model.Hash {
+			return slices.Clone(shardChunks)
 		}
 		return frames
 	})
 	if !errors.Is(err, ErrNotWanted) {
 		t.Fatal(err)
 	}
-	// A stretch of one file, answered with another file's pieces, and with
-	// the file's own pieces in another order.
+	// A stretch of one file, answered with another file's chunks, and with
+	// the file's own chunks in another order.
 	for _, swap := range []bool{false, true} {
 		peer := tamperingPeer(source, func(request []byte, frames [][]byte) [][]byte {
-			if RequestKind(request[0]) != AskPieces {
+			if RequestKind(request[0]) != AskChunks {
 				return frames
 			}
 			if swap {
 				frames[0], frames[1] = frames[1], frames[0]
 				return frames
 			}
-			return slices.Clone(shardPieces)
+			return slices.Clone(shardChunks)
 		})
 		remote := must[*Remote](t)(OpenRemote(peer, root))
 		var out bytes.Buffer
 		if err := remote.Read(model, 0, 64, &out); err == nil || out.Len() != 0 {
-			t.Fatalf("swap: %v: %d bytes of another piece were handed out (%v)", swap, out.Len(), err)
+			t.Fatalf("swap: %v: %d bytes of another chunk were handed out (%v)", swap, out.Len(), err)
 		}
 	}
-	// A stretch of one file, answered with the run of another file's list.
-	otherRun := oracleFrame(byte(FrameFileRun), must[*FileRun](t)(fileListOf(t, source, shard).Open(0, 4)).Encode())
-	peer := tamperingPeer(source, answering(AskFileBytes, otherRun))
+	// A stretch of one file, answered with the branch of another file's list.
+	otherBranch := oracleFrame(byte(FrameFileBranch), must[*FileBranch](t)(fileListOf(t, source, shard).Open(0, 4)).Encode())
+	peer := tamperingPeer(source, answering(AskFileBytes, otherBranch))
 	remote := must[*Remote](t)(OpenRemote(peer, root))
 	var out bytes.Buffer
 	if err := remote.Read(model, 0, 64, &out); err == nil || out.Len() != 0 {
@@ -590,7 +590,7 @@ func TestAFileIsNotGivenAnotherFilesPieces(t *testing.T) {
 
 func TestARecordForAnotherRootIsRefused(t *testing.T) {
 	source, root := sampleTree(t)
-	builder := NewBuilder(source, smallPieces(t))
+	builder := NewBuilder(source, smallChunks(t))
 	otherFile := must[Target](t)(builder.FileFromBytes([]byte("another tree")))
 	other := must[Root](t)(builder.Finish(otherFile, ExtraData{}))
 	otherRecord := keptIn(t, source, StoredRecord, other.Hash())
@@ -620,9 +620,9 @@ func TestNothingIsKeptBeforeItIsTiedToTheRoot(t *testing.T) {
 	record := keptIn(t, source, StoredRecord, root.Hash())
 	topList := oracleFrame(byte(FrameFolderList), keptIn(t, source, StoredFolderList, top.Hash))
 	readmeList := oracleFrame(byte(FrameFileList), keptIn(t, source, StoredFileList, readme.Hash))
-	readmePiece := oracleFrame(byte(FramePiece), []byte("a small file"))
+	readmeChunk := oracleFrame(byte(FrameChunk), []byte("a small file"))
 	deepList := oracleFrame(byte(FrameFileList), keptIn(t, source, StoredFileList, shard.Hash))
-	madeUpPiece := oracleFrame(byte(FramePiece), []byte("no part of this tree"))
+	madeUpChunk := oracleFrame(byte(FrameChunk), []byte("no part of this tree"))
 	dest := NewMemoryStore()
 	refused := func(frame []byte, what string) {
 		t.Helper()
@@ -653,7 +653,7 @@ func TestNothingIsKeptBeforeItIsTiedToTheRoot(t *testing.T) {
 	// Before the record, nothing is tied to anything.
 	refused(topList, "the top folder")
 	refused(readmeList, "a file's list")
-	refused(readmePiece, "a piece")
+	refused(readmeChunk, "a chunk")
 	if must[*Intake](t)(NewIntake(dest, root)).Record() != nil {
 		t.Fatal("an intake that was given nothing has a record")
 	}
@@ -661,7 +661,7 @@ func TestNothingIsKeptBeforeItIsTiedToTheRoot(t *testing.T) {
 	// The record's totals are there to be looked at before anything more is
 	// taken.
 	intake := must[*Intake](t)(NewIntake(dest, root))
-	if intake.Record() == nil || intake.Record().Totals().Pieces != 76 {
+	if intake.Record() == nil || intake.Record().Totals().Chunks != 76 {
 		t.Fatal("the record's totals are not there to be looked at")
 	}
 	if intake.Outstanding() != 1 {
@@ -669,22 +669,22 @@ func TestNothingIsKeptBeforeItIsTiedToTheRoot(t *testing.T) {
 	}
 	// After the record, only the top folder is named.
 	refused(readmeList, "a file's list before its folder")
-	refused(readmePiece, "a piece before its file's list")
+	refused(readmeChunk, "a chunk before its file's list")
 	refused(deepList, "a list from further down")
 	taken(topList, "the top folder")
-	// Now the top folder's files are named, and their pieces are not yet.
-	refused(readmePiece, "a piece before its file's list")
+	// Now the top folder's files are named, and their chunks are not yet.
+	refused(readmeChunk, "a chunk before its file's list")
 	refused(deepList, "a list from further down")
-	refused(madeUpPiece, "a made-up piece")
+	refused(madeUpChunk, "a made-up chunk")
 	taken(readmeList, "a file's list")
-	refused(madeUpPiece, "a made-up piece")
-	taken(readmePiece, "a piece")
+	refused(madeUpChunk, "a made-up chunk")
+	taken(readmeChunk, "a chunk")
 	assertOnlyFrom(t, dest, source)
 	if _, err := must[*Intake](t)(NewIntake(dest, root)).Finish(); !errors.Is(err, ErrMissing) {
 		t.Fatal(err)
 	}
-	// A bundle with a made-up piece in it is refused where the piece comes,
-	// be the piece as long as a piece of this tree or longer.
+	// A bundle with a made-up chunk in it is refused where the chunk comes,
+	// be the chunk as long as a chunk of this tree or longer.
 	var bundle bytes.Buffer
 	if err := Export(source, root, &bundle); err != nil {
 		t.Fatal(err)
@@ -692,9 +692,9 @@ func TestNothingIsKeptBeforeItIsTiedToTheRoot(t *testing.T) {
 	withLengthOf := func(frame []byte) []byte {
 		return joined(binary.BigEndian.AppendUint32(nil, uint32(len(frame))), frame)
 	}
-	shortPiece := oracleFrame(byte(FramePiece), []byte("not of this tree"))
-	for _, piece := range [][]byte{shortPiece, madeUpPiece} {
-		extra := joined(bundle.Bytes(), withLengthOf(piece))
+	shortChunk := oracleFrame(byte(FrameChunk), []byte("not of this tree"))
+	for _, chunk := range [][]byte{shortChunk, madeUpChunk} {
+		extra := joined(bundle.Bytes(), withLengthOf(chunk))
 		fresh := NewMemoryStore()
 		if _, err := Import(fresh, root, bytes.NewReader(extra)); !errors.Is(err, ErrNotWanted) {
 			t.Fatal(err)
@@ -715,9 +715,9 @@ func TestAPeerWhoseOwnStoreIsWrongIsFoundOut(t *testing.T) {
 	shard := targetAt(t, source, root, "weights/shards/a.bin")
 	weights := targetAt(t, source, root, "weights")
 	data := targetAt(t, source, root, "data")
-	piece := fileListOf(t, source, model).Items()[9]
+	chunk := fileListOf(t, source, model).Items()[9]
 	for _, wrong := range []storedThing{
-		{StoredPiece, piece.Hash, string(corpusBytes("wrong", 16))},
+		{StoredChunk, chunk.Hash, string(corpusBytes("wrong", 16))},
 		{StoredFileList, model.Hash, string(keptIn(t, source, StoredFileList, shard.Hash))},
 		{StoredFolderList, weights.Hash, string(keptIn(t, source, StoredFolderList, data.Hash))},
 	} {

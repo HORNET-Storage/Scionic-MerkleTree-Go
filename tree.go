@@ -8,7 +8,7 @@ import (
 
 // The classic tree over a list.
 //
-// A file is a list of pieces and a folder is a list of entries. This file
+// A file is a list of chunks and a folder is a list of entries. This file
 // turns a list into the one hash that its owner is known by, shows a part of
 // a list together with the nodes that stand for the rest, and checks such a
 // showing.
@@ -42,7 +42,7 @@ const (
 type listKind uint8
 
 const (
-	// fileTree: a file's pieces, in the file's order.
+	// fileTree: a file's chunks, in the file's order.
 	fileTree listKind = iota
 	// folderTree: a folder's entries, sorted by name. Its forks record names.
 	folderTree
@@ -68,14 +68,14 @@ type leaf struct {
 //
 // One carried node is in no right half: the one that begins with the list's
 // first item. No hash covers a name for it, so it has none, and a checker
-// takes none. That way every byte of an opening is covered by the hash it is
+// takes none. That way every byte of a branch is covered by the hash it is
 // held against.
 type carried struct {
 	node      node
 	firstName string
 }
 
-// shown is what an opening shows, once it is rebuilt: the node on top of the
+// shown is what a branch shows, once it is rebuilt: the node on top of the
 // list, to hold against the hash and size the list is known by, and how many
 // bytes of file content come before the first opened item.
 type shown struct {
@@ -282,7 +282,7 @@ func (t *listTree) node(offset, width int) (node, error) {
 }
 
 // open gives the nodes to send with items start up to, not including, end:
-// one for each run of items that is left out, in the order a checker meets
+// one for each branch of items that is left out, in the order a checker meets
 // them.
 func (t *listTree) open(start, end uint64) ([]carried, error) {
 	if start >= end || end > t.count() {
@@ -321,14 +321,14 @@ func (t *listTree) collect(offset, width, start, end int, nodes *[]carried) erro
 	return t.collect(offset+leftWidth, width-leftWidth, start, end, nodes)
 }
 
-// checkOpening rebuilds the top of a list of count items from the opened
+// checkBranch rebuilds the top of a list of count items from the opened
 // items, which start at item start, and the nodes carried for the rest.
 //
 // The caller holds the result against the hash and the size that the list is
 // known by. In a folder's list every opened entry must also be where the
 // fork names send its name, so that an entry is never shown at a place where
 // a search for its name would not find it.
-func checkOpening(kind listKind, count, start uint64, opened []leaf, nodes []carried) (shown, error) {
+func checkBranch(kind listKind, count, start uint64, opened []leaf, nodes []carried) (shown, error) {
 	return runWalk(kind, count, start, opened, nodes, "", false)
 }
 
@@ -392,7 +392,7 @@ func runWalk(kind listKind, count, start uint64, opened []leaf, nodes []carried,
 		return shown{}, err
 	}
 	if w.next != len(w.carried) {
-		return shown{}, invalid("an opening carries more nodes than it needs")
+		return shown{}, invalid("a branch carries more nodes than it needs")
 	}
 	return shown{top: top, offset: w.before}, nil
 }
@@ -408,7 +408,7 @@ func (w *listWalk) node(offset, width uint64) (node, string, error) {
 	after := offset + width
 	if after <= w.start || w.end <= offset {
 		if w.next == len(w.carried) {
-			return node{}, "", invalid("an opening carries fewer nodes than it needs")
+			return node{}, "", invalid("a branch carries fewer nodes than it needs")
 		}
 		over := &w.carried[w.next]
 		w.next++

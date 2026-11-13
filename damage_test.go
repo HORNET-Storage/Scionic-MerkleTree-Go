@@ -16,19 +16,19 @@ func namedAs(err error, kind error, what string, hash Hash) bool {
 	return errors.Is(err, kind) && errors.As(err, &told) && told.What == what && told.Hash == hash
 }
 
-func TestADamagedPieceIsNamedAndTheStoreIsLeftAsItIs(t *testing.T) {
+func TestADamagedChunkIsNamedAndTheStoreIsLeftAsItIs(t *testing.T) {
 	store, root := sampleTree(t)
 	model := targetAt(t, store, root, "weights/model.bin")
-	piece := fileListOf(t, store, model).Items()[3]
-	rot := corpusBytes("rot", int(piece.Length))
-	swapIn(store, StoredPiece, piece.Hash, rot)
+	chunk := fileListOf(t, store, model).Items()[3]
+	rot := corpusBytes("rot", int(chunk.Length))
+	swapIn(store, StoredChunk, chunk.Hash, rot)
 	for _, workers := range []int{0, 1, 4} {
-		if _, err := VerifyWith(store, root, VerifyOptions{Workers: workers}); !namedAs(err, ErrCorrupt, "a stored piece", piece.Hash) {
+		if _, err := VerifyWith(store, root, VerifyOptions{Workers: workers}); !namedAs(err, ErrCorrupt, "a stored chunk", chunk.Hash) {
 			t.Fatalf("%d workers: %v", workers, err)
 		}
 	}
 	// Checking changes nothing unless it is told to.
-	if !bytes.Equal(keptIn(t, store, StoredPiece, piece.Hash), rot) {
+	if !bytes.Equal(keptIn(t, store, StoredChunk, chunk.Hash), rot) {
 		t.Fatal("a check changed the store")
 	}
 }
@@ -41,25 +41,25 @@ func TestDamageIsRemovedWhenAskedAndAFetchMakesTheTreeWhole(t *testing.T) {
 	model := targetAt(t, dest, root, "weights/model.bin")
 	weights := targetAt(t, dest, root, "weights")
 	list := fileListOf(t, dest, model)
-	// Two pieces: one harmed at its own length, one at another length.
+	// Two chunks: one harmed at its own length, one at another length.
 	same, other := list.Items()[1], list.Items()[4]
-	swapIn(dest, StoredPiece, same.Hash, corpusBytes("rot-1", int(same.Length)))
-	swapIn(dest, StoredPiece, other.Hash, corpusBytes("rot-2", 7))
+	swapIn(dest, StoredChunk, same.Hash, corpusBytes("rot-1", int(same.Length)))
+	swapIn(dest, StoredChunk, other.Hash, corpusBytes("rot-2", 7))
 	_, err := VerifyWith(dest, root, VerifyOptions{DiscardDamaged: true})
 	var told *Error
-	if !errors.Is(err, ErrMissing) || !errors.As(err, &told) || told.What != "the piece" {
+	if !errors.Is(err, ErrMissing) || !errors.As(err, &told) || told.What != "the chunk" {
 		t.Fatal(err)
 	}
-	for _, harmed := range []PieceRef{same, other} {
-		if held, _ := dest.Has(StoredPiece, harmed.Hash); held {
-			t.Fatal("a harmed piece was not removed")
+	for _, harmed := range []ChunkRef{same, other} {
+		if held, _ := dest.Has(StoredChunk, harmed.Hash); held {
+			t.Fatal("a harmed chunk was not removed")
 		}
 	}
 	peer := newTestPeer(source)
 	must[*Summary](t)(Fetch(dest, root, peer))
 	must[*Summary](t)(Verify(dest, root))
-	if peer.wire.framesOf(FramePiece) != 2 {
-		t.Fatalf("%d pieces were fetched to mend two", peer.wire.framesOf(FramePiece))
+	if peer.wire.framesOf(FrameChunk) != 2 {
+		t.Fatalf("%d chunks were fetched to mend two", peer.wire.framesOf(FrameChunk))
 	}
 	// A list and the record: checking names them, and a fetch replaces them
 	// without being told to, because it cannot go on with them.
@@ -85,37 +85,37 @@ func TestDamageIsRemovedWhenAskedAndAFetchMakesTheTreeWhole(t *testing.T) {
 	}
 }
 
-func TestAListThatLiesAboutAPieceCannotCostAStoreThePiece(t *testing.T) {
-	// A sound piece of 16 bytes, and a file's list that gives it 15.
+func TestAListThatLiesAboutAChunkCannotCostAStoreTheChunk(t *testing.T) {
+	// A sound chunk of 16 bytes, and a file's list that gives it 15.
 	whole := corpusBytes("sound", 16)
-	item := must[PieceRef](t)(PieceRefOf(whole))
-	lying := must[*FileList](t)(NewFileList([]PieceRef{{Hash: item.Hash, Length: 15}}))
-	totals := Totals{Pieces: 1, PieceBytes: 15, ListBytes: 36}
-	record := must[*Record](t)(NewRecord(lying.Target(), totals, smallPieces(t), ExtraData{}))
+	item := must[ChunkRef](t)(ChunkRefOf(whole))
+	lying := must[*FileList](t)(NewFileList([]ChunkRef{{Hash: item.Hash, Length: 15}}))
+	totals := Totals{Chunks: 1, ChunkBytes: 15, ListBytes: 36}
+	record := must[*Record](t)(NewRecord(lying.Target(), totals, smallChunks(t), ExtraData{}))
 	root := RootOfRecord(record.Encode())
 	forger := NewMemoryStore()
 	forger.Put(StoredRecord, root.Hash(), record.Encode())
 	forger.Put(StoredFileList, lying.Hash(), lying.Encode())
-	// A holder of the piece is sent the tree. The tree is refused, and the
-	// piece stays: bytes that hash to what they are kept under are sound,
+	// A holder of the chunk is sent the tree. The tree is refused, and the
+	// chunk stays: bytes that hash to what they are kept under are sound,
 	// whatever a list says of them.
 	holder := NewMemoryStore()
-	holder.Put(StoredPiece, item.Hash, whole)
+	holder.Put(StoredChunk, item.Hash, whole)
 	if _, err := Fetch(holder, root, newTestPeer(forger)); !errors.Is(err, ErrSizeMismatch) {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(keptIn(t, holder, StoredPiece, item.Hash), whole) {
-		t.Fatal("a sound piece was lost to a list that lies about it")
+	if !bytes.Equal(keptIn(t, holder, StoredChunk, item.Hash), whole) {
+		t.Fatal("a sound chunk was lost to a list that lies about it")
 	}
 	// The same when the list is in the store already.
-	forger.Put(StoredPiece, item.Hash, whole)
+	forger.Put(StoredChunk, item.Hash, whole)
 	if _, err := NewIntake(forger, root); !errors.Is(err, ErrSizeMismatch) {
 		t.Fatal(err)
 	}
 	if _, err := VerifyWith(forger, root, VerifyOptions{DiscardDamaged: true}); !errors.Is(err, ErrSizeMismatch) {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(keptIn(t, forger, StoredPiece, item.Hash), whole) {
-		t.Fatal("a sound piece was removed as damaged")
+	if !bytes.Equal(keptIn(t, forger, StoredChunk, item.Hash), whole) {
+		t.Fatal("a sound chunk was removed as damaged")
 	}
 }

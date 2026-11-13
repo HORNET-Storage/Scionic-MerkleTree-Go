@@ -18,13 +18,13 @@ func everyRequest() []Request {
 	return []Request{
 		RequestRecord(Root(hash)),
 		RequestFolder(hash),
-		RequestFolderRun(hash, 3, 9),
+		RequestFolderBranch(hash, 3, 9),
 		RequestFolderName(hash, "model.safetensors"),
 		RequestFile(hash),
-		RequestFileRun(hash, 100, 100),
+		RequestFileBranch(hash, 100, 100),
 		RequestFileBytes(hash, 500<<30, 1<<30),
-		RequestPieces(hash, 100, 101),
-		RequestPiece(hash),
+		RequestChunks(hash, 100, 101),
+		RequestChunk(hash),
 		RequestHave(hash),
 	}
 }
@@ -59,7 +59,7 @@ func TestEveryRequestReadsBackAndIsReadInOneWayOnly(t *testing.T) {
 	if !bytes.Equal(tags, []byte{0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39}) {
 		t.Fatalf("the requests start with % x", tags)
 	}
-	// "Pieces 100 to 200 of this file" is 45 bytes, whatever the file.
+	// "Chunks 100 to 200 of this file" is 45 bytes, whatever the file.
 	if length := len(everyRequest()[7].Encode()); length != 45 {
 		t.Fatal(length)
 	}
@@ -74,17 +74,17 @@ func TestEveryRequestReadsBackAndIsReadInOneWayOnly(t *testing.T) {
 
 func TestARequestForNothingOrForANameNoFolderHoldsIsRefused(t *testing.T) {
 	hash := HashOf([]byte("x"))
-	run := func(tag byte, start uint64, count uint32) error {
+	ranged := func(tag byte, start uint64, count uint32) error {
 		_, err := DecodeRequest(joined([]byte{tag}, hash[:], be64(start), be32(count)))
 		return err
 	}
 	for _, tag := range []byte{0x32, 0x35, 0x37} {
-		takes(t, fmt.Sprintf("request %#x for one item", tag), run(tag, 0, 1))
-		takes(t, fmt.Sprintf("request %#x for the last place there can be", tag), run(tag, MaxListItems-1, 1))
-		takes(t, fmt.Sprintf("request %#x for as many items as a number holds", tag), run(tag, 0, math.MaxUint32))
-		refuses(t, fmt.Sprintf("request %#x for no items", tag), run(tag, 0, 0))
-		refuses(t, fmt.Sprintf("request %#x beyond any list", tag), run(tag, MaxListItems, 1))
-		refuses(t, fmt.Sprintf("request %#x at the widest place", tag), run(tag, math.MaxUint64, 1))
+		takes(t, fmt.Sprintf("request %#x for one item", tag), ranged(tag, 0, 1))
+		takes(t, fmt.Sprintf("request %#x for the last place there can be", tag), ranged(tag, MaxListItems-1, 1))
+		takes(t, fmt.Sprintf("request %#x for as many items as a number holds", tag), ranged(tag, 0, math.MaxUint32))
+		refuses(t, fmt.Sprintf("request %#x for no items", tag), ranged(tag, 0, 0))
+		refuses(t, fmt.Sprintf("request %#x beyond any list", tag), ranged(tag, MaxListItems, 1))
+		refuses(t, fmt.Sprintf("request %#x at the widest place", tag), ranged(tag, math.MaxUint64, 1))
 	}
 	named := func(name string) error {
 		_, err := DecodeRequest(joined([]byte{0x33}, hash[:], be16(len(name)), []byte(name)))
@@ -109,16 +109,16 @@ func TestARequestForNothingOrForANameNoFolderHoldsIsRefused(t *testing.T) {
 	}
 }
 
-func TestAMapOfHeldPiecesHasOneBitAPiece(t *testing.T) {
+func TestAMapOfHeldChunksHasOneBitAChunk(t *testing.T) {
 	held := must[*HaveMap](t)(NewHaveMap(11))
 	if length := len(held.Encode()); length != 8+2 {
 		t.Fatal(length)
 	}
 	for _, index := range []uint64{0, 3, 10} {
-		takes(t, fmt.Sprintf("piece %d", index), held.Set(index))
+		takes(t, fmt.Sprintf("chunk %d", index), held.Set(index))
 	}
-	refuses(t, "a piece after the last", held.Set(11))
-	refuses(t, "a piece at the widest place", held.Set(math.MaxUint64))
+	refuses(t, "a chunk after the last", held.Set(11))
+	refuses(t, "a chunk at the widest place", held.Set(math.MaxUint64))
 	var set []uint64
 	for index := range uint64(16) {
 		if held.Get(index) {
@@ -126,7 +126,7 @@ func TestAMapOfHeldPiecesHasOneBitAPiece(t *testing.T) {
 		}
 	}
 	if held.Held() != 3 || held.Count() != 11 || !slices.Equal(set, []uint64{0, 3, 10}) || held.Get(math.MaxUint64) {
-		t.Fatalf("%d pieces are held: %v", held.Held(), set)
+		t.Fatalf("%d chunks are held: %v", held.Held(), set)
 	}
 	encoded := held.Encode()
 	if !bytes.Equal(encoded[8:], []byte{0b1001_0000, 0b0010_0000}) {
@@ -147,9 +147,9 @@ func TestAMapOfHeldPiecesHasOneBitAPiece(t *testing.T) {
 	_, err = DecodeHaveMap(encoded[:7])
 	refuses(t, "half a count", err)
 	_, err = DecodeHaveMap(be64(MaxListItems + 1))
-	refuses(t, "a map for more pieces than a file can have", err)
+	refuses(t, "a map for more chunks than a file can have", err)
 	_, err = NewHaveMap(MaxListItems + 1)
-	refuses(t, "a new map for more pieces than a file can have", err)
+	refuses(t, "a new map for more chunks than a file can have", err)
 	// A terabyte file's map is about 60 KB.
 	if length := len(must[*HaveMap](t)(NewHaveMap(500_000)).Encode()); length != 8+62_500 {
 		t.Fatal(length)
@@ -157,21 +157,21 @@ func TestAMapOfHeldPiecesHasOneBitAPiece(t *testing.T) {
 	for _, count := range []uint64{0, 1, 7, 8, 9} {
 		empty := must[*HaveMap](t)(NewHaveMap(count))
 		if read := must[*HaveMap](t)(DecodeHaveMap(empty.Encode())); read.Count() != count || read.Held() != 0 {
-			t.Fatalf("a map of %d pieces reads back as one of %d", count, read.Count())
+			t.Fatalf("a map of %d chunks reads back as one of %d", count, read.Count())
 		}
-		// Every piece of it can be held, and then every bit is set.
+		// Every chunk of it can be held, and then every bit is set.
 		for index := range count {
-			takes(t, "a piece", empty.Set(index))
+			takes(t, "a chunk", empty.Set(index))
 		}
 		if read := must[*HaveMap](t)(DecodeHaveMap(empty.Encode())); read.Held() != count {
-			t.Fatalf("a full map of %d pieces holds %d", count, read.Held())
+			t.Fatalf("a full map of %d chunks holds %d", count, read.Held())
 		}
 	}
 }
 
 func TestFramesAreToldApartByTheirFirstByte(t *testing.T) {
-	if frame := must[Frame](t)(DecodeFrame(PieceFrame([]byte("abc")))); frame.Kind != FramePiece || string(frame.Bytes) != "abc" {
-		t.Fatalf("a piece: %+v", frame)
+	if frame := must[Frame](t)(DecodeFrame(ChunkFrame([]byte("abc")))); frame.Kind != FrameChunk || string(frame.Bytes) != "abc" {
+		t.Fatalf("a chunk: %+v", frame)
 	}
 	list := bytes.Repeat([]byte{7}, 36)
 	if frame := must[Frame](t)(DecodeFrame(FileListFrame(list))); frame.Kind != FrameFileList || !bytes.Equal(frame.Bytes, list) {
@@ -186,25 +186,25 @@ func TestFramesAreToldApartByTheirFirstByte(t *testing.T) {
 		}
 	}
 	held := must[*HaveMap](t)(NewHaveMap(3))
-	takes(t, "a piece", held.Set(1))
+	takes(t, "a chunk", held.Set(1))
 	if frame := must[Frame](t)(DecodeFrame(HaveFrame(held))); frame.Kind != FrameHave || !bytes.Equal(frame.Have.Encode(), held.Encode()) {
-		t.Fatalf("a map of held pieces: %+v", frame)
+		t.Fatalf("a map of held chunks: %+v", frame)
 	}
 	if frame := must[Frame](t)(DecodeFrame([]byte{0x20, 1})); frame.Kind != FrameRecord || !bytes.Equal(frame.Bytes, []byte{0x20, 1}) {
 		t.Fatalf("a record: %+v", frame)
 	}
-	fileRun := must[*FileRun](t)(must[*FileList](t)(NewFileList([]PieceRef{pieceOf(1, 4), pieceOf(2, 4), pieceOf(3, 4)})).Open(1, 2))
-	if frame := must[Frame](t)(DecodeFrame(FileRunFrame(fileRun))); frame.Kind != FrameFileRun || !bytes.Equal(frame.FileRun.Encode(), fileRun.Encode()) {
-		t.Fatalf("a run of a file's list: %+v", frame)
+	fileBranch := must[*FileBranch](t)(must[*FileList](t)(NewFileList([]ChunkRef{chunkOf(1, 4), chunkOf(2, 4), chunkOf(3, 4)})).Open(1, 2))
+	if frame := must[Frame](t)(DecodeFrame(FileBranchFrame(fileBranch))); frame.Kind != FrameFileBranch || !bytes.Equal(frame.FileBranch.Encode(), fileBranch.Encode()) {
+		t.Fatalf("a branch of a file's list: %+v", frame)
 	}
-	folderRun := must[*FolderRun](t)(folderNamed(t, "a", "b", "c").Open(1, 2))
-	if frame := must[Frame](t)(DecodeFrame(FolderRunFrame(folderRun))); frame.Kind != FrameFolderRun || !bytes.Equal(frame.FolderRun.Encode(), folderRun.Encode()) {
-		t.Fatalf("a run of a folder's list: %+v", frame)
+	folderBranch := must[*FolderBranch](t)(folderNamed(t, "a", "b", "c").Open(1, 2))
+	if frame := must[Frame](t)(DecodeFrame(FolderBranchFrame(folderBranch))); frame.Kind != FrameFolderBranch || !bytes.Equal(frame.FolderBranch.Encode(), folderBranch.Encode()) {
+		t.Fatalf("a branch of a folder's list: %+v", frame)
 	}
 	// Every kind of frame has a first byte of its own.
 	first := []byte{
-		PieceFrame([]byte("abc"))[0], FileListFrame(list)[0], FolderListFrame(nil)[0], RefusedFrame(RefusalNotHeld)[0],
-		HaveFrame(held)[0], FileRunFrame(fileRun)[0], FolderRunFrame(folderRun)[0], 0x20,
+		ChunkFrame([]byte("abc"))[0], FileListFrame(list)[0], FolderListFrame(nil)[0], RefusedFrame(RefusalNotHeld)[0],
+		HaveFrame(held)[0], FileBranchFrame(fileBranch)[0], FolderBranchFrame(folderBranch)[0], 0x20,
 	}
 	slices.Sort(first)
 	if !bytes.Equal(first, []byte{0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27}) {
@@ -214,10 +214,10 @@ func TestFramesAreToldApartByTheirFirstByte(t *testing.T) {
 		_, err := DecodeFrame(bad)
 		refuses(t, fmt.Sprintf("the frame % x", bad), err)
 	}
-	_, err := DecodeFrame(PieceFrame(make([]byte, MaxPieceBytes+1)))
-	refuses(t, "a piece of more than 8 MiB", err)
-	_, err = DecodeFrame(PieceFrame(make([]byte, MaxPieceBytes)))
-	takes(t, "a piece of 8 MiB", err)
+	_, err := DecodeFrame(ChunkFrame(make([]byte, MaxChunkBytes+1)))
+	refuses(t, "a chunk of more than 8 MiB", err)
+	_, err = DecodeFrame(ChunkFrame(make([]byte, MaxChunkBytes)))
+	takes(t, "a chunk of 8 MiB", err)
 }
 
 // failingReader gives an error of its own after its bytes.

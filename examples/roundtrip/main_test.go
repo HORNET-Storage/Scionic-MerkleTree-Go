@@ -41,7 +41,7 @@ func TestAFolderGoesItsWholeWayRound(t *testing.T) {
 	for _, want := range []string{
 		"root         " + root.String(),
 		// The two files of 3 MiB are one file, kept once.
-		"the tree     6291479 bytes; kept once: 3 pieces of 3145751 bytes",
+		"the tree     6291479 bytes; kept once: 3 chunks of 3145751 bytes",
 		"4 different files in 4 different folders",
 		"4096 bytes from the middle of a file of 3145728 bytes",
 		"the copy has the same root",
@@ -65,25 +65,25 @@ func TestAFolderGoesItsWholeWayRound(t *testing.T) {
 
 func TestTheStoreOnDiskKeepsAndGivesBack(t *testing.T) {
 	store := &dirStore{dir: t.TempDir()}
-	content := []byte("a piece")
+	content := []byte("a chunk")
 	hash := scionic.HashOf(content)
-	if _, found, err := store.Get(scionic.StoredPiece, hash); err != nil || found {
+	if _, found, err := store.Get(scionic.StoredChunk, hash); err != nil || found {
 		t.Fatal(found, err)
 	}
-	if _, found, err := store.Size(scionic.StoredPiece, hash); err != nil || found {
+	if _, found, err := store.Size(scionic.StoredChunk, hash); err != nil || found {
 		t.Fatal(found, err)
 	}
 	// Kept twice, it is kept once.
 	for range 2 {
-		if err := store.Put(scionic.StoredPiece, hash, content); err != nil {
+		if err := store.Put(scionic.StoredChunk, hash, content); err != nil {
 			t.Fatal(err)
 		}
 	}
-	kept, found, err := store.Get(scionic.StoredPiece, hash)
+	kept, found, err := store.Get(scionic.StoredChunk, hash)
 	if err != nil || !found || !bytes.Equal(kept, content) {
 		t.Fatal(found, err)
 	}
-	if size, found, err := store.Size(scionic.StoredPiece, hash); err != nil || !found || size != 7 {
+	if size, found, err := store.Size(scionic.StoredChunk, hash); err != nil || !found || size != 7 {
 		t.Fatal(size, found, err)
 	}
 	// A thing is kept by its kind: the same hash as another kind is not it.
@@ -92,11 +92,11 @@ func TestTheStoreOnDiskKeepsAndGivesBack(t *testing.T) {
 	}
 	// Removed twice, it is gone, and that is no error.
 	for range 2 {
-		if err := store.Remove(scionic.StoredPiece, hash); err != nil {
+		if err := store.Remove(scionic.StoredChunk, hash); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, found, err := store.Get(scionic.StoredPiece, hash); err != nil || found {
+	if _, found, err := store.Get(scionic.StoredChunk, hash); err != nil || found {
 		t.Fatal(found, err)
 	}
 }

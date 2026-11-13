@@ -21,9 +21,9 @@ func TestAFileNeverComesBackShort(t *testing.T) {
 	list := fileListOf(t, source, model)
 	last := list.Items()[list.Count()-1]
 	isLast := func(frame []byte) bool {
-		return FrameKind(frame[0]) == FramePiece && HashOf(frame[1:]) == last.Hash
+		return FrameKind(frame[0]) == FrameChunk && HashOf(frame[1:]) == last.Hash
 	}
-	// A peer that never sends the file's last piece.
+	// A peer that never sends the file's last chunk.
 	dest, err := fetchTampered(t, source, root, func(_ []byte, frames [][]byte) [][]byte {
 		return slices.DeleteFunc(frames, isLast)
 	})
@@ -35,9 +35,9 @@ func TestAFileNeverComesBackShort(t *testing.T) {
 		t.Fatalf("%d bytes came back, and it has to be an error, never a shorter file (%v)", out.Len(), err)
 	}
 	if _, err := Verify(dest, root); err == nil {
-		t.Fatal("a tree with a piece missing counts as whole")
+		t.Fatal("a tree with a chunk missing counts as whole")
 	}
-	// The last piece, one byte short.
+	// The last chunk, one byte short.
 	_, err = fetchTampered(t, source, root, func(_ []byte, frames [][]byte) [][]byte {
 		for at, frame := range frames {
 			if isLast(frame) {
@@ -47,9 +47,9 @@ func TestAFileNeverComesBackShort(t *testing.T) {
 		return frames
 	})
 	if err == nil {
-		t.Fatal("a piece that is a byte short was taken")
+		t.Fatal("a chunk that is a byte short was taken")
 	}
-	// A made-up file that is the real one without its last piece. It is
+	// A made-up file that is the real one without its last chunk. It is
 	// whole and well formed, it is shorter, and it is another file.
 	shorter := oracleItemsOf(list.Items()[:62])
 	shorterList := oracleFrame(byte(FrameFileList), oracleFileListBytes(shorter))
@@ -63,16 +63,16 @@ func TestAFileNeverComesBackShort(t *testing.T) {
 	if !errors.Is(err, ErrNotWanted) {
 		t.Fatal(err)
 	}
-	peer := tamperingPeer(source, answering(AskFileBytes, oracleFileRunFrame(shorter, 0, 62)))
+	peer := tamperingPeer(source, answering(AskFileBytes, oracleFileBranchFrame(shorter, 0, 62)))
 	remote := must[*Remote](t)(OpenRemote(peer, root))
 	out.Reset()
 	if err := remote.Read(model, 0, 1000, &out); err == nil || out.Len() != 0 {
 		t.Fatalf("%d bytes of a shorter file were handed out (%v)", out.Len(), err)
 	}
-	// A peer that sends fewer pieces than a stretch needs, and then none.
+	// A peer that sends fewer chunks than a stretch needs, and then none.
 	sent := 0
 	peer = tamperingPeer(source, func(request []byte, frames [][]byte) [][]byte {
-		if RequestKind(request[0]) != AskPieces {
+		if RequestKind(request[0]) != AskChunks {
 			return frames
 		}
 		keep := min(len(frames), 3-sent)
@@ -107,7 +107,7 @@ func TestOneNameHasOnePlaceInAFolder(t *testing.T) {
 		hashed := oracleFolderHash(entries)
 		folder := Target{Kind: KindFolder, Hash: hashed.hash, Size: hashed.size}
 		listBytes := oracleFolderListBytes(entries)
-		record := oracleRecordBytes(2, hashed.size, hashed.hash, [3]uint64{0, 0, uint64(len(listBytes))}, oracleCutTag("fixed-16"))
+		record := oracleRecordBytes(2, hashed.size, hashed.hash, [3]uint64{0, 0, uint64(len(listBytes))}, oracleChunkingTag("fixed-16"))
 		root := RootOfRecord(record)
 		// Whole, the list is refused as soon as it is read.
 		dest := NewMemoryStore()
@@ -131,7 +131,7 @@ func TestOneNameHasOnePlaceInAFolder(t *testing.T) {
 					if RequestKind(request[0]) == AskRecord {
 						return [][]byte{record}
 					}
-					return [][]byte{oracleFolderRunFrame(entries, shown, shown+1)}
+					return [][]byte{oracleFolderBranchFrame(entries, shown, shown+1)}
 				})
 				remote := must[*Remote](t)(OpenRemote(peer, root))
 				if _, _, err := remote.Entry(folder, name); err == nil {
@@ -142,18 +142,18 @@ func TestOneNameHasOnePlaceInAFolder(t *testing.T) {
 				t.Fatalf("%v: %s was answered at the places %v", names, name, accepted)
 			}
 		}
-		// A run of several entries is accepted only where each of them is
-		// at its name's one place: never a run that shows a name twice.
+		// A branch of several entries is accepted only where each of them is
+		// at its name's one place: never a branch that shows a name twice.
 		for start := range entries {
 			for end := start + 1; end <= len(entries); end++ {
-				frame, err := DecodeFrame(oracleFolderRunFrame(entries, start, end))
-				if err != nil || frame.Kind != FrameFolderRun || frame.FolderRun.Check(folder) != nil {
+				frame, err := DecodeFrame(oracleFolderBranchFrame(entries, start, end))
+				if err != nil || frame.Kind != FrameFolderBranch || frame.FolderBranch.Check(folder) != nil {
 					continue
 				}
-				shown := frame.FolderRun.Entries()
+				shown := frame.FolderBranch.Entries()
 				for at := 1; at < len(shown); at++ {
 					if shown[at-1].Name() >= shown[at].Name() {
-						t.Fatalf("%v: a run that shows %q and then %q was taken", names, shown[at-1].Name(), shown[at].Name())
+						t.Fatalf("%v: a branch that shows %q and then %q was taken", names, shown[at-1].Name(), shown[at].Name())
 					}
 				}
 			}
@@ -169,35 +169,35 @@ func TestNoPlaceExistsBeyondTheCountAndAForkIsNoLeaf(t *testing.T) {
 	hashed := oracleFileHash(items)
 	file := Target{Kind: KindFile, Hash: hashed.hash, Size: hashed.size}
 	check := func(against Target, frame []byte) (uint64, error) {
-		run, err := DecodeFileRun(frame[1:])
+		branch, err := DecodeFileBranch(frame[1:])
 		if err != nil {
 			return 0, err
 		}
-		return run.Check(against)
+		return branch.Check(against)
 	}
-	if at, err := check(file, oracleFileRunFrame(items, 4, 5)); err != nil || at != 64 {
+	if at, err := check(file, oracleFileBranchFrame(items, 4, 5)); err != nil || at != 64 {
 		t.Fatal(at, err)
 	}
-	// The last piece, shown again at the place after the last. A tree that
+	// The last chunk, shown again at the place after the last. A tree that
 	// fills up a level by repeating its last leaf would take this.
 	carried := oracleFileLeaves(items).carried(4, 5)
 	for _, place := range [][2]uint64{{5, 5}, {6, 5}, {6, 4}, {4, 4}, {8, 7}} {
-		forged := oracleFileRunFrameAs(place[0], place[1], items[4:], carried)
+		forged := oracleFileBranchFrameAs(place[0], place[1], items[4:], carried)
 		if _, err := check(file, forged); err == nil {
-			t.Fatalf("the last piece was taken as one of %d pieces, at %d", place[0], place[1])
+			t.Fatalf("the last chunk was taken as one of %d chunks, at %d", place[0], place[1])
 		}
 	}
-	// A file of six pieces whose sixth is the fifth again is another file.
+	// A file of six chunks whose sixth is the fifth again is another file.
 	six := append(slices.Clone(items), items[4])
 	if oracleFileHash(six).hash == hashed.hash || oracleFileLeaves(six).top().hash == oracleFileLeaves(items).top().hash {
-		t.Fatal("a file with its last piece twice hashes as the file")
+		t.Fatal("a file with its last chunk twice hashes as the file")
 	}
 	for _, part := range [][2]int{{0, 6}, {5, 6}, {4, 5}} {
-		if _, err := check(file, oracleFileRunFrame(six, part[0], part[1])); err == nil {
-			t.Fatalf("%v of a file with its last piece twice was taken", part)
+		if _, err := check(file, oracleFileBranchFrame(six, part[0], part[1])); err == nil {
+			t.Fatalf("%v of a file with its last chunk twice was taken", part)
 		}
 	}
-	// A fork passed off as a piece: a file of two "pieces" that are the
+	// A fork passed off as a chunk: a file of two "chunks" that are the
 	// two forks under the top of a file of four.
 	four := items[:4]
 	leaves := oracleFileLeaves(four)
@@ -207,13 +207,13 @@ func TestNoPlaceExistsBeyondTheCountAndAForkIsNoLeaf(t *testing.T) {
 	for _, fork := range []oracleNode{leaves.node(0, 2), leaves.node(2, 2)} {
 		forks = append(forks, oracleItem{hash: fork.hash, length: uint32(fork.size)})
 	}
-	if _, err := check(fourFile, oracleFileRunFrame(forks, 0, 2)); err == nil {
-		t.Fatal("two forks were taken for two pieces")
+	if _, err := check(fourFile, oracleFileBranchFrame(forks, 0, 2)); err == nil {
+		t.Fatal("two forks were taken for two chunks")
 	}
 	if oracleFileHash(forks).hash == fourHashed.hash {
-		t.Fatal("a file of two forks hashes as the file of four pieces")
+		t.Fatal("a file of two forks hashes as the file of four chunks")
 	}
-	// And a leaf passed off as a fork: the top of a file of one piece is
+	// And a leaf passed off as a fork: the top of a file of one chunk is
 	// never the top of a file of two.
 	if oracleFileLeaves(items[:1]).top().hash == oracleFileLeaves(items[:2]).top().hash {
 		t.Fatal("a leaf hashes as a fork")
@@ -234,11 +234,11 @@ func TestATreeThatHoldsMoreThanItsRecordSaysIsStopped(t *testing.T) {
 		field  string
 		totals Totals
 	}{
-		{"pieces", Totals{right.Pieces - 1, right.PieceBytes, right.ListBytes}},
-		{"piece bytes", Totals{right.Pieces, right.PieceBytes - 16, right.ListBytes}},
-		{"list bytes", Totals{right.Pieces, right.PieceBytes, right.ListBytes - 1}},
+		{"chunks", Totals{right.Chunks - 1, right.ChunkBytes, right.ListBytes}},
+		{"chunk bytes", Totals{right.Chunks, right.ChunkBytes - 16, right.ListBytes}},
+		{"list bytes", Totals{right.Chunks, right.ChunkBytes, right.ListBytes - 1}},
 	} {
-		forged := must[*Record](t)(NewRecord(record.Top(), wrong.totals, record.Cutting(), ExtraData{}))
+		forged := must[*Record](t)(NewRecord(record.Top(), wrong.totals, record.Chunking(), ExtraData{}))
 		forgedRoot := forged.Root()
 		source.Put(StoredRecord, forgedRoot.Hash(), forged.Encode())
 		dest := NewMemoryStore()
@@ -253,7 +253,7 @@ func TestATreeThatHoldsMoreThanItsRecordSaysIsStopped(t *testing.T) {
 
 func TestATreeThatIsTooDeepIsRefusedHoweverItArrives(t *testing.T) {
 	source := NewMemoryStore()
-	builder := NewBuilder(source, smallPieces(t))
+	builder := NewBuilder(source, smallChunks(t))
 	file := must[Target](t)(builder.FileFromBytes([]byte("at the bottom")))
 	inner := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "file", file)}))
 	for range 127 {
@@ -265,7 +265,7 @@ func TestATreeThatIsTooDeepIsRefusedHoweverItArrives(t *testing.T) {
 	over := must[*FolderList](t)(NewFolderList([]Entry{plainEntry(t, "d", inner)}))
 	source.Put(StoredFolderList, over.Hash(), over.Encode())
 	totals.ListBytes += over.EncodedLen()
-	forged := must[*Record](t)(NewRecord(over.Target(), totals, smallPieces(t), ExtraData{}))
+	forged := must[*Record](t)(NewRecord(over.Target(), totals, smallChunks(t), ExtraData{}))
 	forgedRoot := forged.Root()
 	source.Put(StoredRecord, forgedRoot.Hash(), forged.Encode())
 	tooDeep := func(err error) bool {
@@ -311,9 +311,9 @@ func TestMalformedInputIsAnErrorAndNeverACrash(t *testing.T) {
 		record,
 		oracleFrame(byte(FrameFolderList), keptIn(t, source, StoredFolderList, top.Hash)),
 		oracleFrame(byte(FrameFileList), keptIn(t, source, StoredFileList, model.Hash)),
-		oracleFrame(byte(FramePiece), []byte("a small file")),
-		oracleFrame(byte(FrameFileRun), must[*FileRun](t)(fileListOf(t, source, model).Open(3, 9)).Encode()),
-		oracleFrame(byte(FrameFolderRun), must[*FolderRun](t)(folderListOf(t, source, weights).Open(1, 2)).Encode()),
+		oracleFrame(byte(FrameChunk), []byte("a small file")),
+		oracleFrame(byte(FrameFileBranch), must[*FileBranch](t)(fileListOf(t, source, model).Open(3, 9)).Encode()),
+		oracleFrame(byte(FrameFolderBranch), must[*FolderBranch](t)(folderListOf(t, source, weights).Open(1, 2)).Encode()),
 		oracleFrame(0x26, []byte{0, 0, 0, 0, 0, 0, 0, 9, 0xff, 0x80}),
 		{0x27, 1},
 	}
@@ -326,7 +326,7 @@ func TestMalformedInputIsAnErrorAndNeverACrash(t *testing.T) {
 			t.Fatalf("%x: %v", frame[:1], err)
 		}
 	}
-	// Every way of cutting a frame short, and every single byte of it
+	// Every way of chunking a frame short, and every single byte of it
 	// changed in three ways.
 	var forged [][]byte
 	for _, frame := range honest {
@@ -373,16 +373,16 @@ func TestMalformedInputIsAnErrorAndNeverACrash(t *testing.T) {
 		DecodeOpenFile(frame)
 		DecodeOpenFolder(frame)
 		DecodeHaveMap(frame)
-		if run, err := DecodeFileRun(frame); err == nil {
-			run.Check(model)
-			run.CheckWithCutting(model, smallPieces(t))
+		if branch, err := DecodeFileBranch(frame); err == nil {
+			branch.Check(model)
+			branch.CheckWithChunking(model, smallChunks(t))
 		}
-		if run, err := DecodeFolderRun(frame); err == nil {
-			run.Check(weights)
-			run.CheckName(weights, "model.bin")
+		if branch, err := DecodeFolderBranch(frame); err == nil {
+			branch.Check(weights)
+			branch.CheckName(weights, "model.bin")
 		}
 		ParseRoot(string(frame))
-		CuttingFromTag(frame)
+		ChunkingFromTag(frame)
 		CheckName(string(frame))
 		responder.Answer(frame, nothing)
 		must[*Intake](t)(NewIntake(dest, root)).Accept(frame)

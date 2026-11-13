@@ -13,16 +13,16 @@ import (
 // What a tree is made of, held to the bytes the format names, and read
 // strictly.
 
-// pieceOf is an item of a file's list for tests: a hash that follows from a
+// chunkOf is an item of a file's list for tests: a hash that follows from a
 // number, and a length.
-func pieceOf(seed byte, length uint32) PieceRef {
-	return PieceRef{Hash: HashOf([]byte{seed}), Length: length}
+func chunkOf(seed byte, length uint32) ChunkRef {
+	return ChunkRef{Hash: HashOf([]byte{seed}), Length: length}
 }
 
-// smallFile is a file of one piece.
+// smallFile is a file of one chunk.
 func smallFile(t *testing.T, seed byte) Target {
 	t.Helper()
-	return must[*FileList](t)(NewFileList([]PieceRef{pieceOf(seed, uint32(seed)+1)})).Target()
+	return must[*FileList](t)(NewFileList([]ChunkRef{chunkOf(seed, uint32(seed)+1)})).Target()
 }
 
 // folderNamed is a folder with a small file under each of these names.
@@ -60,9 +60,9 @@ func takes(t *testing.T, what string, err error) {
 
 func TestEveryHashCoversExactlyTheBytesTheFormatNames(t *testing.T) {
 	// A file's list item, and its leaf.
-	first, second := pieceOf(1, 5), pieceOf(2, 7)
+	first, second := chunkOf(1, 5), chunkOf(2, 7)
 	item := joined(first.Hash[:], be32(5))
-	one := must[*FileList](t)(NewFileList([]PieceRef{first}))
+	one := must[*FileList](t)(NewFileList([]ChunkRef{first}))
 	if !bytes.Equal(one.Encode(), item) {
 		t.Fatal("a file's list of one item is not that item's bytes")
 	}
@@ -70,17 +70,17 @@ func TestEveryHashCoversExactlyTheBytesTheFormatNames(t *testing.T) {
 	if first.leaf() != (node{hash: firstLeaf, size: 5}) {
 		t.Fatal("an item's leaf is not the hash of its mark and its bytes")
 	}
-	// A file of one piece: the leaf is the top of its list.
+	// A file of one chunk: the leaf is the top of its list.
 	if one.Hash() != oracleSHA([]byte{0x10}, be64(1), be64(5), firstLeaf[:]) {
-		t.Fatal("a file of one piece is not hashed as the format says")
+		t.Fatal("a file of one chunk is not hashed as the format says")
 	}
-	// A file of two pieces: the top is a fork over the two leaves.
+	// A file of two chunks: the top is a fork over the two leaves.
 	secondLeaf := second.leaf().hash
 	top := oracleSHA([]byte{0x01}, firstLeaf[:], be64(5), be64(1), secondLeaf[:], be64(7), be64(1))
-	two := must[*FileList](t)(NewFileList([]PieceRef{first, second}))
+	two := must[*FileList](t)(NewFileList([]ChunkRef{first, second}))
 	twoHash := two.Hash()
 	if two.Size() != 12 || twoHash != oracleSHA([]byte{0x10}, be64(2), be64(12), top[:]) {
-		t.Fatal("a file of two pieces is not hashed as the format says")
+		t.Fatal("a file of two chunks is not hashed as the format says")
 	}
 	// An entry with extra data, and its leaf.
 	extra := must[ExtraData](t)(ExtraData{}.WithText("mode", "644"))
@@ -114,22 +114,22 @@ func TestEveryHashCoversExactlyTheBytesTheFormatNames(t *testing.T) {
 		t.Fatal("a folder of two entries is not hashed as the format says")
 	}
 	// The record, and the root.
-	totals := Totals{Pieces: 2, PieceBytes: 12, ListBytes: 72 + both.EncodedLen()}
-	record := must[*Record](t)(NewRecord(both.Target(), totals, must[Cutting](t)(FixedCutting(5)), ExtraData{}))
+	totals := Totals{Chunks: 2, ChunkBytes: 12, ListBytes: 72 + both.EncodedLen()}
+	record := must[*Record](t)(NewRecord(both.Target(), totals, must[Chunking](t)(FixedChunking(5)), ExtraData{}))
 	recordBytes := joined([]byte{0x20, 2}, be64(12), bothHash[:], be64(2), be64(12), be64(totals.ListBytes),
 		[]byte{0, 1, 0, 8}, []byte("chunking"), []byte{0, 7}, []byte("fixed-5"))
 	if !bytes.Equal(record.Encode(), recordBytes) || record.Root().Hash() != HashOf(recordBytes) {
 		t.Fatal("a record is not written as the format says, or its root is not its hash")
 	}
 	read := must[*Record](t)(DecodeRecord(recordBytes))
-	if !bytes.Equal(read.Encode(), recordBytes) || read.Top() != both.Target() || read.Totals() != totals || read.Cutting() != record.Cutting() {
+	if !bytes.Equal(read.Encode(), recordBytes) || read.Top() != both.Target() || read.Totals() != totals || read.Chunking() != record.Chunking() {
 		t.Fatal("a record does not read back")
 	}
 }
 
 func TestTheSameThingHasTheSameHashWhereverItIs(t *testing.T) {
-	// A file's hash covers its pieces, and nothing about where it sits.
-	list := must[*FileList](t)(NewFileList([]PieceRef{pieceOf(1, 5), pieceOf(2, 7), pieceOf(1, 5)}))
+	// A file's hash covers its chunks, and nothing about where it sits.
+	list := must[*FileList](t)(NewFileList([]ChunkRef{chunkOf(1, 5), chunkOf(2, 7), chunkOf(1, 5)}))
 	here := must[*FolderList](t)(NewFolderList([]Entry{plainEntry(t, "a.bin", list.Target())}))
 	there := must[*FolderList](t)(NewFolderList([]Entry{plainEntry(t, "other", smallFile(t, 9)), plainEntry(t, "renamed.bin", list.Target())}))
 	if here.Entries()[0].Hash() != there.Entries()[1].Hash() || here.Hash() == there.Hash() {
@@ -150,22 +150,22 @@ func TestTheSameThingHasTheSameHashWhereverItIs(t *testing.T) {
 	if emptyFolder.Hash() != FolderHash(0, 0, Hash{}) || emptyFolder.Hash() == emptyFile.Hash() {
 		t.Fatal("the empty folder is the empty file")
 	}
-	// The pieces' order, their number and their lengths are all covered.
-	otherOrder := must[*FileList](t)(NewFileList([]PieceRef{pieceOf(2, 7), pieceOf(1, 5), pieceOf(1, 5)}))
-	oneLess := must[*FileList](t)(NewFileList([]PieceRef{pieceOf(1, 5), pieceOf(2, 7)}))
-	otherLength := must[*FileList](t)(NewFileList([]PieceRef{pieceOf(1, 5), pieceOf(2, 6), pieceOf(1, 6)}))
+	// The chunks' order, their number and their lengths are all covered.
+	otherOrder := must[*FileList](t)(NewFileList([]ChunkRef{chunkOf(2, 7), chunkOf(1, 5), chunkOf(1, 5)}))
+	oneLess := must[*FileList](t)(NewFileList([]ChunkRef{chunkOf(1, 5), chunkOf(2, 7)}))
+	otherLength := must[*FileList](t)(NewFileList([]ChunkRef{chunkOf(1, 5), chunkOf(2, 6), chunkOf(1, 6)}))
 	if otherLength.Size() != list.Size() {
 		t.Fatal(otherLength.Size())
 	}
 	for _, other := range []*FileList{otherOrder, oneLess, otherLength} {
 		if other.Hash() == list.Hash() {
-			t.Fatal("a file's hash does not cover its pieces' order, number and lengths")
+			t.Fatal("a file's hash does not cover its chunks' order, number and lengths")
 		}
 	}
 	// A list keeps its own copy of what it was made from.
-	items := []PieceRef{pieceOf(1, 5), pieceOf(2, 7)}
+	items := []ChunkRef{chunkOf(1, 5), chunkOf(2, 7)}
 	kept := must[*FileList](t)(NewFileList(items))
-	items[0] = pieceOf(9, 9)
+	items[0] = chunkOf(9, 9)
 	if kept.Hash() != oneLess.Hash() || !bytes.Equal(kept.Encode(), oneLess.Encode()) {
 		t.Fatal("a list changed with the slice it was made from")
 	}
@@ -352,12 +352,12 @@ func TestExtraDataIsHeldToItsLimitsAndReadInOneWayOnly(t *testing.T) {
 
 func TestListsAreReadStrictly(t *testing.T) {
 	hash := HashOf([]byte("x"))
-	// A file's list: whole items, and pieces of 1 byte to 8 MiB.
+	// A file's list: whole items, and chunks of 1 byte to 8 MiB.
 	item := func(length uint32) []byte { return joined(hash[:], be32(length)) }
 	for what, content := range map[string][]byte{
-		"a piece of 1 byte": item(1),
-		"a piece of 8 MiB":  item(MaxPieceBytes),
-		"two pieces":        joined(item(1), item(2)),
+		"a chunk of 1 byte": item(1),
+		"a chunk of 8 MiB":  item(MaxChunkBytes),
+		"two chunks":        joined(item(1), item(2)),
 	} {
 		_, err := DecodeFileList(content)
 		takes(t, what, err)
@@ -365,31 +365,31 @@ func TestListsAreReadStrictly(t *testing.T) {
 		takes(t, what, err)
 	}
 	for what, content := range map[string][]byte{
-		"a piece of no bytes":          item(0),
-		"a piece of more than 8 MiB":   item(MaxPieceBytes + 1),
+		"a chunk of no bytes":          item(0),
+		"a chunk of more than 8 MiB":   item(MaxChunkBytes + 1),
 		"an item cut short":            item(1)[:35],
 		"a byte after the last item":   joined(item(1), []byte{0}),
-		"a piece of the widest length": item(math.MaxUint32),
+		"a chunk of the widest length": item(math.MaxUint32),
 	} {
 		_, err := DecodeFileList(content)
 		refuses(t, what, err)
 		_, err = DecodeOpenFile(content)
 		refuses(t, what, err)
 	}
-	if _, err := PieceRefOf(nil); err == nil {
-		t.Fatal("a piece of no bytes was made")
+	if _, err := ChunkRefOf(nil); err == nil {
+		t.Fatal("a chunk of no bytes was made")
 	}
-	if _, err := PieceRefOf(make([]byte, MaxPieceBytes+1)); err == nil {
-		t.Fatal("a piece of more than 8 MiB was made")
+	if _, err := ChunkRefOf(make([]byte, MaxChunkBytes+1)); err == nil {
+		t.Fatal("a chunk of more than 8 MiB was made")
 	}
-	if whole, err := PieceRefOf(make([]byte, MaxPieceBytes)); err != nil || whole.Length != MaxPieceBytes {
-		t.Fatal("a piece of 8 MiB was not made")
+	if whole, err := ChunkRefOf(make([]byte, MaxChunkBytes)); err != nil || whole.Length != MaxChunkBytes {
+		t.Fatal("a chunk of 8 MiB was not made")
 	}
-	if made := must[PieceRef](t)(PieceRefOf([]byte("x"))); made != (PieceRef{Hash: hash, Length: 1}) || !made.Matches([]byte("x")) || made.Matches([]byte("y")) || made.Matches([]byte("xx")) {
-		t.Fatal("a piece's item is not its hash and its length")
+	if made := must[ChunkRef](t)(ChunkRefOf([]byte("x"))); made != (ChunkRef{Hash: hash, Length: 1}) || !made.Matches([]byte("x")) || made.Matches([]byte("y")) || made.Matches([]byte("xx")) {
+		t.Fatal("a chunk's item is not its hash and its length")
 	}
-	if _, err := NewFileList([]PieceRef{{Hash: hash, Length: 0}}); err == nil {
-		t.Fatal("a file was made with a piece of no bytes")
+	if _, err := NewFileList([]ChunkRef{{Hash: hash, Length: 0}}); err == nil {
+		t.Fatal("a file was made with a chunk of no bytes")
 	}
 	// A folder's list: every entry whole, of a known kind, validly named.
 	for _, kind := range []byte{1, 2} {
@@ -425,16 +425,16 @@ func TestListsAreReadStrictly(t *testing.T) {
 
 func TestARecordIsReadStrictly(t *testing.T) {
 	top := folderNamed(t, "a", "b").Target()
-	totals := Totals{Pieces: 2, PieceBytes: 3, ListBytes: 200}
-	extra := must[ExtraData](t)(ExtraData{}.WithText(CuttingKey, "a caller cannot set this"))
+	totals := Totals{Chunks: 2, ChunkBytes: 3, ListBytes: 200}
+	extra := must[ExtraData](t)(ExtraData{}.WithText(ChunkingKey, "a caller cannot set this"))
 	extra = must[ExtraData](t)(extra.WithText(TimestampKey, "2026-11-12T00:00:00Z"))
 	record := must[*Record](t)(NewRecord(top, totals, FastCDCV1, extra))
-	if tag, _ := record.Extra().Text(CuttingKey); tag != "fastcdc-v1" || record.Cutting() != FastCDCV1 || record.Top() != top || record.Totals() != totals {
+	if tag, _ := record.Extra().Text(ChunkingKey); tag != "fastcdc-v1" || record.Chunking() != FastCDCV1 || record.Top() != top || record.Totals() != totals {
 		t.Fatalf("the record says %q", tag)
 	}
 	encoded := record.Encode()
 	read := must[*Record](t)(DecodeRecord(encoded))
-	if !bytes.Equal(read.Encode(), encoded) || read.Top() != top || read.Totals() != totals || read.Cutting() != FastCDCV1 || !read.Extra().Equal(record.Extra()) {
+	if !bytes.Equal(read.Encode(), encoded) || read.Top() != top || read.Totals() != totals || read.Chunking() != FastCDCV1 || !read.Extra().Equal(record.Extra()) {
 		t.Fatal("a record does not read back")
 	}
 	if record.Root() != RootOfRecord(encoded) || len(encoded) > MaxRecordBytes {
@@ -457,87 +457,87 @@ func TestARecordIsReadStrictly(t *testing.T) {
 		_, err = DecodeRecord(changed(1, kind))
 		refuses(t, fmt.Sprintf("a record of kind %d", kind), err)
 	}
-	// A record that does not say how its tree was cut is no record.
+	// A record that does not say how its tree was chunked is no record.
 	_, err = DecodeRecord(joined(encoded[:66], noExtra))
-	refuses(t, "a record that does not say how its tree was cut", err)
+	refuses(t, "a record that does not say how its tree was chunked", err)
 	_, err = DecodeRecord(joined(encoded[:66], []byte{0, 1, 0, 8}, []byte("chunking"), []byte{0, 8}, []byte("fixed-2m")))
-	refuses(t, "a record that names a way of cutting nobody knows", err)
+	refuses(t, "a record that names a way of chunking nobody knows", err)
 	_, err = DecodeRecord(joined(encoded[:66], []byte{0, 1, 0, 8}, []byte("chunking"), []byte{0, 2}, []byte{0xff, 0xfe}))
-	refuses(t, "a record whose way of cutting is not text", err)
+	refuses(t, "a record whose way of chunking is not text", err)
 	// Totals that no tree can have, made and read.
 	for what, bad := range map[string]Totals{
-		"more pieces than piece bytes":                {3, 2, 200},
-		"more piece bytes than the tree holds":        {1, top.Size + 1, 200},
-		"lists too short to name the pieces":          {2, 3, 71},
-		"bytes without pieces":                        {0, 1, 0},
-		"more pieces than any list of lists can name": {math.MaxUint64, math.MaxUint64, math.MaxUint64},
+		"more chunks than chunk bytes":                {3, 2, 200},
+		"more chunk bytes than the tree holds":        {1, top.Size + 1, 200},
+		"lists too short to name the chunks":          {2, 3, 71},
+		"bytes without chunks":                        {0, 1, 0},
+		"more chunks than any list of lists can name": {math.MaxUint64, math.MaxUint64, math.MaxUint64},
 	} {
 		_, err := NewRecord(top, bad, FastCDCV1, ExtraData{})
 		refuses(t, what, err)
-		written := oracleRecordBytes(2, top.Size, top.Hash, [3]uint64{bad.Pieces, bad.PieceBytes, bad.ListBytes}, oracleCutTag("fastcdc-v1"))
+		written := oracleRecordBytes(2, top.Size, top.Hash, [3]uint64{bad.Chunks, bad.ChunkBytes, bad.ListBytes}, oracleChunkingTag("fastcdc-v1"))
 		_, err = DecodeRecord(written)
 		refuses(t, what+", in a record that is read", err)
 	}
 	// The same record with totals that a tree can have is read.
-	good := oracleRecordBytes(2, top.Size, top.Hash, [3]uint64{2, 3, 200}, oracleCutTag("fastcdc-v1"))
+	good := oracleRecordBytes(2, top.Size, top.Hash, [3]uint64{2, 3, 200}, oracleChunkingTag("fastcdc-v1"))
 	takes(t, "a record written by hand", func() error { _, err := DecodeRecord(good); return err }())
 	// A file on top has no folders' lists: its lists are whole items.
-	fileTop := must[*FileList](t)(NewFileList([]PieceRef{pieceOf(1, 5)})).Target()
-	_, err = NewRecord(fileTop, Totals{Pieces: 1, PieceBytes: 5, ListBytes: 37}, FastCDCV1, ExtraData{})
+	fileTop := must[*FileList](t)(NewFileList([]ChunkRef{chunkOf(1, 5)})).Target()
+	_, err = NewRecord(fileTop, Totals{Chunks: 1, ChunkBytes: 5, ListBytes: 37}, FastCDCV1, ExtraData{})
 	refuses(t, "a file's lists that are not whole items", err)
-	_, err = NewRecord(fileTop, Totals{Pieces: 1, PieceBytes: 5, ListBytes: 36}, FastCDCV1, ExtraData{})
-	takes(t, "a file of one piece", err)
-	// One piece holds 8 MiB at most.
-	bigTop := Target{Kind: KindFile, Hash: fileTop.Hash, Size: MaxPieceBytes + 1}
-	_, err = NewRecord(bigTop, Totals{Pieces: 1, PieceBytes: MaxPieceBytes + 1, ListBytes: 36}, FastCDCV1, ExtraData{})
-	refuses(t, "one piece of more than 8 MiB", err)
-	_, err = NewRecord(bigTop, Totals{Pieces: 2, PieceBytes: MaxPieceBytes + 1, ListBytes: 72}, FastCDCV1, ExtraData{})
-	takes(t, "two pieces of more than 8 MiB together", err)
+	_, err = NewRecord(fileTop, Totals{Chunks: 1, ChunkBytes: 5, ListBytes: 36}, FastCDCV1, ExtraData{})
+	takes(t, "a file of one chunk", err)
+	// One chunk holds 8 MiB at most.
+	bigTop := Target{Kind: KindFile, Hash: fileTop.Hash, Size: MaxChunkBytes + 1}
+	_, err = NewRecord(bigTop, Totals{Chunks: 1, ChunkBytes: MaxChunkBytes + 1, ListBytes: 36}, FastCDCV1, ExtraData{})
+	refuses(t, "one chunk of more than 8 MiB", err)
+	_, err = NewRecord(bigTop, Totals{Chunks: 2, ChunkBytes: MaxChunkBytes + 1, ListBytes: 72}, FastCDCV1, ExtraData{})
+	takes(t, "two chunks of more than 8 MiB together", err)
 	// A record is neither a file's nor a folder's when its top is neither.
 	_, err = NewRecord(Target{Kind: 3, Hash: top.Hash, Size: top.Size}, totals, FastCDCV1, ExtraData{})
 	refuses(t, "a record of a top that is neither a file nor a folder", err)
 }
 
-func TestAWayOfCuttingHasOneSpellingAndHoldsPiecesToItsLengths(t *testing.T) {
-	fixed := func(size uint32) Cutting { return must[Cutting](t)(FixedCutting(size)) }
-	if FastCDCV1.Tag() != "fastcdc-v1" || fixed(16).Tag() != "fixed-16" || (Cutting{}) != FastCDCV1 {
-		t.Fatal("a way of cutting is spelled another way")
+func TestAWayOfChunkingHasOneSpellingAndHoldsChunksToItsLengths(t *testing.T) {
+	fixed := func(size uint32) Chunking { return must[Chunking](t)(FixedChunking(size)) }
+	if FastCDCV1.Tag() != "fastcdc-v1" || fixed(16).Tag() != "fixed-16" || (Chunking{}) != FastCDCV1 {
+		t.Fatal("a way of chunking is spelled another way")
 	}
-	for _, cutting := range []Cutting{FastCDCV1, fixed(1), fixed(16), fixed(MaxPieceBytes)} {
-		if read, err := CuttingFromTag([]byte(cutting.Tag())); err != nil || read != cutting {
-			t.Fatalf("%s does not read back: %v", cutting.Tag(), err)
+	for _, chunking := range []Chunking{FastCDCV1, fixed(1), fixed(16), fixed(MaxChunkBytes)} {
+		if read, err := ChunkingFromTag([]byte(chunking.Tag())); err != nil || read != chunking {
+			t.Fatalf("%s does not read back: %v", chunking.Tag(), err)
 		}
 	}
 	for _, tag := range []string{
 		"", "fastcdc-v2", "FASTCDC-V1", "fastcdc-v1 ", " fastcdc-v1", "fixed-", "fixed-0", "fixed-016", "fixed-+16", "fixed--16",
 		"fixed-16 ", "fixed-2m", "fixed-1e3", "fixed-8388609", "fixed-99999999", "fixed-4294967297", "fixed-18446744073709551617", "Fixed-16",
 	} {
-		if _, err := CuttingFromTag([]byte(tag)); err == nil {
+		if _, err := ChunkingFromTag([]byte(tag)); err == nil {
 			t.Fatalf("the tag %q was read", tag)
 		}
 	}
-	if _, err := FixedCutting(0); err == nil {
-		t.Fatal("pieces of no bytes")
+	if _, err := FixedChunking(0); err == nil {
+		t.Fatal("chunks of no bytes")
 	}
-	if _, err := FixedCutting(MaxPieceBytes + 1); err == nil {
-		t.Fatal("pieces of more than 8 MiB")
+	if _, err := FixedChunking(MaxChunkBytes + 1); err == nil {
+		t.Fatal("chunks of more than 8 MiB")
 	}
 	if size, isFixed := fixed(16).Fixed(); size != 16 || !isFixed {
 		t.Fatal(size, isFixed)
 	}
 	if _, isFixed := FastCDCV1.Fixed(); isFixed {
-		t.Fatal("cutting by content has a fixed size")
+		t.Fatal("chunking by content has a fixed size")
 	}
 	const least, most = FastCDCMinSize, FastCDCMaxSize
 	for _, check := range []struct {
-		cutting Cutting
-		length  uint32
-		isLast  bool
-		fits    bool
+		chunking Chunking
+		length   uint32
+		isLast   bool
+		fits     bool
 	}{
 		{FastCDCV1, least + 1, false, true},
 		{FastCDCV1, most, false, true},
-		// The cutter never stops there.
+		// The chunker never stops there.
 		{FastCDCV1, least, false, false},
 		{FastCDCV1, 1, false, false},
 		{FastCDCV1, most + 1, false, false},
@@ -556,13 +556,13 @@ func TestAWayOfCuttingHasOneSpellingAndHoldsPiecesToItsLengths(t *testing.T) {
 		{fixed(16), 17, true, false},
 		{fixed(16), 0, true, false},
 	} {
-		if err := check.cutting.CheckLength(check.length, check.isLast); (err == nil) != check.fits {
-			t.Fatalf("%s, a piece of %d, the last: %v: %v", check.cutting.Tag(), check.length, check.isLast, err)
+		if err := check.chunking.CheckLength(check.length, check.isLast); (err == nil) != check.fits {
+			t.Fatalf("%s, a chunk of %d, the last: %v: %v", check.chunking.Tag(), check.length, check.isLast, err)
 		}
 	}
 }
 
-func TestAFilesSizeBoundsHowManyPiecesItCanHave(t *testing.T) {
+func TestAFilesSizeBoundsHowManyChunksItCanHave(t *testing.T) {
 	const step, most = uint64(FastCDCMinSize) + 1, uint64(FastCDCMaxSize)
 	content := FastCDCV1
 	for _, bound := range []struct{ size, fewest, most uint64 }{
@@ -573,57 +573,57 @@ func TestAFilesSizeBoundsHowManyPiecesItCanHave(t *testing.T) {
 		{most, 1, 16},
 		{most + 1, 2, 16},
 		{2*step + 1, 1, 3},
-		// A terabyte: at most about two million pieces, never a billion.
-		// The most is 2,097,148 pieces of 524,289 bytes, and a last one
+		// A terabyte: at most about two million chunks, never a billion.
+		// The most is 2,097,148 chunks of 524,289 bytes, and a last one
 		// of 4.
 		{1 << 40, 131_072, 2_097_149},
 	} {
 		if fewest, most := content.CountBounds(bound.size); fewest != bound.fewest || most != bound.most {
-			t.Fatalf("a file of %d bytes has %d to %d pieces", bound.size, fewest, most)
+			t.Fatalf("a file of %d bytes has %d to %d chunks", bound.size, fewest, most)
 		}
 	}
 	if 2_097_148*step+4 != 1<<40 {
 		t.Fatal("the sum is wrong")
 	}
-	takes(t, "a terabyte in 500,000 pieces", content.CheckCount(1<<40, 500_000))
-	takes(t, "a terabyte in the most pieces", content.CheckCount(1<<40, 2_097_149))
-	takes(t, "a terabyte in the fewest pieces", content.CheckCount(1<<40, 131_072))
-	refuses(t, "a terabyte in one piece more than the most", content.CheckCount(1<<40, 2_097_150))
-	refuses(t, "a terabyte in one piece fewer than the fewest", content.CheckCount(1<<40, 131_071))
-	refuses(t, "an empty file of one piece", content.CheckCount(0, 1))
-	refuses(t, "a file of one byte in no pieces", content.CheckCount(1, 0))
+	takes(t, "a terabyte in 500,000 chunks", content.CheckCount(1<<40, 500_000))
+	takes(t, "a terabyte in the most chunks", content.CheckCount(1<<40, 2_097_149))
+	takes(t, "a terabyte in the fewest chunks", content.CheckCount(1<<40, 131_072))
+	refuses(t, "a terabyte in one chunk more than the most", content.CheckCount(1<<40, 2_097_150))
+	refuses(t, "a terabyte in one chunk fewer than the fewest", content.CheckCount(1<<40, 131_071))
+	refuses(t, "an empty file of one chunk", content.CheckCount(0, 1))
+	refuses(t, "a file of one byte in no chunks", content.CheckCount(1, 0))
 	// The widest size there is does not wrap.
 	if fewest, most := content.CountBounds(math.MaxUint64); fewest != (math.MaxUint64-1)/most0()+1 || most <= fewest {
-		t.Fatalf("the widest size has %d to %d pieces", fewest, most)
+		t.Fatalf("the widest size has %d to %d chunks", fewest, most)
 	}
-	// What the bounds say is what lists of fitting pieces can add up to.
-	fixed := must[Cutting](t)(FixedCutting(4))
+	// What the bounds say is what lists of fitting chunks can add up to.
+	fixed := must[Chunking](t)(FixedChunking(4))
 	for size := range uint64(40) {
-		pieces := uint64(len(fixed.Cut(make([]byte, size))))
-		if fewest, most := fixed.CountBounds(size); fewest != pieces || most != pieces {
-			t.Fatalf("%d bytes in pieces of 4 are %d pieces, and the bounds say %d to %d", size, pieces, fewest, most)
+		chunks := uint64(len(fixed.Cut(make([]byte, size))))
+		if fewest, most := fixed.CountBounds(size); fewest != chunks || most != chunks {
+			t.Fatalf("%d bytes in chunks of 4 are %d chunks, and the bounds say %d to %d", size, chunks, fewest, most)
 		}
 	}
-	list := must[*FileList](t)(NewFileList([]PieceRef{pieceOf(1, 4), pieceOf(2, 4), pieceOf(3, 3)}))
-	takes(t, "pieces of 4, 4 and 3 as cut at 4", list.CheckCutting(fixed))
-	refuses(t, "pieces of 4, 4 and 3 as cut at 5", list.CheckCutting(must[Cutting](t)(FixedCutting(5))))
-	refuses(t, "pieces of 4, 4 and 3 as cut by content", list.CheckCutting(content))
-	shortInTheMiddle := must[*FileList](t)(NewFileList([]PieceRef{pieceOf(1, 4), pieceOf(2, 3), pieceOf(3, 4)}))
-	refuses(t, "a short piece in the middle", shortInTheMiddle.CheckCutting(fixed))
-	shortAtTheStart := must[*FileList](t)(NewFileList([]PieceRef{pieceOf(1, 3), pieceOf(2, 4)}))
-	refuses(t, "a short piece at the start", shortAtTheStart.CheckCutting(fixed))
-	takes(t, "the empty file", must[*FileList](t)(NewFileList(nil)).CheckCutting(content))
-	takes(t, "the empty file, cut at 4", must[*FileList](t)(NewFileList(nil)).CheckCutting(fixed))
+	list := must[*FileList](t)(NewFileList([]ChunkRef{chunkOf(1, 4), chunkOf(2, 4), chunkOf(3, 3)}))
+	takes(t, "chunks of 4, 4 and 3 as cut at 4", list.CheckChunking(fixed))
+	refuses(t, "chunks of 4, 4 and 3 as cut at 5", list.CheckChunking(must[Chunking](t)(FixedChunking(5))))
+	refuses(t, "chunks of 4, 4 and 3 as cut by content", list.CheckChunking(content))
+	shortInTheMiddle := must[*FileList](t)(NewFileList([]ChunkRef{chunkOf(1, 4), chunkOf(2, 3), chunkOf(3, 4)}))
+	refuses(t, "a short chunk in the middle", shortInTheMiddle.CheckChunking(fixed))
+	shortAtTheStart := must[*FileList](t)(NewFileList([]ChunkRef{chunkOf(1, 3), chunkOf(2, 4)}))
+	refuses(t, "a short chunk at the start", shortAtTheStart.CheckChunking(fixed))
+	takes(t, "the empty file", must[*FileList](t)(NewFileList(nil)).CheckChunking(content))
+	takes(t, "the empty file, cut at 4", must[*FileList](t)(NewFileList(nil)).CheckChunking(fixed))
 }
 
-// most0 is the most bytes a piece cut by content holds.
+// most0 is the most bytes a chunk holds when a file is chunked by content.
 func most0() uint64 { return FastCDCMaxSize }
 
-func TestEveryRunOfAFileChecksAndGivesTheByteItStartsAt(t *testing.T) {
+func TestEveryBranchOfAFileChecksAndGivesTheByteItStartsAt(t *testing.T) {
 	for count := 1; count <= 17; count++ {
-		items := make([]PieceRef, count)
+		items := make([]ChunkRef, count)
 		for index := range items {
-			items[index] = pieceOf(byte(index), uint32(index%5)+1)
+			items[index] = chunkOf(byte(index), uint32(index%5)+1)
 		}
 		list := must[*FileList](t)(NewFileList(items))
 		open := must[*OpenFile](t)(NewOpenFile(list))
@@ -635,125 +635,125 @@ func TestEveryRunOfAFileChecksAndGivesTheByteItStartsAt(t *testing.T) {
 		var before uint64
 		for start := range uint64(count) {
 			for end := start + 1; end <= uint64(count); end++ {
-				what := fmt.Sprintf("%d pieces, %d up to %d", count, start, end)
-				run := must[*FileRun](t)(open.Open(start, end))
-				encoded := run.Encode()
-				if !bytes.Equal(encoded, must[*FileRun](t)(list.Open(start, end)).Encode()) || !bytes.Equal(encoded, must[*FileRun](t)(read.Open(start, end)).Encode()) {
-					t.Fatalf("%s: a list that is kept open shows another run", what)
+				what := fmt.Sprintf("%d chunks, %d up to %d", count, start, end)
+				branch := must[*FileBranch](t)(open.Open(start, end))
+				encoded := branch.Encode()
+				if !bytes.Equal(encoded, must[*FileBranch](t)(list.Open(start, end)).Encode()) || !bytes.Equal(encoded, must[*FileBranch](t)(read.Open(start, end)).Encode()) {
+					t.Fatalf("%s: a list that is kept open shows another branch", what)
 				}
-				back := must[*FileRun](t)(DecodeFileRun(encoded))
+				back := must[*FileBranch](t)(DecodeFileBranch(encoded))
 				if !bytes.Equal(back.Encode(), encoded) || back.Count() != uint64(count) || back.Start() != start {
-					t.Fatalf("%s: the run does not read back", what)
+					t.Fatalf("%s: the branch does not read back", what)
 				}
 				if at, err := back.Check(target); err != nil || at != before {
-					t.Fatalf("%s: the run starts at byte %d, and not %d (%v)", what, at, before, err)
+					t.Fatalf("%s: the branch starts at byte %d, and not %d (%v)", what, at, before, err)
 				}
-				if !slices.Equal(run.Items(), items[start:end]) {
-					t.Fatalf("%s: the run shows other pieces", what)
+				if !slices.Equal(branch.Items(), items[start:end]) {
+					t.Fatalf("%s: the branch shows other chunks", what)
 				}
 			}
 			if at, found := open.StartOf(start); !found || at != before {
-				t.Fatalf("piece %d of %d starts at %d", start, count, at)
+				t.Fatalf("chunk %d of %d starts at %d", start, count, at)
 			}
 			before += uint64(items[start].Length)
 		}
 		if at, found := open.StartOf(uint64(count)); !found || at != list.Size() || before != list.Size() {
-			t.Fatalf("the end of %d pieces is at %d", count, at)
+			t.Fatalf("the end of %d chunks is at %d", count, at)
 		}
 		if _, found := open.StartOf(uint64(count) + 1); found {
-			t.Fatal("a piece after the end has a start")
+			t.Fatal("a chunk after the end has a start")
 		}
 	}
 }
 
-func TestARunOfAFileIsRefusedForAnyOtherFileCountOrPlace(t *testing.T) {
-	items := make([]PieceRef, 9)
+func TestABranchOfAFileIsRefusedForAnyOtherFileCountOrPlace(t *testing.T) {
+	items := make([]ChunkRef, 9)
 	for index := range items {
-		items[index] = pieceOf(byte(index), 4)
+		items[index] = chunkOf(byte(index), 4)
 	}
 	list := must[*FileList](t)(NewFileList(items))
 	target := list.Target()
-	run := must[*FileRun](t)(list.Open(3, 5))
-	if at, err := run.Check(target); err != nil || at != 12 {
+	branch := must[*FileBranch](t)(list.Open(3, 5))
+	if at, err := branch.Check(target); err != nil || at != 12 {
 		t.Fatal(at, err)
 	}
 	// Another file, another size, and a folder.
-	if _, err := run.Check(smallFile(t, 1)); !errors.Is(err, ErrSizeMismatch) {
+	if _, err := branch.Check(smallFile(t, 1)); !errors.Is(err, ErrSizeMismatch) {
 		t.Fatalf("another file: %v", err)
 	}
-	if _, err := run.Check(Target{Kind: KindFile, Hash: HashOf([]byte("other")), Size: target.Size}); !errors.Is(err, ErrHashMismatch) {
+	if _, err := branch.Check(Target{Kind: KindFile, Hash: HashOf([]byte("other")), Size: target.Size}); !errors.Is(err, ErrHashMismatch) {
 		t.Fatalf("another hash: %v", err)
 	}
-	if _, err := run.Check(Target{Kind: KindFile, Hash: target.Hash, Size: target.Size + 1}); !errors.Is(err, ErrSizeMismatch) {
+	if _, err := branch.Check(Target{Kind: KindFile, Hash: target.Hash, Size: target.Size + 1}); !errors.Is(err, ErrSizeMismatch) {
 		t.Fatalf("another size: %v", err)
 	}
-	if _, err := run.Check(Target{Kind: KindFolder, Hash: target.Hash, Size: target.Size}); err == nil {
-		t.Fatal("a run of a file was taken for a folder")
+	if _, err := branch.Check(Target{Kind: KindFolder, Hash: target.Hash, Size: target.Size}); err == nil {
+		t.Fatal("a branch of a file was taken for a folder")
 	}
 	// The same bytes with another count, another place, or one item less.
-	encoded := run.Encode()
+	encoded := branch.Encode()
 	with := func(at int, value byte) error {
 		changed := slices.Clone(encoded)
 		changed[at] = value
-		run, err := DecodeFileRun(changed)
+		branch, err := DecodeFileBranch(changed)
 		if err != nil {
 			return err
 		}
-		_, err = run.Check(target)
+		_, err = branch.Check(target)
 		return err
 	}
 	last := len(encoded) - 1
-	refuses(t, "the run as of a file of 10 pieces", with(7, 10))
-	refuses(t, "the run as of a file of 8 pieces", with(7, 8))
-	refuses(t, "the run one place on", with(15, 4))
-	refuses(t, "the run one place back", with(15, 2))
-	refuses(t, "the run with one item less", with(19, 1))
-	refuses(t, "the run with no items", with(19, 0))
-	refuses(t, "the run with another piece", with(20, encoded[20]^1))
-	refuses(t, "the run with another length for a piece", with(20+35, encoded[20+35]^1))
-	refuses(t, "the run with another size for a carried node", with(last, encoded[last]^1))
-	takes(t, "the run as it is", with(7, 9))
+	refuses(t, "the branch as of a file of 10 chunks", with(7, 10))
+	refuses(t, "the branch as of a file of 8 chunks", with(7, 8))
+	refuses(t, "the branch one place on", with(15, 4))
+	refuses(t, "the branch one place back", with(15, 2))
+	refuses(t, "the branch with one item less", with(19, 1))
+	refuses(t, "the branch with no items", with(19, 0))
+	refuses(t, "the branch with another chunk", with(20, encoded[20]^1))
+	refuses(t, "the branch with another length for a chunk", with(20+35, encoded[20+35]^1))
+	refuses(t, "the branch with another size for a carried node", with(last, encoded[last]^1))
+	takes(t, "the branch as it is", with(7, 9))
 	// Every single byte of it counts.
 	for at := range encoded {
-		refuses(t, fmt.Sprintf("the run with byte %d changed", at), with(at, encoded[at]^0x80))
+		refuses(t, fmt.Sprintf("the branch with byte %d changed", at), with(at, encoded[at]^0x80))
 	}
 	for cut := range len(encoded) {
-		_, err := DecodeFileRun(encoded[:cut])
-		refuses(t, fmt.Sprintf("a run cut at %d", cut), err)
+		_, err := DecodeFileBranch(encoded[:cut])
+		refuses(t, fmt.Sprintf("a branch cut at %d", cut), err)
 	}
-	_, err := DecodeFileRun(joined(encoded, []byte{0}))
-	refuses(t, "a byte after a run", err)
-	// The pieces' lengths are held to the way of cutting, when one is given.
-	if _, err := run.CheckWithCutting(target, must[Cutting](t)(FixedCutting(4))); err != nil {
+	_, err := DecodeFileBranch(joined(encoded, []byte{0}))
+	refuses(t, "a byte after a branch", err)
+	// The chunks' lengths are held to the way of chunking, when one is given.
+	if _, err := branch.CheckWithChunking(target, must[Chunking](t)(FixedChunking(4))); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := run.CheckWithCutting(target, must[Cutting](t)(FixedCutting(5))); err == nil {
-		t.Fatal("pieces of 4 were taken as cut at 5")
+	if _, err := branch.CheckWithChunking(target, must[Chunking](t)(FixedChunking(5))); err == nil {
+		t.Fatal("chunks of 4 were taken as cut at 5")
 	}
-	if _, err := run.CheckWithCutting(target, FastCDCV1); err == nil {
-		t.Fatal("pieces of 4 were taken as cut by content")
+	if _, err := branch.CheckWithChunking(target, FastCDCV1); err == nil {
+		t.Fatal("chunks of 4 were taken as cut by content")
 	}
-	// A run that claims more carried nodes than any list needs.
+	// A branch that claims more carried nodes than any list needs.
 	crowded := joined(encoded[:20+2*ListItemBytes], be16(81), make([]byte, 81*40))
-	_, err = DecodeFileRun(crowded)
-	refuses(t, "a run that carries 81 nodes", err)
-	// A run that claims more items than it has bytes for.
+	_, err = DecodeFileBranch(crowded)
+	refuses(t, "a branch that carries 81 nodes", err)
+	// A branch that claims more items than it has bytes for.
 	hollow := joined(encoded[:16], be32(math.MaxUint32))
-	_, err = DecodeFileRun(hollow)
-	refuses(t, "a run that claims more items than it has bytes for", err)
+	_, err = DecodeFileBranch(hollow)
+	refuses(t, "a branch that claims more items than it has bytes for", err)
 	// And one that claims a list longer than any list.
 	endless := joined(be64(MaxListItems+1), be64(3), be32(2), encoded[20:])
-	_, err = DecodeFileRun(endless)
-	refuses(t, "a run of a list longer than any list", err)
+	_, err = DecodeFileBranch(endless)
+	refuses(t, "a branch of a list longer than any list", err)
 }
 
-func TestThePiecesThatHoldAStretchOfBytesAreFound(t *testing.T) {
+func TestTheChunksThatHoldAStretchOfBytesAreFound(t *testing.T) {
 	lengths := []uint32{3, 1, 4, 1, 5, 9, 2, 6}
-	items := make([]PieceRef, len(lengths))
-	// Which piece holds each byte, worked out the long way.
+	items := make([]ChunkRef, len(lengths))
+	// Which chunk holds each byte, worked out the long way.
 	var holder []uint64
 	for index, length := range lengths {
-		items[index] = pieceOf(byte(index), length)
+		items[index] = chunkOf(byte(index), length)
 		for range length {
 			holder = append(holder, uint64(index))
 		}
@@ -766,27 +766,27 @@ func TestThePiecesThatHoldAStretchOfBytesAreFound(t *testing.T) {
 	}
 	for offset := range size {
 		for length := uint64(1); length <= size-offset; length++ {
-			first, after, err := open.PiecesFor(offset, length)
+			first, after, err := open.ChunksFor(offset, length)
 			if err != nil || first != holder[offset] || after != holder[offset+length-1]+1 {
-				t.Fatalf("%d bytes from %d are in pieces %d up to %d (%v)", length, offset, first, after, err)
+				t.Fatalf("%d bytes from %d are in chunks %d up to %d (%v)", length, offset, first, after, err)
 			}
-			run := must[*FileRun](t)(open.OpenBytes(offset, length))
-			startsAt := must[uint64](t)(run.Check(list.Target()))
+			branch := must[*FileBranch](t)(open.OpenBytes(offset, length))
+			startsAt := must[uint64](t)(branch.Check(list.Target()))
 			var shown uint64
-			for _, item := range run.Items() {
+			for _, item := range branch.Items() {
 				shown += uint64(item.Length)
 			}
 			if startsAt > offset || startsAt+shown < offset+length {
-				t.Fatalf("%d bytes from %d: the run shows %d bytes from %d", length, offset, shown, startsAt)
+				t.Fatalf("%d bytes from %d: the branch shows %d bytes from %d", length, offset, shown, startsAt)
 			}
-			// No piece is shown that holds none of the bytes.
-			if first != run.Start() || after-first != uint64(len(run.Items())) {
-				t.Fatalf("%d bytes from %d: the run shows more pieces than hold them", length, offset)
+			// No chunk is shown that holds none of the bytes.
+			if first != branch.Start() || after-first != uint64(len(branch.Items())) {
+				t.Fatalf("%d bytes from %d: the branch shows more chunks than hold them", length, offset)
 			}
 		}
 	}
 	for _, outside := range [][2]uint64{{0, 0}, {size, 1}, {size - 1, 2}, {math.MaxUint64, 2}, {1, math.MaxUint64}, {size, 0}} {
-		if _, _, err := open.PiecesFor(outside[0], outside[1]); err == nil {
+		if _, _, err := open.ChunksFor(outside[0], outside[1]); err == nil {
 			t.Fatalf("%d bytes from %d were found", outside[1], outside[0])
 		}
 		if _, err := open.OpenBytes(outside[0], outside[1]); err == nil {
@@ -794,7 +794,7 @@ func TestThePiecesThatHoldAStretchOfBytesAreFound(t *testing.T) {
 		}
 	}
 	empty := must[*OpenFile](t)(NewOpenFile(must[*FileList](t)(NewFileList(nil))))
-	if _, _, err := empty.PiecesFor(0, 1); err == nil {
+	if _, _, err := empty.ChunksFor(0, 1); err == nil {
 		t.Fatal("a byte of the empty file was found")
 	}
 	if at, found := empty.StartOf(0); !found || at != 0 {
@@ -802,7 +802,7 @@ func TestThePiecesThatHoldAStretchOfBytesAreFound(t *testing.T) {
 	}
 }
 
-func TestEveryRunOfAFolderChecksAndReadsBack(t *testing.T) {
+func TestEveryBranchOfAFolderChecksAndReadsBack(t *testing.T) {
 	names := make([]string, 13)
 	for index := range names {
 		names[index] = fmt.Sprintf("n%02d", index)
@@ -819,18 +819,18 @@ func TestEveryRunOfAFolderChecksAndReadsBack(t *testing.T) {
 		for start := range uint64(count) {
 			for end := start + 1; end <= uint64(count); end++ {
 				what := fmt.Sprintf("%d entries, %d up to %d", count, start, end)
-				run := must[*FolderRun](t)(open.Open(start, end))
-				encoded := run.Encode()
-				if !bytes.Equal(encoded, must[*FolderRun](t)(list.Open(start, end)).Encode()) || !bytes.Equal(encoded, must[*FolderRun](t)(read.Open(start, end)).Encode()) {
-					t.Fatalf("%s: a list that is kept open shows another run", what)
+				branch := must[*FolderBranch](t)(open.Open(start, end))
+				encoded := branch.Encode()
+				if !bytes.Equal(encoded, must[*FolderBranch](t)(list.Open(start, end)).Encode()) || !bytes.Equal(encoded, must[*FolderBranch](t)(read.Open(start, end)).Encode()) {
+					t.Fatalf("%s: a list that is kept open shows another branch", what)
 				}
-				back := must[*FolderRun](t)(DecodeFolderRun(encoded))
+				back := must[*FolderBranch](t)(DecodeFolderBranch(encoded))
 				if !bytes.Equal(back.Encode(), encoded) || back.Count() != uint64(count) || back.Start() != start {
-					t.Fatalf("%s: the run does not read back", what)
+					t.Fatalf("%s: the branch does not read back", what)
 				}
 				takes(t, what, back.Check(target))
 				if !slices.EqualFunc(back.Entries(), list.Entries()[start:end], Entry.Equal) {
-					t.Fatalf("%s: the run shows other entries", what)
+					t.Fatalf("%s: the branch shows other entries", what)
 				}
 				refuses(t, what+", for another folder", back.Check(other))
 				refuses(t, what+", for a file", back.Check(Target{Kind: KindFile, Hash: target.Hash, Size: target.Size}))
@@ -838,29 +838,29 @@ func TestEveryRunOfAFolderChecksAndReadsBack(t *testing.T) {
 			}
 		}
 	}
-	// A run is read whole, or not at all.
+	// A branch is read whole, or not at all.
 	list := folderNamed(t, names[:9]...)
-	encoded := must[*FolderRun](t)(list.Open(3, 5)).Encode()
+	encoded := must[*FolderBranch](t)(list.Open(3, 5)).Encode()
 	for cut := range len(encoded) {
-		_, err := DecodeFolderRun(encoded[:cut])
-		refuses(t, fmt.Sprintf("a run cut at %d", cut), err)
+		_, err := DecodeFolderBranch(encoded[:cut])
+		refuses(t, fmt.Sprintf("a branch cut at %d", cut), err)
 	}
-	_, err := DecodeFolderRun(joined(encoded, []byte{0}))
-	refuses(t, "a byte after a run", err)
+	_, err := DecodeFolderBranch(joined(encoded, []byte{0}))
+	refuses(t, "a byte after a branch", err)
 	// The carried node that begins the list comes with no name, and every
-	// other one with a name: a run is read in one way only. Here each entry
+	// other one with a name: a branch is read in one way only. Here each entry
 	// takes 48 bytes, and a carried node's name follows its 40 bytes.
 	nameAt := 20 + 2*48 + 2 + 40
 	if !bytes.Equal(encoded[nameAt:nameAt+2], []byte{0, 0}) {
 		t.Fatalf("the node that begins the list is carried with a name of %d bytes", encoded[nameAt+1])
 	}
-	_, err = DecodeFolderRun(joined(encoded[:nameAt], []byte{0, 3}, []byte("n00"), encoded[nameAt+2:]))
+	_, err = DecodeFolderBranch(joined(encoded[:nameAt], []byte{0, 3}, []byte("n00"), encoded[nameAt+2:]))
 	refuses(t, "a name for the carried node that begins the list", err)
-	fromTheStart := must[*FolderRun](t)(list.Open(0, 2)).Encode()
+	fromTheStart := must[*FolderBranch](t)(list.Open(0, 2)).Encode()
 	if !bytes.Equal(fromTheStart[nameAt:nameAt+5], joined([]byte{0, 3}, []byte("n02"))) {
-		t.Fatalf("the first carried node of a run from the start is carried as % x", fromTheStart[nameAt:nameAt+5])
+		t.Fatalf("the first carried node of a branch from the start is carried as % x", fromTheStart[nameAt:nameAt+5])
 	}
-	_, err = DecodeFolderRun(joined(fromTheStart[:nameAt], []byte{0, 0}, fromTheStart[nameAt+5:]))
+	_, err = DecodeFolderBranch(joined(fromTheStart[:nameAt], []byte{0, 0}, fromTheStart[nameAt+5:]))
 	refuses(t, "no name for a carried node that is not the one that begins the list", err)
 }
 
@@ -879,19 +879,19 @@ func TestANameIsShownToBeThereOrNotThereByItsOnePlace(t *testing.T) {
 				t.Fatalf("%s has no place", what)
 			}
 			// The answer the folder gives.
-			answer := must[*FolderRun](t)(list.OpenName(name))
+			answer := must[*FolderBranch](t)(list.OpenName(name))
 			encoded := answer.Encode()
-			if !bytes.Equal(encoded, must[*FolderRun](t)(open.OpenName(name)).Encode()) {
+			if !bytes.Equal(encoded, must[*FolderBranch](t)(open.OpenName(name)).Encode()) {
 				t.Fatalf("%s: a list that is kept open gives another answer", what)
 			}
-			back := must[*FolderRun](t)(DecodeFolderRun(encoded))
+			back := must[*FolderBranch](t)(DecodeFolderBranch(encoded))
 			if got, found, err := back.CheckName(target, name); err != nil || found != there || (there && !got.Equal(truth)) {
 				t.Fatalf("%s: found: %v, and it is there: %v (%v)", what, found, there, err)
 			}
 			// Any other entry shown in its place is refused, so there is
 			// one answer, and it is the true one.
 			for other := range uint64(count) {
-				shown := must[*FolderRun](t)(list.Open(other, other+1))
+				shown := must[*FolderBranch](t)(list.Open(other, other+1))
 				got, found, err := shown.CheckName(target, name)
 				if other != place {
 					refuses(t, fmt.Sprintf("%s, answered at %d", what, other), err)
@@ -899,9 +899,9 @@ func TestANameIsShownToBeThereOrNotThereByItsOnePlace(t *testing.T) {
 					t.Fatalf("%s at its place %d: found: %v, and it is there: %v (%v)", what, other, found, there, err)
 				}
 			}
-			// A run of two entries is no answer for one name.
+			// A branch of two entries is no answer for one name.
 			if count >= 2 {
-				_, _, err := must[*FolderRun](t)(list.Open(0, 2)).CheckName(target, name)
+				_, _, err := must[*FolderBranch](t)(list.Open(0, 2)).CheckName(target, name)
 				refuses(t, what+", answered by two entries", err)
 			}
 			// The true answer for another folder is no answer for this one.
@@ -912,7 +912,7 @@ func TestANameIsShownToBeThereOrNotThereByItsOnePlace(t *testing.T) {
 		}
 		_, err := list.OpenName("a/b")
 		refuses(t, "a name with a slash", err)
-		_, _, err = must[*FolderRun](t)(list.Open(0, 1)).CheckName(target, "")
+		_, _, err = must[*FolderBranch](t)(list.Open(0, 1)).CheckName(target, "")
 		refuses(t, "the empty name", err)
 	}
 }
@@ -922,30 +922,30 @@ func TestAnEmptyFolderShowsThatItHoldsNoName(t *testing.T) {
 	if _, hasPlace := empty.PlaceOf("a"); hasPlace {
 		t.Fatal("the empty folder has a place for a name")
 	}
-	answer := must[*FolderRun](t)(empty.OpenName("a"))
+	answer := must[*FolderBranch](t)(empty.OpenName("a"))
 	encoded := answer.Encode()
 	if len(encoded) != 22 {
 		t.Fatalf("the answer of an empty folder takes %d bytes", len(encoded))
 	}
-	back := must[*FolderRun](t)(DecodeFolderRun(encoded))
+	back := must[*FolderBranch](t)(DecodeFolderBranch(encoded))
 	if !bytes.Equal(back.Encode(), encoded) {
 		t.Fatal("the answer does not read back")
 	}
 	if _, found, err := back.CheckName(empty.Target(), "a"); err != nil || found {
 		t.Fatal(found, err)
 	}
-	takes(t, "the run of an empty folder", back.Check(empty.Target()))
+	takes(t, "the branch of an empty folder", back.Check(empty.Target()))
 	// The same answer for a folder that is not empty is refused.
 	full := folderNamed(t, "a")
 	_, _, err := back.CheckName(full.Target(), "a")
 	refuses(t, "an empty folder's answer for a folder with entries", err)
-	refuses(t, "an empty folder's run for a folder with entries", back.Check(full.Target()))
-	// And a run that shows nothing of a folder with entries is no run.
-	_, err = DecodeFolderRun(joined(be64(3), make([]byte, 8+4+2)))
-	refuses(t, "a run that shows nothing of a folder with entries", err)
-	_, err = DecodeFolderRun(joined(be64(0), make([]byte, 8+4), []byte{0, 1}, make([]byte, 40), []byte{0, 1, 'a'}))
-	refuses(t, "a run of an empty folder that carries a node", err)
-	// A run of an empty folder that starts somewhere is no run either.
-	_, err = DecodeFolderRun(joined(be64(0), be64(1), make([]byte, 4+2)))
-	refuses(t, "a run of an empty folder that starts at a place", err)
+	refuses(t, "an empty folder's branch for a folder with entries", back.Check(full.Target()))
+	// And a branch that shows nothing of a folder with entries is no branch.
+	_, err = DecodeFolderBranch(joined(be64(3), make([]byte, 8+4+2)))
+	refuses(t, "a branch that shows nothing of a folder with entries", err)
+	_, err = DecodeFolderBranch(joined(be64(0), make([]byte, 8+4), []byte{0, 1}, make([]byte, 40), []byte{0, 1, 'a'}))
+	refuses(t, "a branch of an empty folder that carries a node", err)
+	// A branch of an empty folder that starts somewhere is no branch either.
+	_, err = DecodeFolderBranch(joined(be64(0), be64(1), make([]byte, 4+2)))
+	refuses(t, "a branch of an empty folder that starts at a place", err)
 }

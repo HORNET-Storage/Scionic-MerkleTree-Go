@@ -60,22 +60,22 @@ func TestAFolderIsBuiltTheSameOnOneCoreAndOnMany(t *testing.T) {
 	}
 	top := writeTree(t, files)
 	var roots []Root
-	for _, cutting := range []Cutting{FastCDCV1, smallPieces(t)} {
+	for _, chunking := range []Chunking{FastCDCV1, smallChunks(t)} {
 		var first Root
 		for index, workers := range []int{1, 2, 0} {
 			store := NewMemoryStore()
-			root, err := Build(store, top, BuildOptions{Cutting: cutting, Workers: workers})
+			root, err := Build(store, top, BuildOptions{Chunking: chunking, Workers: workers})
 			if err != nil {
-				t.Fatalf("%v with %d workers: %v", cutting, workers, err)
+				t.Fatalf("%v with %d workers: %v", chunking, workers, err)
 			}
 			if index == 0 {
 				first = root
 			} else if root != first {
-				t.Fatalf("%v with %d workers: the root is %v, and not %v", cutting, workers, root, first)
+				t.Fatalf("%v with %d workers: the root is %v, and not %v", chunking, workers, root, first)
 			}
-			summary, err := VerifyWith(store, root, VerifyOptions{Recut: true})
+			summary, err := VerifyWith(store, root, VerifyOptions{Rechunk: true})
 			if err != nil {
-				t.Fatalf("%v with %d workers: %v", cutting, workers, err)
+				t.Fatalf("%v with %d workers: %v", chunking, workers, err)
 			}
 			// The top, b, b/d, empty-folder, long, z, z/y, z/y/x and z/y/x/w.
 			if summary.Folders != 9 {
@@ -92,7 +92,7 @@ func TestAFolderIsBuiltTheSameOnOneCoreAndOnMany(t *testing.T) {
 		roots = append(roots, first)
 	}
 	if roots[0] == roots[1] {
-		t.Fatal("two ways of cutting gave one root")
+		t.Fatal("two ways of chunking gave one root")
 	}
 }
 
@@ -102,17 +102,17 @@ func TestALinkIsRefusedOrLeftOut(t *testing.T) {
 		t.Skipf("this system makes no links here: %v", err)
 	}
 	store := NewMemoryStore()
-	_, err := Build(store, top, BuildOptions{Cutting: smallPieces(t)})
+	_, err := Build(store, top, BuildOptions{Chunking: smallChunks(t)})
 	var told *Error
 	if !errors.Is(err, ErrUnsupportedEntry) || !errors.As(err, &told) || told.What != "a link" {
 		t.Fatalf("a link was not refused: %v", err)
 	}
 	without := writeTree(t, map[string][]byte{"real.txt": []byte("real"), "folder/inside.txt": []byte("inside")})
-	want, err := Build(NewMemoryStore(), without, BuildOptions{Cutting: smallPieces(t)})
+	want, err := Build(NewMemoryStore(), without, BuildOptions{Chunking: smallChunks(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := Build(store, top, BuildOptions{Cutting: smallPieces(t), Links: LinksSkip})
+	got, err := Build(store, top, BuildOptions{Chunking: smallChunks(t), Links: LinksSkip})
 	if err != nil {
 		t.Fatal(err)
 	}

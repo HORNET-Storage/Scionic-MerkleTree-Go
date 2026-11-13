@@ -52,7 +52,7 @@ type Error struct {
 	Name string
 	// Reason is why a name is refused.
 	Reason string
-	// What is the thing in question: "a piece", "a stored file's list".
+	// What is the thing in question: "a chunk", "a stored file's list".
 	What string
 	// Hash names the thing: for ErrCorrupt and ErrMissing.
 	Hash Hash

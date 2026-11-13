@@ -390,7 +390,7 @@ A writer that has a `Flush` method, as a buffered one has, is flushed by the lib
 
 **Building.** Building uses every core unless `BuildOptions.Workers` says otherwise. Several files are chunked at once, and the chunks of one long file are hashed several at once. A file is never held in memory whole: a builder holds up to 16 MiB of it, or up to 64 MiB while other goroutines help it. `BuildOptions.Timestamp` writes the time into the tree's record, and `BuildWith` attaches extra data to each entry, such as a file mode or a media type. A link or a special file in the folder is refused, or left out with `LinksSkip`. It is never followed.
 
-**Verifying and mending.** `Verify` checks every list and every chunk that a store holds for a root, on every core. When bytes were harmed where they are kept, the error says which thing it is: it matches `ErrCorrupt`, and carries the hash. With `VerifyOptions{DiscardDamaged: true}` the damaged parts are removed, and the next `Fetch` brings back exactly those. `VerifyOptions.Recut` also chunks every file again, and refuses a file that was not chunked the standard way.
+**Verifying and mending.** `Verify` checks every list and every chunk that a store holds for a root, on every core. When bytes were harmed where they are kept, the error says which thing it is: it matches `ErrCorrupt`, and carries the hash. With `VerifyOptions{DiscardDamaged: true}` the damaged parts are removed, and the next `Fetch` brings back exactly those. `VerifyOptions.Rechunk` also chunks every file again, and refuses a file that was not chunked the standard way.
 
 ```go
 	// Verifying finds the damage, and the error names what was harmed.
@@ -512,15 +512,15 @@ A reader that fails is never taken for one that ended. A file whose reader break
 
 ## Words Used in the API
 
-The API and the specification use short, plain words. This is how they line up with the words above:
+The API and the specification use the same words as this page. This is where each one is found:
 
 | Here | In the API and in `spec/FORMAT.md` |
 | --- | --- |
-| chunk | piece: `PieceRef`, `StoredPiece` |
+| chunk | `ChunkRef`, `StoredChunk` |
 | a file's chunk list | file list: `FileList` |
 | a folder's listing | folder list: `FolderList`, made of entries: `Entry` |
-| Merkle branch, Merkle proof | run: `FileRun`, `FolderRun` |
-| chunking | cutting: `Cutting`, `FastCDCV1` |
+| Merkle branch, Merkle proof | branch: `FileBranch`, `FolderBranch` |
+| chunking | `Chunking`, `FastCDCV1` |
 | root | `Root`, the hash of the tree's record: `Record` |
 
 | File | What it holds |

@@ -13,9 +13,9 @@ import (
 // stretch of it, and writing the tree out to disk.
 //
 // Everything read from the store is checked again before it is used: a list
-// against the hash it was asked for by, and a piece against the hash and the
+// against the hash it was asked for by, and a chunk against the hash and the
 // length its file gives it. A file's bytes are handed out only when every
-// piece they need is there. Otherwise it is an error, never a shorter file.
+// chunk they need is there. Otherwise it is an error, never a shorter file.
 
 // RecordOf gives the record of the tree with this root.
 func RecordOf(store Store, root Root) (*Record, error) {
@@ -41,7 +41,7 @@ func FolderOf(store Store, folder Target) (*FolderList, error) {
 	return list, nil
 }
 
-// FileOf gives the list of a file's pieces.
+// FileOf gives the list of a file's chunks.
 func FileOf(store Store, file Target) (*FileList, error) {
 	list, err := loadFile(store, file)
 	if err != nil {
@@ -94,7 +94,7 @@ func ReadFile(store Store, file Target, out io.Writer) error {
 }
 
 // ReadFileBytes gives a file's bytes, in memory. Room for them is taken
-// only once every piece of the file is found.
+// only once every chunk of the file is found.
 func ReadFileBytes(store Store, file Target) ([]byte, error) {
 	if file.Size > uint64(maxInt) {
 		return nil, sizeOverflow("a file read into memory")
@@ -103,13 +103,13 @@ func ReadFileBytes(store Store, file Target) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	wanted := piecesOfStretch(list, 0, list.Size())
+	wanted := chunksOfStretch(list, 0, list.Size())
 	if err := requireHeld(store, wanted); err != nil {
 		return nil, err
 	}
 	content := make([]byte, 0, list.Size())
-	for _, piece := range wanted {
-		kept, err := heldPiece(store, piece.item)
+	for _, chunk := range wanted {
+		kept, err := heldChunk(store, chunk.item)
 		if err != nil {
 			return nil, err
 		}
@@ -118,17 +118,17 @@ func ReadFileBytes(store Store, file Target) ([]byte, error) {
 	return content, nil
 }
 
-// wantedPiece is a piece that holds a part of a stretch, with the byte of
+// wantedChunk is a chunk that holds a part of a stretch, with the byte of
 // the file it starts at.
-type wantedPiece struct {
-	item  PieceRef
+type wantedChunk struct {
+	item  ChunkRef
 	start uint64
 }
 
-// piecesOfStretch gives the pieces that hold the bytes from offset up to
+// chunksOfStretch gives the chunks that hold the bytes from offset up to
 // end, each with the byte it starts at.
-func piecesOfStretch(list *FileList, offset, end uint64) []wantedPiece {
-	var wanted []wantedPiece
+func chunksOfStretch(list *FileList, offset, end uint64) []wantedChunk {
+	var wanted []wantedChunk
 	var start uint64
 	for _, item := range list.Items() {
 		if start >= end {
@@ -136,7 +136,7 @@ func piecesOfStretch(list *FileList, offset, end uint64) []wantedPiece {
 		}
 		after := start + uint64(item.Length)
 		if after > offset {
-			wanted = append(wanted, wantedPiece{item: item, start: start})
+			wanted = append(wanted, wantedChunk{item: item, start: start})
 		}
 		start = after
 	}
@@ -145,8 +145,8 @@ func piecesOfStretch(list *FileList, offset, end uint64) []wantedPiece {
 
 // ReadRange writes length bytes of a file, from byte offset, to out.
 //
-// Before the first byte goes out, every piece of the stretch is looked for.
-// If one is missing, nothing is written. Each piece is then checked against
+// Before the first byte goes out, every chunk of the stretch is looked for.
+// If one is missing, nothing is written. Each chunk is then checked against
 // its hash as it is written.
 //
 // The file's list is read and checked on every call. For many stretches of
@@ -163,11 +163,11 @@ func ReadRange(store Store, file Target, offset, length uint64, out io.Writer) e
 	if length == 0 {
 		return nil
 	}
-	return writeStretch(store, piecesOfStretch(list, offset, end), offset, end, out)
+	return writeStretch(store, chunksOfStretch(list, offset, end), offset, end, out)
 }
 
 // ReadOpen writes length bytes of a file whose list is open, from byte
-// offset, to out. It does what ReadRange does, and finds the pieces without
+// offset, to out. It does what ReadRange does, and finds the chunks without
 // a pass over the list.
 func ReadOpen(store Store, file *OpenFile, offset, length uint64, out io.Writer) error {
 	if length == 0 {
@@ -176,74 +176,74 @@ func ReadOpen(store Store, file *OpenFile, offset, length uint64, out io.Writer)
 		}
 		return nil
 	}
-	first, after, err := file.PiecesFor(offset, length)
+	first, after, err := file.ChunksFor(offset, length)
 	if err != nil {
 		return err
 	}
 	items := file.List().Items()
-	wanted := make([]wantedPiece, 0, after-first)
+	wanted := make([]wantedChunk, 0, after-first)
 	for number := first; number < after; number++ {
 		start, known := file.StartOf(number)
 		if !known || number >= uint64(len(items)) {
-			return invariant("an open file names a piece it does not have")
+			return invariant("an open file names a chunk it does not have")
 		}
-		wanted = append(wanted, wantedPiece{item: items[number], start: start})
+		wanted = append(wanted, wantedChunk{item: items[number], start: start})
 	}
 	return writeStretch(store, wanted, offset, offset+length, out)
 }
 
-// requireHeld: every piece has to be held, with the length its list gives
-// it. The pieces' bytes are counted here, not read.
-func requireHeld(store Store, wanted []wantedPiece) error {
-	for _, piece := range wanted {
-		if err := requirePiece(store, piece.item); err != nil {
+// requireHeld: every chunk has to be held, with the length its list gives
+// it. The chunks' bytes are counted here, not read.
+func requireHeld(store Store, wanted []wantedChunk) error {
+	for _, chunk := range wanted {
+		if err := requireChunk(store, chunk.item); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func requirePiece(store Store, item PieceRef) error {
-	size, held, err := storeSize(store, StoredPiece, item.Hash)
+func requireChunk(store Store, item ChunkRef) error {
+	size, held, err := storeSize(store, StoredChunk, item.Hash)
 	switch {
 	case err != nil:
 		return err
 	case !held:
-		return missing("the piece", item.Hash)
+		return missing("the chunk", item.Hash)
 	case size != uint64(item.Length):
-		return sizeMismatch("a stored piece", uint64(item.Length), size)
+		return sizeMismatch("a stored chunk", uint64(item.Length), size)
 	}
 	return nil
 }
 
-// heldPiece gives the bytes of a piece that has to be there, checked.
-func heldPiece(store Store, item PieceRef) ([]byte, error) {
-	kept, held, err := loadPiece(store, item)
+// heldChunk gives the bytes of a chunk that has to be there, checked.
+func heldChunk(store Store, item ChunkRef) ([]byte, error) {
+	kept, held, err := loadChunk(store, item)
 	if err != nil {
 		return nil, err
 	}
 	if !held {
-		return nil, missing("the piece", item.Hash)
+		return nil, missing("the chunk", item.Hash)
 	}
 	return kept, nil
 }
 
-// writeStretch writes the bytes from offset up to end out of the pieces
+// writeStretch writes the bytes from offset up to end out of the chunks
 // that hold them.
-func writeStretch(store Store, wanted []wantedPiece, offset, end uint64, out io.Writer) error {
+func writeStretch(store Store, wanted []wantedChunk, offset, end uint64, out io.Writer) error {
 	if err := requireHeld(store, wanted); err != nil {
 		return err
 	}
-	for _, piece := range wanted {
-		kept, err := heldPiece(store, piece.item)
+	for _, chunk := range wanted {
+		kept, err := heldChunk(store, chunk.item)
 		if err != nil {
 			return err
 		}
 		var from uint64
-		if offset > piece.start {
-			from = offset - piece.start
+		if offset > chunk.start {
+			from = offset - chunk.start
 		}
-		to := min(end, piece.start+uint64(piece.item.Length)) - piece.start
+		to := min(end, chunk.start+uint64(chunk.item.Length)) - chunk.start
 		if err := writeAll(out, kept[from:to]); err != nil {
 			return streamError("write a file's bytes", err)
 		}
@@ -334,7 +334,7 @@ type WriteOptions struct {
 	// one counted. Zero is DefaultMaxWrittenEntries.
 	MaxEntries uint64
 	// MaxBytes is the most bytes that may be written. A tree's record says
-	// how many it takes: the size of what is on top, with a file or a piece
+	// how many it takes: the size of what is on top, with a file or a chunk
 	// that the tree uses twice counted twice. Zero is as many bytes as the
 	// tree has.
 	MaxBytes uint64
@@ -344,7 +344,7 @@ type WriteOptions struct {
 // dest, or its top file as the new file dest.
 //
 // Writing is stricter than holding. dest must not exist. Before anything is
-// written, the whole tree is looked through: every list and every piece
+// written, the whole tree is looked through: every list and every chunk
 // must be there, no folder may sit too deep, every name must be one that
 // this system can hold as it is, and what would be made must fit within the
 // limits of WriteOptions. Every file and folder is then created as new.
@@ -382,7 +382,7 @@ func WriteToDiskWith(store Store, root Root, dest string, options WriteOptions) 
 		if err != nil {
 			return err
 		}
-		if err := requirePieces(store, list); err != nil {
+		if err := requireChunks(store, list); err != nil {
 			return err
 		}
 	} else if entries, err = survey(store, top); err != nil {
@@ -508,7 +508,7 @@ func fillFolder(store Store, folder *held, target Target) ([]folderToFill, error
 }
 
 // survey looks through a whole tree before it is written out, each folder
-// once, however many places it has. Every list and every piece must be
+// once, however many places it has. Every list and every chunk must be
 // there, every name must be one this system can hold, and no folder may sit
 // too deep. It gives how many files and folders writing the tree makes, the
 // top one counted, and a folder with several places counted at each.
@@ -552,7 +552,7 @@ func survey(store Store, top Target) (uint64, error) {
 					if err != nil {
 						return 0, err
 					}
-					if err := requirePieces(store, list); err != nil {
+					if err := requireChunks(store, list); err != nil {
 						return 0, err
 					}
 				}
@@ -622,11 +622,11 @@ func checkNames(folder *FolderList) error {
 	return nil
 }
 
-// requirePieces: every piece of a file has to be held, with the length its
+// requireChunks: every chunk of a file has to be held, with the length its
 // list gives it.
-func requirePieces(store Store, list *FileList) error {
+func requireChunks(store Store, list *FileList) error {
 	for _, item := range list.Items() {
-		if err := requirePiece(store, item); err != nil {
+		if err := requireChunk(store, item); err != nil {
 			return err
 		}
 	}

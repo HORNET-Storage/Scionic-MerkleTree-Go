@@ -9,13 +9,13 @@ import (
 	"sync"
 )
 
-// Syncing by file hash and piece number.
+// Syncing by file hash and chunk number.
 //
 //   - A Responder answers a receiver's requests from a store.
 //   - Fetch takes a whole tree from a peer into a store, from the top down,
 //     and skips whatever the store holds already.
 //   - A Remote reads parts of a tree straight from a peer: one name in a
-//     folder, a run of entries, or a stretch of a file's bytes. It needs no
+//     folder, a branch of entries, or a stretch of a file's bytes. It needs no
 //     store, and takes nothing but the parts it is asked for.
 //   - Export and Import carry a whole tree as one stream of frames.
 //   - Serve answers requests on a connection, and a StreamPeer asks them
@@ -32,14 +32,14 @@ const (
 	// requestsPerRound is the most requests Fetch sends before it looks at
 	// what is still wanted.
 	requestsPerRound = 64
-	// maxRunItems is the most items of a list that one answer shows.
-	maxRunItems = 16_384
-	// maxPiecesPerAnswer is the most pieces that one answer sends.
-	maxPiecesPerAnswer = 256
-	// runFixedBytes is the bytes of a run's frame that are there whatever it
-	// shows: its first byte, the list's count, the run's start, how many
+	// maxBranchItems is the most items of a list that one answer shows.
+	maxBranchItems = 16_384
+	// maxChunksPerAnswer is the most chunks that one answer sends.
+	maxChunksPerAnswer = 256
+	// branchFixedBytes is the bytes of a branch's frame that are there whatever it
+	// shows: its first byte, the list's count, the branch's start, how many
 	// items it shows, and how many nodes it carries.
-	runFixedBytes = 23
+	branchFixedBytes = 23
 	// recentItems is how many items of lists a responder keeps between
 	// requests, for each of the three kinds it keeps, unless it is told
 	// otherwise. This many items of files' lists stand for about half a
@@ -85,24 +85,24 @@ func timesPlus(count uint64, each, more int) int {
 	return int(count)*each + more
 }
 
-// folderRunLimit is the longest frame that shows entries entries of a
+// folderBranchLimit is the longest frame that shows entries entries of a
 // folder.
-func folderRunLimit(entries uint64) int {
-	return timesPlus(entries, MaxEntryBytes, runFixedBytes+MaxCarriedNodes*(42+MaxNameBytes))
+func folderBranchLimit(entries uint64) int {
+	return timesPlus(entries, MaxEntryBytes, branchFixedBytes+MaxCarriedNodes*(42+MaxNameBytes))
 }
 
-// fileRunLimit is the longest frame that shows items items of a file's
+// fileBranchLimit is the longest frame that shows items items of a file's
 // list.
-func fileRunLimit(items uint64) int {
-	return timesPlus(items, ListItemBytes, runFixedBytes+MaxCarriedNodes*40)
+func fileBranchLimit(items uint64) int {
+	return timesPlus(items, ListItemBytes, branchFixedBytes+MaxCarriedNodes*40)
 }
 
-// mostPiecesIn is the most pieces that length bytes of a file can lie in.
+// mostChunksIn is the most chunks that length bytes of a file can lie in.
 // All of them but the first and the last lie in the stretch whole, and no
-// piece but a file's last is shorter than the tree's way of cutting allows.
-func mostPiecesIn(cutting Cutting, length uint64) uint64 {
+// chunk but a file's last is shorter than the tree's way of chunking allows.
+func mostChunksIn(chunking Chunking, length uint64) uint64 {
 	shortest := uint64(FastCDCMinSize + 1)
-	if size, fixed := cutting.Fixed(); fixed {
+	if size, fixed := chunking.Fixed(); fixed {
 		shortest = uint64(size)
 	}
 	return length/shortest + 2
@@ -243,8 +243,8 @@ func (r *Responder) Recent(items uint64) *Responder {
 	return r
 }
 
-// Have sets whether a peer is told which pieces of a file are held here.
-// Telling takes a look into the store for every piece of the file, so a
+// Have sets whether a peer is told which chunks of a file are held here.
+// Telling takes a look into the store for every chunk of the file, so a
 // responder that serves strangers may leave it off. It then answers such a
 // request as it does for a file it does not hold. It is set before the
 // responder is used, and gives the responder back.
@@ -345,9 +345,9 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 		return whole(StoredFolderList, FolderListFrame)
 	case AskFile:
 		return whole(StoredFileList, FileListFrame)
-	case AskPiece:
-		return whole(StoredPiece, PieceFrame)
-	case AskFolderRun:
+	case AskChunk:
+		return whole(StoredChunk, ChunkFrame)
+	case AskFolderBranch:
 		open, err := r.openFolder(asked.Hash)
 		if err != nil {
 			return err
@@ -357,17 +357,17 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 		}
 		total := open.List().Count()
 		if total == 0 {
-			return onFrame(FolderRunFrame(&FolderRun{}))
+			return onFrame(FolderBranchFrame(&FolderBranch{}))
 		}
 		if asked.Start >= total {
 			return outOfRange()
 		}
-		end := min(total, asked.Start+min(uint64(asked.Count), maxRunItems))
-		run, err := open.Open(asked.Start, end)
+		end := min(total, asked.Start+min(uint64(asked.Count), maxBranchItems))
+		branch, err := open.Open(asked.Start, end)
 		if err != nil {
 			return err
 		}
-		return onFrame(FolderRunFrame(run))
+		return onFrame(FolderBranchFrame(branch))
 	case AskFolderName:
 		open, err := r.openFolder(asked.Hash)
 		if err != nil {
@@ -376,12 +376,12 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 		if open == nil {
 			return notHeld()
 		}
-		run, err := open.OpenName(asked.Name)
+		branch, err := open.OpenName(asked.Name)
 		if err != nil {
 			return err
 		}
-		return onFrame(FolderRunFrame(run))
-	case AskFileRun:
+		return onFrame(FolderBranchFrame(branch))
+	case AskFileBranch:
 		open, err := r.openFile(asked.Hash)
 		if err != nil {
 			return err
@@ -393,12 +393,12 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 		if asked.Start >= total {
 			return outOfRange()
 		}
-		end := min(total, asked.Start+min(uint64(asked.Count), maxRunItems))
-		run, err := open.Open(asked.Start, end)
+		end := min(total, asked.Start+min(uint64(asked.Count), maxBranchItems))
+		branch, err := open.Open(asked.Start, end)
 		if err != nil {
 			return err
 		}
-		return onFrame(FileRunFrame(run))
+		return onFrame(FileBranchFrame(branch))
 	case AskFileBytes:
 		open, err := r.openFile(asked.Hash)
 		if err != nil {
@@ -411,16 +411,16 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 		if asked.Offset >= size {
 			return outOfRange()
 		}
-		first, after, err := open.PiecesFor(asked.Offset, min(asked.Length, size-asked.Offset))
+		first, after, err := open.ChunksFor(asked.Offset, min(asked.Length, size-asked.Offset))
 		if err != nil {
 			return err
 		}
-		run, err := open.Open(first, min(after, first+maxRunItems))
+		branch, err := open.Open(first, min(after, first+maxBranchItems))
 		if err != nil {
 			return err
 		}
-		return onFrame(FileRunFrame(run))
-	case AskPieces:
+		return onFrame(FileBranchFrame(branch))
+	case AskChunks:
 		list, err := r.fileList(asked.Hash)
 		if err != nil {
 			return err
@@ -432,16 +432,16 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 			return outOfRange()
 		}
 		items := list.Items()[asked.Start:]
-		items = items[:min(uint64(len(items)), uint64(asked.Count), maxPiecesPerAnswer)]
+		items = items[:min(uint64(len(items)), uint64(asked.Count), maxChunksPerAnswer)]
 		for _, item := range items {
-			kept, held, err := r.store.Get(StoredPiece, item.Hash)
+			kept, held, err := r.store.Get(StoredChunk, item.Hash)
 			if err != nil {
 				return err
 			}
 			if !held {
 				return notHeld()
 			}
-			if err := onFrame(PieceFrame(kept)); err != nil {
+			if err := onFrame(ChunkFrame(kept)); err != nil {
 				return err
 			}
 		}
@@ -462,7 +462,7 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 			return err
 		}
 		for number, item := range list.Items() {
-			held, err := storeHas(r.store, StoredPiece, item.Hash)
+			held, err := storeHas(r.store, StoredChunk, item.Hash)
 			if err != nil {
 				return err
 			}
@@ -522,8 +522,8 @@ func askOne(peer Peer, request Request, limit int) ([]byte, error) {
 // Fetch takes the whole tree with this root from a peer into a store.
 //
 // It goes from the top down: the record, then each folder's entries and
-// each file's list, then the pieces, by their file and their numbers in it.
-// Whatever the store holds already is skipped by its hash, be it a piece, a
+// each file's list, then the chunks, by their file and their numbers in it.
+// Whatever the store holds already is skipped by its hash, be it a chunk, a
 // file or a whole folder, and wherever it came from. Every answer has to be
 // exactly what was asked for, and is checked before it is kept.
 //
@@ -585,7 +585,7 @@ func Fetch(store Store, root Root, peer Peer) (*Summary, error) {
 	return intake.Finish()
 }
 
-// Entries is a run of a folder's entries, as a peer showed it and as it was
+// Entries is a branch of a folder's entries, as a peer showed it and as it was
 // checked.
 type Entries struct {
 	// Total is how many entries the folder has in all.
@@ -641,7 +641,7 @@ func (r *Remote) Entry(folder Target, name string) (Entry, bool, error) {
 	if err := folder.require(KindFolder); err != nil {
 		return Entry{}, false, err
 	}
-	frame, err := askOne(r.peer, RequestFolderName(folder.Hash, name), folderRunLimit(1))
+	frame, err := askOne(r.peer, RequestFolderName(folder.Hash, name), folderBranchLimit(1))
 	if err != nil {
 		return Entry{}, false, err
 	}
@@ -649,10 +649,10 @@ func (r *Remote) Entry(folder Target, name string) (Entry, bool, error) {
 	if err != nil {
 		return Entry{}, false, err
 	}
-	if shown.Kind != FrameFolderRun {
+	if shown.Kind != FrameFolderBranch {
 		return Entry{}, false, otherKind()
 	}
-	return shown.FolderRun.CheckName(folder, name)
+	return shown.FolderBranch.CheckName(folder, name)
 }
 
 // Lookup gives what is at path in the tree: names with "/" between them.
@@ -687,7 +687,7 @@ func (r *Remote) Entries(folder Target, start uint64, count uint32) (*Entries, e
 	if err := folder.require(KindFolder); err != nil {
 		return nil, err
 	}
-	frame, err := askOne(r.peer, RequestFolderRun(folder.Hash, start, count), folderRunLimit(uint64(count)))
+	frame, err := askOne(r.peer, RequestFolderBranch(folder.Hash, start, count), folderBranchLimit(uint64(count)))
 	if err != nil {
 		return nil, err
 	}
@@ -695,24 +695,24 @@ func (r *Remote) Entries(folder Target, start uint64, count uint32) (*Entries, e
 	if err != nil {
 		return nil, err
 	}
-	if shown.Kind != FrameFolderRun {
+	if shown.Kind != FrameFolderBranch {
 		return nil, otherKind()
 	}
-	run := shown.FolderRun
-	if err := run.Check(folder); err != nil {
+	branch := shown.FolderBranch
+	if err := branch.Check(folder); err != nil {
 		return nil, err
 	}
-	if run.Count() != 0 && (run.Start() != start || uint64(len(run.Entries())) > uint64(count)) {
-		return nil, notWanted("a run that was not asked for")
+	if branch.Count() != 0 && (branch.Start() != start || uint64(len(branch.Entries())) > uint64(count)) {
+		return nil, notWanted("a branch that was not asked for")
 	}
-	return &Entries{Total: run.Count(), Start: run.Start(), Entries: run.Entries()}, nil
+	return &Entries{Total: branch.Count(), Start: branch.Start(), Entries: branch.Entries()}, nil
 }
 
 // Read writes length bytes of a file, from byte offset, to out.
 //
-// The peer shows the run of the file's list that holds the stretch, and
-// that proves each piece's number and the byte it starts at. Then the
-// pieces are asked for by their numbers, and each is checked against the
+// The peer shows the branch of the file's list that holds the stretch, and
+// that proves each chunk's number and the byte it starts at. Then the
+// chunks are asked for by their numbers, and each is checked against the
 // list before any of its bytes is written. Nothing else of the file is
 // taken.
 func (r *Remote) Read(file Target, offset, length uint64, out io.Writer) error {
@@ -723,10 +723,10 @@ func (r *Remote) Read(file Target, offset, length uint64, out io.Writer) error {
 	if end < offset || end > file.Size {
 		return invalid("a stretch of bytes is outside the file")
 	}
-	cutting := r.record.Cutting()
+	chunking := r.record.Chunking()
 	at := offset
 	for at < end {
-		frame, err := askOne(r.peer, RequestFileBytes(file.Hash, at, end-at), fileRunLimit(mostPiecesIn(cutting, end-at)))
+		frame, err := askOne(r.peer, RequestFileBytes(file.Hash, at, end-at), fileBranchLimit(mostChunksIn(chunking, end-at)))
 		if err != nil {
 			return err
 		}
@@ -734,35 +734,35 @@ func (r *Remote) Read(file Target, offset, length uint64, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if shown.Kind != FrameFileRun {
+		if shown.Kind != FrameFileBranch {
 			return otherKind()
 		}
-		run := shown.FileRun
-		runStart, err := run.CheckWithCutting(file, cutting)
+		branch := shown.FileBranch
+		branchStart, err := branch.CheckWithChunking(file, chunking)
 		if err != nil {
 			return err
 		}
-		items := run.Items()
-		// The run has to begin with the piece that holds the first byte
-		// still due, and may not reach past the piece that holds the last.
+		items := branch.Items()
+		// The branch has to begin with the chunk that holds the first byte
+		// still due, and may not reach past the chunk that holds the last.
 		var beforeLast uint64
 		longest := 0
 		for index, item := range items {
 			if index < len(items)-1 {
 				beforeLast += uint64(item.Length)
 			}
-			// No piece that is due is longer than the longest in the run.
+			// No chunk that is due is longer than the longest in the branch.
 			longest = max(longest, int(item.Length))
 		}
-		holdsFirst := runStart <= at && at < runStart+uint64(items[0].Length)
-		if !holdsFirst || runStart+beforeLast >= end {
-			return notWanted("a run that does not hold the bytes asked for")
+		holdsFirst := branchStart <= at && at < branchStart+uint64(items[0].Length)
+		if !holdsFirst || branchStart+beforeLast >= end {
+			return notWanted("a branch that does not hold the bytes asked for")
 		}
 		taken := 0
-		pieceStart := runStart
+		chunkStart := branchStart
 		refused := false
-		pieces := RequestPieces(file.Hash, run.Start(), uint32(len(items)))
-		err = r.peer.Ask(pieces.Encode(), longest+1, func(frame []byte) error {
+		chunks := RequestChunks(file.Hash, branch.Start(), uint32(len(items)))
+		err = r.peer.Ask(chunks.Encode(), longest+1, func(frame []byte) error {
 			if refused {
 				return peerError("sent more after it refused")
 			}
@@ -774,22 +774,22 @@ func (r *Remote) Read(file Target, offset, length uint64, out io.Writer) error {
 			case FrameRefused:
 				refused = true
 				return nil
-			case FramePiece:
+			case FrameChunk:
 				if taken >= len(items) {
 					return tooMuch()
 				}
 				item := items[taken]
-				if err := checkPiece(item, sent.Bytes, "a piece"); err != nil {
+				if err := checkChunk(item, sent.Bytes, "a chunk"); err != nil {
 					return err
 				}
-				pieceEnd := pieceStart + uint64(item.Length)
-				from := at - pieceStart
-				to := min(end, pieceEnd) - pieceStart
+				chunkEnd := chunkStart + uint64(item.Length)
+				from := at - chunkStart
+				to := min(end, chunkEnd) - chunkStart
 				if err := writeAll(out, sent.Bytes[from:to]); err != nil {
 					return streamError("write a file's bytes", err)
 				}
-				at = min(end, pieceEnd)
-				pieceStart = pieceEnd
+				at = min(end, chunkEnd)
+				chunkStart = chunkEnd
 				taken++
 				return nil
 			}
@@ -799,22 +799,22 @@ func (r *Remote) Read(file Target, offset, length uint64, out io.Writer) error {
 			return err
 		}
 		if taken == 0 {
-			return peerError("does not hold the pieces asked for")
+			return peerError("does not hold the chunks asked for")
 		}
 	}
 	return nil
 }
 
-// Have gives which pieces of a file the peer says it holds, one bit a
-// piece. This is what the peer says about itself: nothing proves it, and a
-// piece it claims is still checked when it comes. Only the number of pieces
+// Have gives which chunks of a file the peer says it holds, one bit a
+// chunk. This is what the peer says about itself: nothing proves it, and a
+// chunk it claims is still checked when it comes. Only the number of chunks
 // is held to what the file's size allows.
 func (r *Remote) Have(file Target) (*HaveMap, error) {
 	if err := file.require(KindFile); err != nil {
 		return nil, err
 	}
-	cutting := r.record.Cutting()
-	_, most := cutting.CountBounds(file.Size)
+	chunking := r.record.Chunking()
+	_, most := chunking.CountBounds(file.Size)
 	frame, err := askOne(r.peer, RequestHave(file.Hash), timesPlus((most+7)/8, 1, 9))
 	if err != nil {
 		return nil, err
@@ -826,7 +826,7 @@ func (r *Remote) Have(file Target) (*HaveMap, error) {
 	if shown.Kind != FrameHave {
 		return nil, otherKind()
 	}
-	if err := cutting.CheckCount(file.Size, shown.Have.Count()); err != nil {
+	if err := chunking.CheckCount(file.Size, shown.Have.Count()); err != nil {
 		return nil, err
 	}
 	return shown.Have, nil
@@ -839,7 +839,7 @@ type writtenList struct {
 }
 
 // Export writes a whole tree to out as one stream: the bundle's first
-// bytes, the record, and then every list and every piece once, each after
+// bytes, the record, and then every list and every chunk once, each after
 // what names it. Import reads it back. If out has a Flush method, as a
 // buffered writer has, it is called once the bundle is written.
 func Export(store Store, root Root, out io.Writer) error {
@@ -854,7 +854,7 @@ func Export(store Store, root Root, out io.Writer) error {
 		return err
 	}
 	lists := make(map[writtenList]bool)
-	pieces := make(map[Hash]bool)
+	chunks := make(map[Hash]bool)
 	pending := []Target{record.Top()}
 	for len(pending) > 0 {
 		target := pending[len(pending)-1]
@@ -885,15 +885,15 @@ func Export(store Store, root Root, out io.Writer) error {
 			return err
 		}
 		for _, item := range list.Items() {
-			if pieces[item.Hash] {
+			if chunks[item.Hash] {
 				continue
 			}
-			pieces[item.Hash] = true
-			kept, err := heldPiece(store, item)
+			chunks[item.Hash] = true
+			kept, err := heldChunk(store, item)
 			if err != nil {
 				return err
 			}
-			if err := WriteFrame(out, PieceFrame(kept)); err != nil {
+			if err := WriteFrame(out, ChunkFrame(kept)); err != nil {
 				return err
 			}
 		}

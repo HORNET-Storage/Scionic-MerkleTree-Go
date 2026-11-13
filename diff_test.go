@@ -38,13 +38,13 @@ func writeFiles(t *testing.T, folder string, files map[string][]byte) {
 
 func TestEachChangeIsListedOnceByItsPath(t *testing.T) {
 	folder := writeTree(t, sampleFiles())
-	options := BuildOptions{Cutting: smallPieces(t)}
+	options := BuildOptions{Chunking: smallChunks(t)}
 	store := NewMemoryStore()
 	old := must[Root](t)(Build(store, folder, options))
 	if changes := must[[]Change](t)(Diff(store, old, old)); len(changes) != 0 {
 		t.Fatalf("a tree differs from itself: %+v", changes)
 	}
-	// One piece of a file changes.
+	// One chunk of a file changes.
 	model := corpusBytes("model", 1000)
 	copy(model[320:336], corpusBytes("changed", 16))
 	// A file gets another name.
@@ -125,7 +125,7 @@ func TestEachChangeIsListedOnceByItsPath(t *testing.T) {
 	// What is the same in both trees is not read: the comparison works
 	// without the folder that did not change, and without any file.
 	store.Remove(StoredFolderList, at(new, "weights/shards").Hash())
-	for _, kind := range []Stored{StoredFileList, StoredPiece} {
+	for _, kind := range []Stored{StoredFileList, StoredChunk} {
 		for _, hash := range store.Hashes(kind) {
 			store.Remove(kind, hash)
 		}
@@ -145,7 +145,7 @@ func TestExtraDataThatChangedIsAChange(t *testing.T) {
 	store := NewMemoryStore()
 	tagged := func(tag string) Root {
 		t.Helper()
-		return must[Root](t)(BuildWith(store, folder, BuildOptions{Cutting: smallPieces(t)}, func(_, name string, _ Kind) (ExtraData, error) {
+		return must[Root](t)(BuildWith(store, folder, BuildOptions{Chunking: smallChunks(t)}, func(_, name string, _ Kind) (ExtraData, error) {
 			if name == "weights" || name == "readme.txt" {
 				return ExtraData{}.WithText("tag", tag)
 			}
@@ -172,13 +172,13 @@ func TestExtraDataThatChangedIsAChange(t *testing.T) {
 
 func TestTreesWithAFileOnTopHaveNoEntriesToCompare(t *testing.T) {
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	one := must[Target](t)(builder.FileFromBytes([]byte("one")))
 	two := must[Target](t)(builder.FileFromBytes([]byte("two")))
 	folder := must[Target](t)(builder.Folder(nil))
 	finish := func(top Target, extra ExtraData) Root {
 		t.Helper()
-		return must[Root](t)(NewBuilder(store, smallPieces(t)).Finish(top, extra))
+		return must[Root](t)(NewBuilder(store, smallChunks(t)).Finish(top, extra))
 	}
 	first, second, empty := finish(one, ExtraData{}), finish(two, ExtraData{}), finish(folder, ExtraData{})
 	// The same file under two records is the same tree to compare.
@@ -213,10 +213,10 @@ func doubled(t *testing.T, builder *Builder, content string, levels int) Target 
 
 func TestTwoSmallTreesThatDifferAtMorePlacesThanAListHoldsAreRefused(t *testing.T) {
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	finish := func(top Target) Root {
 		t.Helper()
-		return must[Root](t)(NewBuilder(store, smallPieces(t)).Finish(top, ExtraData{}))
+		return must[Root](t)(NewBuilder(store, smallChunks(t)).Finish(top, ExtraData{}))
 	}
 	// Two trees of 41 small folders each. They differ in one file, and that
 	// file has 2^40 places.
@@ -238,7 +238,7 @@ func TestTwoSmallTreesThatDifferAtMorePlacesThanAListHoldsAreRefused(t *testing.
 		t.Fatalf("a tree differs from itself at %d places", len(changes))
 	}
 	// Ten levels of it are 1,024 places, and are listed.
-	builder = NewBuilder(store, smallPieces(t))
+	builder = NewBuilder(store, smallChunks(t))
 	old, new = finish(doubled(t, builder, "old", 10)), finish(doubled(t, builder, "new", 10))
 	changes := must[[]Change](t)(Diff(store, old, new))
 	if len(changes) != 1024 || changes[0].Path != "a/a/a/a/a/a/a/a/a/a/x" || changes[1023].Path != "b/b/b/b/b/b/b/b/b/b/x" {
@@ -254,7 +254,7 @@ func TestTwoSmallTreesThatDifferAtMorePlacesThanAListHoldsAreRefused(t *testing.
 
 func TestALimitOnChangesIsHeldExactly(t *testing.T) {
 	folder := writeTree(t, sampleFiles())
-	options := BuildOptions{Cutting: smallPieces(t)}
+	options := BuildOptions{Chunking: smallChunks(t)}
 	store := NewMemoryStore()
 	old := must[Root](t)(Build(store, folder, options))
 	if err := os.Remove(filepath.Join(folder, "readme.txt")); err != nil {

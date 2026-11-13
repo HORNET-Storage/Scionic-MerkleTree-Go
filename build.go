@@ -16,24 +16,24 @@ import (
 
 const (
 	// roomAlone is how much of a file a builder holds at a time when it
-	// works alone: two pieces of the longest kind.
+	// works alone: two chunks of the longest kind.
 	roomAlone = 2 * FastCDCMaxSize
 	// roomWithHelp is how much of a file a builder holds at a time when
-	// other goroutines help it: enough pieces to give each of them some.
+	// other goroutines help it: enough chunks to give each of them some.
 	roomWithHelp = 8 * FastCDCMaxSize
-	// piecesAtATime is how many pieces of a file that lies in memory are
+	// chunksAtATime is how many chunks of a file that lies in memory are
 	// handed on at a time.
-	piecesAtATime = 64
+	chunksAtATime = 64
 	// foldersAhead is how many folders' files may wait for the goroutines
-	// that cut. A folder is kept open while it has files that are not cut
+	// that chunk. A folder is kept open while it has files that are not chunked
 	// yet, so this bounds how many folders are open at a time.
 	foldersAhead = 16
 )
 
 // helpers counts the goroutines that are free to help with a long file.
 //
-// A file is cut on the goroutine that asks for it, because where one piece
-// ends decides where the next begins. Hashing and keeping the pieces is the
+// A file is chunked on the goroutine that asks for it, because where one chunk
+// ends decides where the next begins. Hashing and keeping the chunks is the
 // greater part of the work and needs no order, so it is shared out among
 // that goroutine and the helpers that are free.
 type helpers struct {
@@ -77,30 +77,30 @@ func (h *helpers) give(count int) {
 // Builder builds a tree part by part: files from their bytes, folders from
 // their entries, and at the end the record.
 //
-// Everything goes into the store as it is made. A piece, a file or a folder
+// Everything goes into the store as it is made. A chunk, a file or a folder
 // that the store holds already is not written again.
 //
 // A builder is used by one goroutine at a time.
 type Builder struct {
-	store   Store
-	cutting Cutting
-	cutter  streamCutter
-	helpers *helpers
+	store    Store
+	chunking Chunking
+	chunker  streamChunker
+	helpers  *helpers
 }
 
 // NewBuilder makes a builder that uses one goroutine for each core on a
 // long file.
-func NewBuilder(store Store, cutting Cutting) *Builder {
-	return sharingBuilder(store, cutting, helpersForThreads(0))
+func NewBuilder(store Store, chunking Chunking) *Builder {
+	return sharingBuilder(store, chunking, helpersForThreads(0))
 }
 
-func sharingBuilder(store Store, cutting Cutting, shared *helpers) *Builder {
-	return &Builder{store: store, cutting: cutting, helpers: shared}
+func sharingBuilder(store Store, chunking Chunking, shared *helpers) *Builder {
+	return &Builder{store: store, chunking: chunking, helpers: shared}
 }
 
-// Threads sets how many goroutines hash and keep the pieces of one file: 1
+// Threads sets how many goroutines hash and keep the chunks of one file: 1
 // is the calling goroutine alone, and zero is one for each core. A file is
-// always cut on the calling goroutine. With help, a builder holds up to
+// always chunked on the calling goroutine. With help, a builder holds up to
 // 64 MiB of a long file at a time; alone it holds up to 16 MiB. It gives
 // the builder back.
 func (b *Builder) Threads(threads int) *Builder {
@@ -108,12 +108,12 @@ func (b *Builder) Threads(threads int) *Builder {
 	return b
 }
 
-// Cutting is how this builder cuts files.
-func (b *Builder) Cutting() Cutting {
-	return b.cutting
+// Chunking is how this builder chunks files.
+func (b *Builder) Chunking() Chunking {
+	return b.chunking
 }
 
-// File cuts everything reader gives into pieces, keeps the pieces and the
+// File splits everything reader gives into chunks, keeps the chunks and the
 // file's list, and says what the file is. The file is never held in memory
 // whole: only a window of it, as Threads says.
 func (b *Builder) File(reader io.Reader) (Target, error) {
@@ -127,17 +127,17 @@ func (b *Builder) File(reader io.Reader) (Target, error) {
 	})
 }
 
-// FileFromBytes is the file with these bytes. They are cut where they lie,
+// FileFromBytes is the file with these bytes. They are chunked where they lie,
 // and nothing is copied on the way to the store.
 func (b *Builder) FileFromBytes(content []byte) (Target, error) {
-	var items []PieceRef
-	pieces := b.cutting.Cut(content)
-	for len(pieces) > 0 {
-		count := min(len(pieces), piecesAtATime)
-		if err := keepPieces(b.store, b.helpers, pieces[:count], &items); err != nil {
+	var items []ChunkRef
+	chunks := b.chunking.Cut(content)
+	for len(chunks) > 0 {
+		count := min(len(chunks), chunksAtATime)
+		if err := keepChunks(b.store, b.helpers, chunks[:count], &items); err != nil {
 			return Target{}, err
 		}
-		pieces = pieces[count:]
+		chunks = chunks[count:]
 	}
 	return b.keepList(items)
 }
@@ -164,9 +164,9 @@ func (b *Builder) fileFrom(read func(buffer []byte) (int, error)) (Target, error
 	if b.helpers.any() {
 		room = roomWithHelp
 	}
-	var items []PieceRef
-	err := b.cutter.cut(b.cutting, room, read, func(pieces [][]byte) error {
-		return keepPieces(b.store, b.helpers, pieces, &items)
+	var items []ChunkRef
+	err := b.chunker.cut(b.chunking, room, read, func(chunks [][]byte) error {
+		return keepChunks(b.store, b.helpers, chunks, &items)
 	})
 	if err != nil {
 		return Target{}, err
@@ -174,9 +174,9 @@ func (b *Builder) fileFrom(read func(buffer []byte) (int, error)) (Target, error
 	return b.keepList(items)
 }
 
-// keepList keeps the list of a file whose pieces are kept, and says what
+// keepList keeps the list of a file whose chunks are kept, and says what
 // the file is.
-func (b *Builder) keepList(items []PieceRef) (Target, error) {
+func (b *Builder) keepList(items []ChunkRef) (Target, error) {
 	list, err := newFileList(items)
 	if err != nil {
 		return Target{}, err
@@ -218,15 +218,15 @@ func (b *Builder) Folder(entries []Entry) (Target, error) {
 // tree's root. The store must hold every list under top.
 //
 // The whole tree is checked before its record is kept: its sizes, how its
-// files are cut, and how deep its folders sit. The checks are the ones a
+// files are chunked, and how deep its folders sit. The checks are the ones a
 // tree goes through when it is taken in, and the totals in the record are
 // what those checks counted.
 func (b *Builder) Finish(top Target, extra ExtraData) (Root, error) {
-	totals, err := measure(b.store, top, b.cutting)
+	totals, err := measure(b.store, top, b.chunking)
 	if err != nil {
 		return Root{}, err
 	}
-	record, err := NewRecord(top, totals, b.cutting, extra)
+	record, err := NewRecord(top, totals, b.chunking, extra)
 	if err != nil {
 		return Root{}, err
 	}
@@ -238,34 +238,34 @@ func (b *Builder) Finish(top Target, extra ExtraData) (Root, error) {
 	return root, nil
 }
 
-// keepPiece hashes and keeps one piece, and says what it is. A piece that
+// keepChunk hashes and keeps one chunk, and says what it is. A chunk that
 // the store holds already is not written again.
-func keepPiece(store Store, piece []byte) (PieceRef, error) {
-	item, err := PieceRefOf(piece)
+func keepChunk(store Store, chunk []byte) (ChunkRef, error) {
+	item, err := ChunkRefOf(chunk)
 	if err != nil {
-		return PieceRef{}, err
+		return ChunkRef{}, err
 	}
-	held, err := storeHas(store, StoredPiece, item.Hash)
+	held, err := storeHas(store, StoredChunk, item.Hash)
 	if err != nil {
-		return PieceRef{}, err
+		return ChunkRef{}, err
 	}
 	if !held {
-		if err := store.Put(StoredPiece, item.Hash, piece); err != nil {
-			return PieceRef{}, err
+		if err := store.Put(StoredChunk, item.Hash, chunk); err != nil {
+			return ChunkRef{}, err
 		}
 	}
 	return item, nil
 }
 
-// keepPieces hashes and keeps pieces that follow one another in a file, and
+// keepChunks hashes and keeps chunks that follow one another in a file, and
 // adds what they are to items, in their order. Helpers that are free take a
-// share. The pieces are used only until this returns, or panics.
-func keepPieces(store Store, shared *helpers, pieces [][]byte, items *[]PieceRef) error {
-	// A helper is worth starting only for a few pieces of its own.
-	helping := shared.take(len(pieces) / 2)
+// share. The chunks are used only until this returns, or panics.
+func keepChunks(store Store, shared *helpers, chunks [][]byte, items *[]ChunkRef) error {
+	// A helper is worth starting only for a few chunks of its own.
+	helping := shared.take(len(chunks) / 2)
 	if helping == 0 {
-		for _, piece := range pieces {
-			item, err := keepPiece(store, piece)
+		for _, chunk := range chunks {
+			item, err := keepChunk(store, chunk)
 			if err != nil {
 				return err
 			}
@@ -273,23 +273,23 @@ func keepPieces(store Store, shared *helpers, pieces [][]byte, items *[]PieceRef
 		}
 		return nil
 	}
-	// What became of each piece, at the piece's place.
+	// What became of each chunk, at the chunk's place.
 	type outcome struct {
-		item PieceRef
+		item ChunkRef
 		err  error
 		done bool
 	}
-	kept := make([]outcome, len(pieces))
+	kept := make([]outcome, len(chunks))
 	var next atomic.Int64
 	work := func() {
 		for {
 			index := next.Add(1) - 1
-			if index >= int64(len(pieces)) {
+			if index >= int64(len(chunks)) {
 				return
 			}
-			item, err := keepPiece(store, pieces[index])
+			item, err := keepChunk(store, chunks[index])
 			if err != nil {
-				next.Store(int64(len(pieces)))
+				next.Store(int64(len(chunks)))
 			}
 			kept[index] = outcome{item: item, err: err, done: true}
 		}
@@ -300,20 +300,20 @@ func keepPieces(store Store, shared *helpers, pieces [][]byte, items *[]PieceRef
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			defer panics.note(func() { next.Store(int64(len(pieces))) })
+			defer panics.note(func() { next.Store(int64(len(chunks))) })
 			work()
 		}()
 	}
 	func() {
-		// The helpers read the caller's pieces, so they are waited for
+		// The helpers read the caller's chunks, so they are waited for
 		// whatever happens here, and are free again after that. If this
-		// goroutine falls over, they take no more pieces.
+		// goroutine falls over, they take no more chunks.
 		finished := false
 		defer shared.give(helping)
 		defer wait.Wait()
 		defer func() {
 			if !finished {
-				next.Store(int64(len(pieces)))
+				next.Store(int64(len(chunks)))
 			}
 		}()
 		work()
@@ -327,7 +327,7 @@ func keepPieces(store Store, shared *helpers, pieces [][]byte, items *[]PieceRef
 	}
 	for index := range kept {
 		if !kept[index].done {
-			return invariant("a piece was left out of a file")
+			return invariant("a chunk was left out of a file")
 		}
 		*items = append(*items, kept[index].item)
 	}
@@ -346,20 +346,20 @@ const (
 	LinksSkip
 )
 
-// BuildOptions says how a tree is built from disk. The zero value cuts by
+// BuildOptions says how a tree is built from disk. The zero value chunks by
 // content, on every core, and refuses links.
 type BuildOptions struct {
-	// Cutting is how files are cut. The zero value cuts them by content,
+	// Chunking is how files are chunked. The zero value chunks them by content,
 	// as every tree outside a test should be.
-	Cutting Cutting
+	Chunking Chunking
 	// Extra is extra data for the tree's record.
 	Extra ExtraData
 	// Timestamp writes the time of building into the record. Two builds of
 	// the same folder then have different roots.
 	Timestamp bool
 	// Workers is how many goroutines build the tree. Zero is one for each
-	// core. Files are cut several at once, and a goroutine that has no
-	// file of its own helps to hash the pieces of a long one.
+	// core. Files are chunked several at once, and a goroutine that has no
+	// file of its own helps to hash the chunks of a long one.
 	Workers int
 	// Links is what is done with a link or a special file.
 	Links Links
@@ -396,7 +396,7 @@ func BuildWith(store Store, path string, options BuildOptions, entryExtra EntryE
 	if err != nil {
 		return Root{}, ioError("look at", path, err)
 	}
-	builder := NewBuilder(store, options.Cutting).Threads(options.Workers)
+	builder := NewBuilder(store, options.Chunking).Threads(options.Workers)
 	if !info.IsDir() {
 		top, err := builder.FileAt(path)
 		if err != nil {
@@ -412,7 +412,7 @@ func BuildWith(store Store, path string, options BuildOptions, entryExtra EntryE
 	}
 	folders, fileTargets, err := func() ([]builtFolder, []Target, error) {
 		defer top.release()
-		return walkAndCut(store, options.Cutting, top, options.Links, options.Workers)
+		return walkAndChunk(store, options.Chunking, top, options.Links, options.Workers)
 	}()
 	if err != nil {
 		return Root{}, err
@@ -488,7 +488,7 @@ type batchFile struct {
 }
 
 // fileBatch is the files that the walk found in one folder, for the
-// goroutines to cut. The folder is held open for the batch, and each file
+// goroutines to chunk. The folder is held open for the batch, and each file
 // is opened from it by its name.
 type fileBatch struct {
 	folder *held
@@ -533,10 +533,10 @@ func changed(path string, err error) error {
 // failure's.
 var errStopped = invariant("the build was stopped")
 
-// cutFileIn cuts and keeps the file name of a folder that is held open. The
+// chunkFileIn chunks and keeps the file name of a folder that is held open. The
 // file is opened from the folder itself. Once stop is set, the file is
 // given up, however much of it is left.
-func cutFileIn(builder *Builder, folder *held, name string, stop *atomic.Bool) (Target, error) {
+func chunkFileIn(builder *Builder, folder *held, name string, stop *atomic.Bool) (Target, error) {
 	file, err := folder.openFile(name)
 	if err != nil {
 		return Target{}, changed(pathWithin(folder.path, name), err)
@@ -680,11 +680,11 @@ func walk(top *held, links Links, onFiles func(batch *fileBatch) error) ([]built
 	}
 }
 
-// waiting holds the folders whose files wait for the goroutines that cut,
+// waiting holds the folders whose files wait for the goroutines that chunk,
 // between the goroutine that walks and those goroutines.
 //
 // Nobody waits here for a goroutine that is gone. A file that cannot be
-// cut, a walk that fails and a goroutine that falls over each set failed,
+// chunked, a walk that fails and a goroutine that falls over each set failed,
 // and wake whoever waits.
 type waiting struct {
 	lock sync.Mutex
@@ -697,7 +697,7 @@ type waiting struct {
 	batches []*fileBatch
 	// over: the walk is over, and no more folders will come.
 	over bool
-	// failed: nothing more is to be cut.
+	// failed: nothing more is to be chunked.
 	failed atomic.Bool
 }
 
@@ -734,7 +734,7 @@ func (w *waiting) add(batch *fileBatch) error {
 	return nil
 }
 
-// next, for a goroutine that cuts: a folder that has files left to take,
+// next, for a goroutine that chunks: a folder that has files left to take,
 // held once more for the caller, who releases it. It gives nil when the walk
 // is over and every file is taken, or when the build has failed.
 func (w *waiting) next() *fileBatch {
@@ -762,7 +762,7 @@ func (w *waiting) next() *fileBatch {
 	}
 }
 
-// fail: nothing more is to be cut. It is set with the lock held, so that no
+// fail: nothing more is to be chunked. It is set with the lock held, so that no
 // goroutine can look, miss it, and then wait.
 func (w *waiting) fail() {
 	w.lock.Lock()
@@ -790,32 +790,32 @@ func (w *waiting) drop() {
 	w.lock.Unlock()
 }
 
-// cutFile is a file that was cut: its place among the files, and what it
+// chunkedFile is a file that was chunked: its place among the files, and what it
 // is.
-type cutFile struct {
+type chunkedFile struct {
 	index  int
 	target Target
 }
 
-// walkAndCut finds every folder and every file under top, and cuts and
+// walkAndChunk finds every folder and every file under top, and chunks and
 // keeps the files while they are found, several at once. It gives the
 // folders, and what each file is.
-func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads int) ([]builtFolder, []Target, error) {
+func walkAndChunk(store Store, chunking Chunking, top *held, links Links, threads int) ([]builtFolder, []Target, error) {
 	threads = workerCount(threads)
 	// A goroutine that has no file left gives itself up to help with the
-	// long files that are still being cut.
+	// long files that are still being chunked.
 	shared := newHelpers(0)
 	if threads == 1 {
-		// One goroutine walks and cuts in turn.
-		builder := sharingBuilder(store, cutting, shared)
+		// One goroutine walks and chunks in turn.
+		builder := sharingBuilder(store, chunking, shared)
 		var targets []Target
 		folders, _, err := walk(top, links, func(batch *fileBatch) error {
 			defer batch.folder.release()
 			for _, file := range batch.files {
 				if file.index != len(targets) {
-					return invariant("a file was cut out of its turn")
+					return invariant("a file was chunked out of its turn")
 				}
-				target, err := cutFileIn(builder, batch.folder, file.name, nil)
+				target, err := chunkFileIn(builder, batch.folder, file.name, nil)
 				if err != nil {
 					return err
 				}
@@ -829,13 +829,13 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 		return folders, targets, nil
 	}
 	queue := newWaiting()
-	done := make([][]cutFile, threads)
+	done := make([][]chunkedFile, threads)
 	failures := make([]error, threads)
 	work := func(worker int) error {
 		// With no file left, or gone, it is one more that may help with the
-		// long files that are still being cut.
+		// long files that are still being chunked.
 		defer shared.give(1)
-		builder := sharingBuilder(store, cutting, shared)
+		builder := sharingBuilder(store, chunking, shared)
 		var firstError error
 		for {
 			batch := queue.next()
@@ -851,7 +851,7 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 					if !left || queue.failed.Load() {
 						return
 					}
-					target, err := cutFileIn(builder, batch.folder, file.name, &queue.failed)
+					target, err := chunkFileIn(builder, batch.folder, file.name, &queue.failed)
 					if err != nil {
 						if firstError == nil {
 							firstError = err
@@ -859,7 +859,7 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 						queue.fail()
 						continue
 					}
-					done[worker] = append(done[worker], cutFile{index: file.index, target: target})
+					done[worker] = append(done[worker], chunkedFile{index: file.index, target: target})
 				}
 			}()
 		}
@@ -896,7 +896,7 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 			queue.end()
 		}()
 		folders, files, walkErr = walk(top, links, queue.add)
-		// A walk that failed stops the cutting too: a goroutine gives up
+		// A walk that failed stops the chunking too: a goroutine gives up
 		// the file it is on, however long that file is.
 		walked = walkErr == nil
 	}()
@@ -905,11 +905,11 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 	// goroutine that only stopped for another's failure has nothing to
 	// tell.
 	stopped := false
-	cut := 0
+	chunked := 0
 	for worker := range threads {
 		switch err := failures[worker]; {
 		case err == nil:
-			cut += len(done[worker])
+			chunked += len(done[worker])
 		case err == errStopped:
 			stopped = true
 		default:
@@ -919,7 +919,7 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 	if walkErr != nil {
 		return nil, nil, walkErr
 	}
-	if stopped || cut != files {
+	if stopped || chunked != files {
 		if stopped {
 			return nil, nil, errStopped
 		}
@@ -930,7 +930,7 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 	for worker := range threads {
 		for _, file := range done[worker] {
 			if file.index >= files || filled[file.index] {
-				return nil, nil, invariant("a file was cut twice, or out of its place")
+				return nil, nil, invariant("a file was chunked twice, or out of its place")
 			}
 			targets[file.index] = file.target
 			filled[file.index] = true

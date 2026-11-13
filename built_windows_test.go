@@ -49,7 +49,7 @@ func TestOnWindowsANameIsReadAsTheFolderListsIt(t *testing.T) {
 	}
 	for _, workers := range []int{1, 4} {
 		store := NewMemoryStore()
-		root := must[Root](t)(Build(store, filepath.Join(scratch, "tree"), BuildOptions{Cutting: smallPieces(t), Workers: workers}))
+		root := must[Root](t)(Build(store, filepath.Join(scratch, "tree"), BuildOptions{Chunking: smallChunks(t), Workers: workers}))
 		for _, name := range files {
 			entry, found, err := Lookup(store, root, name)
 			if err != nil || !found {

@@ -120,7 +120,7 @@ func TestAStreamThatFailsHasFailedWhereverItFails(t *testing.T) {
 	if _, err := ReadFrame(greedyReader{}, 16); !errors.Is(err, ErrStream) || !errors.Is(err, ErrInvariant) {
 		t.Fatalf("a reader that gives more than it was asked for: %v", err)
 	}
-	if _, err := NewBuilder(NewMemoryStore(), smallPieces(t)).File(greedyReader{}); !errors.Is(err, ErrInvariant) {
+	if _, err := NewBuilder(NewMemoryStore(), smallChunks(t)).File(greedyReader{}); !errors.Is(err, ErrInvariant) {
 		t.Fatalf("a reader that gives more than it was asked for, as a file: %v", err)
 	}
 	// An error that only wraps the end of a stream is an error, and not the
@@ -135,7 +135,7 @@ func TestAStreamThatFailsHasFailedWhereverItFails(t *testing.T) {
 	}
 	store := NewMemoryStore()
 	cutOff := &scriptedReader{steps: []readStep{{give: corpusBytes("cut-off", 100)}, {err: wrapped}}}
-	if _, err := NewBuilder(store, smallPieces(t)).File(cutOff); !errors.Is(err, ErrStream) || store.Count(StoredFileList) != 0 {
+	if _, err := NewBuilder(store, smallChunks(t)).File(cutOff); !errors.Is(err, ErrStream) || store.Count(StoredFileList) != 0 {
 		t.Fatalf("a file whose reader was cut off: %v", err)
 	}
 }

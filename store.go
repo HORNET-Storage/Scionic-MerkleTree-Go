@@ -8,9 +8,9 @@ import (
 
 // Where a tree's parts are kept.
 //
-// A store keeps four kinds of thing, each found by its hash: pieces, the
+// A store keeps four kinds of thing, each found by its hash: chunks, the
 // lists of files, the lists of folders, and records. Because a thing's hash
-// covers only what the thing is, a piece, a file or a folder that occurs in
+// covers only what the thing is, a chunk, a file or a folder that occurs in
 // many trees is kept once.
 //
 // A store checks nothing: it keeps what it is given under the hash it is
@@ -21,8 +21,8 @@ import (
 type Stored uint8
 
 const (
-	// StoredPiece is a piece's bytes, under the SHA-256 of them.
-	StoredPiece Stored = iota + 1
+	// StoredChunk is a chunk's bytes, under the SHA-256 of them.
+	StoredChunk Stored = iota + 1
 	// StoredFileList is a file's whole list, under the file's hash.
 	StoredFileList
 	// StoredFolderList is a folder's whole list, under the folder's hash.
@@ -33,8 +33,8 @@ const (
 
 func (s Stored) String() string {
 	switch s {
-	case StoredPiece:
-		return "piece"
+	case StoredChunk:
+		return "chunk"
 	case StoredFileList:
 		return "file list"
 	case StoredFolderList:
@@ -51,7 +51,7 @@ func (s Stored) String() string {
 // A store that can answer without reading the bytes may also have the
 // methods of [StoreHas] and [StoreSize]. They are used when they are there.
 // A store on disk should have Size at the least: without it, seeing whether
-// a piece is there takes a read of the whole piece.
+// a chunk is there takes a read of the whole chunk.
 type Store interface {
 	// Put keeps bytes under hash. Keeping what is kept already changes
 	// nothing. The bytes are lent for the call only: a store that keeps
@@ -288,8 +288,8 @@ func loadFile(store Store, file Target) (*FileList, error) {
 	return list, nil
 }
 
-// checkPiece reports whether bytes are the piece that item names.
-func checkPiece(item PieceRef, content []byte, what string) error {
+// checkChunk reports whether bytes are the chunk that item names.
+func checkChunk(item ChunkRef, content []byte, what string) error {
 	if uint64(len(content)) != uint64(item.Length) {
 		return sizeMismatch(what, uint64(item.Length), uint64(len(content)))
 	}
@@ -299,20 +299,20 @@ func checkPiece(item PieceRef, content []byte, what string) error {
 	return nil
 }
 
-// loadPiece gives the bytes of the piece that item names, read from the
-// store and checked. Bytes that do not hash to the piece's hash are damaged.
+// loadChunk gives the bytes of the chunk that item names, read from the
+// store and checked. Bytes that do not hash to the chunk's hash are damaged.
 // Bytes that do, and are not as many as the item says, show that the item is
-// wrong. It gives false when the store does not hold the piece.
-func loadPiece(store Store, item PieceRef) ([]byte, bool, error) {
-	kept, found, err := store.Get(StoredPiece, item.Hash)
+// wrong. It gives false when the store does not hold the chunk.
+func loadChunk(store Store, item ChunkRef) ([]byte, bool, error) {
+	kept, found, err := store.Get(StoredChunk, item.Hash)
 	if err != nil || !found {
 		return nil, false, err
 	}
 	if HashOf(kept) != item.Hash {
-		return nil, false, corrupt("a stored piece", item.Hash)
+		return nil, false, corrupt("a stored chunk", item.Hash)
 	}
 	if uint64(len(kept)) != uint64(item.Length) {
-		return nil, false, sizeMismatch("a stored piece", uint64(item.Length), uint64(len(kept)))
+		return nil, false, sizeMismatch("a stored chunk", uint64(item.Length), uint64(len(kept)))
 	}
 	return kept, true, nil
 }

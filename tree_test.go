@@ -188,7 +188,7 @@ func TestTheSameItemsInAnotherOrderOrNumberGiveAnotherTop(t *testing.T) {
 		t.Fatal("a list in another order is the same list")
 	}
 	// The same leaves as a folder's entries are another thing than as a
-	// file's pieces.
+	// file's chunks.
 	file := fileLeaves(4)
 	folder := sortedFolder(4)
 	if must[node](t)(topOf(fileTree, file)).hash == must[node](t)(topOf(folderTree, folder)).hash {
@@ -208,7 +208,7 @@ func TestAFolderListOutOfOrderOrWithANameTwiceHasNoHash(t *testing.T) {
 	}
 }
 
-func TestEveryRunOfEveryListOpensAndRebuildsToTheTop(t *testing.T) {
+func TestEveryBranchOfEveryListOpensAndRebuildsToTheTop(t *testing.T) {
 	for _, of := range bothKinds {
 		for count := 1; count <= 33; count++ {
 			leaves := of.list(count)
@@ -218,14 +218,14 @@ func TestEveryRunOfEveryListOpensAndRebuildsToTheTop(t *testing.T) {
 				for end := start + 1; end <= count; end++ {
 					what := fmt.Sprintf("%s of %d, %d up to %d", of.name, count, start, end)
 					nodes := must[[]carried](t)(tree.open(uint64(start), uint64(end)))
-					result, err := checkOpening(of.kind, uint64(count), uint64(start), leaves[start:end], nodes)
+					result, err := checkBranch(of.kind, uint64(count), uint64(start), leaves[start:end], nodes)
 					if err != nil {
 						t.Fatalf("%s: %v", what, err)
 					}
 					if result.top != top || result.offset != sizeBefore(leaves, start) {
 						t.Fatalf("%s rebuilds to another top, or begins at another byte", what)
 					}
-					// An opening carries a node for each run it leaves out,
+					// A branch carries a node for each stretch of the list it leaves out,
 					// and never more than two for a level.
 					if len(nodes) > 2*6 || (start == 0 && end == count && len(nodes) != 0) {
 						t.Fatalf("%s carries %d nodes", what, len(nodes))
@@ -236,19 +236,19 @@ func TestEveryRunOfEveryListOpensAndRebuildsToTheTop(t *testing.T) {
 	}
 }
 
-func TestAnOpeningThatIsChangedDoesNotRebuildToTheTop(t *testing.T) {
+func TestABranchThatIsChangedDoesNotRebuildToTheTop(t *testing.T) {
 	leaves := fileLeaves(11)
 	tree := must[*listTree](t)(buildListTree(fileTree, leaves))
 	top := must[node](t)(tree.top())
 	nodes := must[[]carried](t)(tree.open(4, 6))
-	// rebuilds says whether an opening rebuilds to the top, and whether it
+	// rebuilds says whether a branch rebuilds to the top, and whether it
 	// is refused before that.
 	rebuilds := func(count, start uint64, opened []leaf, nodes []carried) (toTheTop, refused bool) {
-		result, err := checkOpening(fileTree, count, start, opened, nodes)
+		result, err := checkBranch(fileTree, count, start, opened, nodes)
 		return err == nil && result.top == top, err != nil
 	}
 	if toTheTop, _ := rebuilds(11, 4, leaves[4:6], nodes); !toTheTop {
-		t.Fatal("the opening as it was made does not rebuild to the top")
+		t.Fatal("the branch as it was made does not rebuild to the top")
 	}
 	notTheTop := func(what string, count, start uint64, opened []leaf, nodes []carried) {
 		t.Helper()
@@ -282,7 +282,7 @@ func TestAnOpeningThatIsChangedDoesNotRebuildToTheTop(t *testing.T) {
 		notTheTop(fmt.Sprintf("carried node %d with another hash", at), 11, 4, leaves[4:6], wrongHash)
 	}
 	if len(nodes) < 2 {
-		t.Fatalf("the opening carries %d nodes", len(nodes))
+		t.Fatalf("the branch carries %d nodes", len(nodes))
 	}
 	swapped := slices.Clone(nodes)
 	swapped[0], swapped[1] = swapped[1], swapped[0]
@@ -308,7 +308,7 @@ func TestAListsTreeHasNoPlaceBeyondItsCount(t *testing.T) {
 		leaves := fileLeaves(int(count))
 		tree := must[*listTree](t)(buildListTree(fileTree, leaves))
 		nodes := must[[]carried](t)(tree.open(count-1, count))
-		if _, err := checkOpening(fileTree, count, count, leaves[count-1:], nodes); err == nil {
+		if _, err := checkBranch(fileTree, count, count, leaves[count-1:], nodes); err == nil {
 			t.Fatalf("the last of %d items is shown again at the place after it", count)
 		}
 		if _, err := tree.open(count, count+1); err == nil {
@@ -336,8 +336,8 @@ func TestSizesThatDoNotFitAreAnError(t *testing.T) {
 	for at := range nodes {
 		nodes[at].node.size = math.MaxUint64
 	}
-	if _, err := checkOpening(fileTree, 4, 3, four[3:], nodes); err == nil {
-		t.Fatal("sizes that do not fit were added in an opening")
+	if _, err := checkBranch(fileTree, 4, 3, four[3:], nodes); err == nil {
+		t.Fatal("sizes that do not fit were added in a branch")
 	}
 }
 
@@ -404,10 +404,10 @@ func TestAFolderBuiltOutOfOrderCannotShowOneNameAtTwoPlaces(t *testing.T) {
 				if err == nil && result.top == top {
 					answers = append(answers, answer{index, present})
 				}
-				// An entry with this name that is shown as a plain opening
+				// An entry with this name that is shown as a plain branch
 				// passes only at the place a search would reach.
 				if entry.name == name {
-					plain, err := checkOpening(folderTree, uint64(count), uint64(index), []leaf{entry}, nodes)
+					plain, err := checkBranch(folderTree, uint64(count), uint64(index), []leaf{entry}, nodes)
 					opens := err == nil && plain.top == top
 					foundHere := len(answers) > 0 && answers[len(answers)-1] == (answer{index, true})
 					if opens != foundHere {
@@ -430,18 +430,18 @@ func TestAFolderBuiltOutOfOrderCannotShowOneNameAtTwoPlaces(t *testing.T) {
 	}
 }
 
-func TestRunsOfAFolderBuiltOutOfOrderOpenOnlyWhereASearchAgrees(t *testing.T) {
+func TestBranchesOfAFolderBuiltOutOfOrderOpenOnlyWhereASearchAgrees(t *testing.T) {
 	// "c" sits left of a fork named "b": it cannot be shown, alone or in a
-	// run, and a search for it is sent to "b", which says it is missing.
+	// branch, and a search for it is sent to "b", which says it is missing.
 	leaves := folderLeaves("a", "c", "b", "d")
 	tree := must[*listTree](t)(listTreeOf(folderTree, leaves))
 	top := must[node](t)(tree.top())
 	opens := func(start, end int) bool {
 		nodes := must[[]carried](t)(tree.open(uint64(start), uint64(end)))
-		result, err := checkOpening(folderTree, 4, uint64(start), leaves[start:end], nodes)
+		result, err := checkBranch(folderTree, 4, uint64(start), leaves[start:end], nodes)
 		return err == nil && result.top == top
 	}
-	for _, run := range []struct {
+	for _, branch := range []struct {
 		what       string
 		start, end int
 		opens      bool
@@ -456,8 +456,8 @@ func TestRunsOfAFolderBuiltOutOfOrderOpenOnlyWhereASearchAgrees(t *testing.T) {
 		{"c, b and d", 1, 4, false},
 		{"the whole list", 0, 4, false},
 	} {
-		if opens(run.start, run.end) != run.opens {
-			t.Fatalf("%s opens: %v", run.what, !run.opens)
+		if opens(branch.start, branch.end) != branch.opens {
+			t.Fatalf("%s opens: %v", branch.what, !branch.opens)
 		}
 	}
 	nodes := must[[]carried](t)(tree.open(2, 3))
@@ -479,12 +479,12 @@ func TestACarriedNameIsHeldToTheForkItEnters(t *testing.T) {
 	tree := must[*listTree](t)(buildListTree(folderTree, leaves))
 	top := must[node](t)(tree.top())
 	nodes := must[[]carried](t)(tree.open(1, 2))
-	if honest := must[shown](t)(checkOpening(folderTree, 8, 1, leaves[1:2], nodes)); honest.top != top {
-		t.Fatal("the opening as it was made does not rebuild to the top")
+	if honest := must[shown](t)(checkBranch(folderTree, 8, 1, leaves[1:2], nodes)); honest.top != top {
+		t.Fatal("the branch as it was made does not rebuild to the top")
 	}
 	last := len(nodes) - 1
 	nodes[last].firstName = "name-9999"
-	if forged, err := checkOpening(folderTree, 8, 1, leaves[1:2], nodes); err == nil && forged.top == top {
+	if forged, err := checkBranch(folderTree, 8, 1, leaves[1:2], nodes); err == nil && forged.top == top {
 		t.Fatal("a carried node under another name rebuilds to the top")
 	}
 }
@@ -499,7 +499,7 @@ func TestAFilesTreeCarriesNoNames(t *testing.T) {
 		}
 	}
 	nodes[0].firstName = "x"
-	if _, err := checkOpening(fileTree, 4, 0, leaves[:1], nodes); err == nil {
+	if _, err := checkBranch(fileTree, 4, 0, leaves[:1], nodes); err == nil {
 		t.Fatal("a node of a file's tree was taken with a name")
 	}
 }
@@ -517,11 +517,11 @@ func TestTheCarriedNodeThatBeginsAFoldersListHasNoName(t *testing.T) {
 			for end := start + 1; end <= count; end++ {
 				nodes := must[[]carried](t)(tree.open(uint64(start), uint64(end)))
 				rebuilds := func(nodes []carried) bool {
-					result, err := checkOpening(folderTree, uint64(count), uint64(start), leaves[start:end], nodes)
+					result, err := checkBranch(folderTree, uint64(count), uint64(start), leaves[start:end], nodes)
 					return err == nil && result.top == top
 				}
 				if !rebuilds(nodes) {
-					t.Fatalf("%d entries, %d up to %d: the opening does not rebuild to the top", count, start, end)
+					t.Fatalf("%d entries, %d up to %d: the branch does not rebuild to the top", count, start, end)
 				}
 				for index := range nodes {
 					what := fmt.Sprintf("%d entries, %d up to %d, carried node %d", count, start, end, index)

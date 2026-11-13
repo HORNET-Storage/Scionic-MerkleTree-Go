@@ -35,7 +35,7 @@ func writeTreeAt(t *testing.T, top string, files map[string][]byte) string {
 }
 
 func smallOptions(t *testing.T) BuildOptions {
-	return BuildOptions{Cutting: smallPieces(t)}
+	return BuildOptions{Chunking: smallChunks(t)}
 }
 
 func TestAFolderHasTheSameRootWhereverItIsAndWhateverItIsCalled(t *testing.T) {
@@ -76,7 +76,7 @@ func TestTheRootIsWhatTheFormatSaysItIs(t *testing.T) {
 		t.Fatal("the sizes by the rules are not the sizes of what was written")
 	}
 	listBytes := uint64(36 + 3*36 + len(oracleFolderListBytes(sub)) + len(oracleFolderListBytes(tree)))
-	record := oracleRecordBytes(2, 45, topFolder.hash, [3]uint64{4, 45, listBytes}, oracleCutTag("fixed-16"))
+	record := oracleRecordBytes(2, 45, topFolder.hash, [3]uint64{4, 45, listBytes}, oracleChunkingTag("fixed-16"))
 	if root.Hash() != oracleSHA(record) {
 		t.Fatalf("the root is %x, and by the rules it is %x", root.Hash(), oracleSHA(record))
 	}
@@ -91,20 +91,20 @@ func TestTheRootIsWhatTheFormatSaysItIs(t *testing.T) {
 		{"the folder's list", StoredFolderList, subFolder.hash, oracleFolderListBytes(sub)},
 		{"a file's list", StoredFileList, bFile.hash, oracleFileListBytes(bItems)},
 		{"the empty file's list", StoredFileList, emptyFile.hash, nil},
-		{"a file's last piece", StoredPiece, bItems[2].hash, b[32:]},
-		{"a file's only piece", StoredPiece, aItems[0].hash, a},
+		{"a file's last chunk", StoredChunk, bItems[2].hash, b[32:]},
+		{"a file's only chunk", StoredChunk, aItems[0].hash, a},
 	} {
 		kept, held, err := store.Get(want.kind, want.hash)
 		if err != nil || !held || !bytes.Equal(kept, want.content) {
 			t.Fatalf("%s: held: %v, %x (%v)", want.what, held, kept, err)
 		}
 	}
-	// A piece's hash is the plain SHA-256 of its bytes.
+	// A chunk's hash is the plain SHA-256 of its bytes.
 	if got := HashOf(a).Hex(); got != "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824" {
 		t.Fatal(got)
 	}
 	// Nothing else is in the store: the record, two folders, three files
-	// and four pieces.
+	// and four chunks.
 	if len(contentsOf(store)) != 1+2+3+4 {
 		t.Fatalf("the store holds %d things", len(contentsOf(store)))
 	}
@@ -112,7 +112,7 @@ func TestTheRootIsWhatTheFormatSaysItIs(t *testing.T) {
 
 func TestIdenticalThingsAreStoredOnce(t *testing.T) {
 	store, root := sampleTree(t)
-	// Two names, one file: the same hash, one list, and its pieces once.
+	// Two names, one file: the same hash, one list, and its chunks once.
 	model, _, _ := Lookup(store, root, "weights/model.bin")
 	copied, found, err := Lookup(store, root, "weights/copy-of-model.bin")
 	if err != nil || !found || model.Hash() != copied.Hash() || model.Target() != copied.Target() {
@@ -124,16 +124,16 @@ func TestIdenticalThingsAreStoredOnce(t *testing.T) {
 	if !slices.Equal(counts, []uint64{6, 5, 6, 5, 1}) {
 		t.Fatalf("%v", counts)
 	}
-	// 12, 1,000, 100, 33 and 32 bytes in pieces of 16.
-	if totals.Pieces != 1+63+7+3+2 || totals.PieceBytes != 12+1000+100+33+32 {
+	// 12, 1,000, 100, 33 and 32 bytes in chunks of 16.
+	if totals.Chunks != 1+63+7+3+2 || totals.ChunkBytes != 12+1000+100+33+32 {
 		t.Fatalf("%+v", totals)
 	}
-	if uint64(store.Count(StoredPiece)) != totals.Pieces || store.Bytes(StoredPiece) != totals.PieceBytes ||
+	if uint64(store.Count(StoredChunk)) != totals.Chunks || store.Bytes(StoredChunk) != totals.ChunkBytes ||
 		store.Bytes(StoredFileList)+store.Bytes(StoredFolderList) != totals.ListBytes {
 		t.Fatal("the record's totals are not what the store holds")
 	}
 	// The tree's size counts the file under both of its names.
-	if top := summary.Record.Top(); top.Size != totals.PieceBytes+1000 || top.Kind != KindFolder {
+	if top := summary.Record.Top(); top.Size != totals.ChunkBytes+1000 || top.Kind != KindFolder {
 		t.Fatalf("%+v", top)
 	}
 }
@@ -143,10 +143,10 @@ func TestASecondTreeAddsOnlyWhatIsNew(t *testing.T) {
 	store := NewMemoryStore()
 	first := must[Root](t)(Build(store, folder, smallOptions(t)))
 	count := func() [3]int {
-		return [3]int{store.Count(StoredPiece), store.Count(StoredFileList), store.Count(StoredFolderList)}
+		return [3]int{store.Count(StoredChunk), store.Count(StoredFileList), store.Count(StoredFolderList)}
 	}
 	before := count()
-	// One piece of one file changes, and another file gets a new name.
+	// One chunk of one file changes, and another file gets a new name.
 	model := corpusBytes("model", 1000)
 	copy(model[320:336], corpusBytes("changed", 16))
 	writeFiles(t, folder, map[string][]byte{"weights/model.bin": model})
@@ -157,7 +157,7 @@ func TestASecondTreeAddsOnlyWhatIsNew(t *testing.T) {
 	if first == second {
 		t.Fatal("a folder that changed has the same root")
 	}
-	// One new piece. One new list for the changed file: the renamed file is
+	// One new chunk. One new list for the changed file: the renamed file is
 	// the same file. Two new folders: the one that holds the change, and
 	// the top, which holds both.
 	if after := count(); after != [3]int{before[0] + 1, before[1] + 1, before[2] + 2} {
@@ -187,45 +187,45 @@ func TestASecondTreeAddsOnlyWhatIsNew(t *testing.T) {
 	}
 }
 
-func TestAFileThatRepeatsAPieceReadsBackWhole(t *testing.T) {
+func TestAFileThatRepeatsAChunkReadsBackWhole(t *testing.T) {
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	x, y := corpusBytes("x", 16), corpusBytes("y", 16)
 	content := joined(x, y, x)
 	file := must[Target](t)(builder.FileFromBytes(content))
 	list := fileListOf(t, store, file)
-	if store.Count(StoredPiece) != 2 || list.Count() != 3 || list.Items()[0] != list.Items()[2] {
-		t.Fatal("a piece that comes twice is not kept once and listed twice")
+	if store.Count(StoredChunk) != 2 || list.Count() != 3 || list.Items()[0] != list.Items()[2] {
+		t.Fatal("a chunk that comes twice is not kept once and listed twice")
 	}
 	if read := must[[]byte](t)(ReadFileBytes(store, file)); !bytes.Equal(read, content) {
 		t.Fatal("the file does not read back")
 	}
 	// Each of the three places is shown on its own, at its own byte.
 	for place := range uint64(3) {
-		run := must[*FileRun](t)(list.Open(place, place+1))
-		if at, err := run.CheckWithCutting(file, smallPieces(t)); err != nil || at != place*16 {
+		branch := must[*FileBranch](t)(list.Open(place, place+1))
+		if at, err := branch.CheckWithChunking(file, smallChunks(t)); err != nil || at != place*16 {
 			t.Fatal(place, at, err)
 		}
 	}
 	root := must[Root](t)(builder.Finish(file, ExtraData{}))
 	summary := must[*Summary](t)(Verify(store, root))
-	if summary.Record.Top().Size != 48 || summary.Record.Totals() != (Totals{Pieces: 2, PieceBytes: 32, ListBytes: 108}) {
+	if summary.Record.Top().Size != 48 || summary.Record.Totals() != (Totals{Chunks: 2, ChunkBytes: 32, ListBytes: 108}) {
 		t.Fatalf("%+v", summary.Record.Totals())
 	}
 }
 
-func TestTheSamePieceInTwoFilesIsOnePiece(t *testing.T) {
+func TestTheSameChunkInTwoFilesIsOneChunk(t *testing.T) {
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	shared := corpusBytes("shared", 16)
 	first := must[Target](t)(builder.FileFromBytes(joined(shared, corpusBytes("first", 10))))
 	second := must[Target](t)(builder.FileFromBytes(joined(corpusBytes("second", 16), shared)))
-	if first.Hash == second.Hash || store.Count(StoredPiece) != 3 {
-		t.Fatal("a piece that two files share is kept twice")
+	if first.Hash == second.Hash || store.Count(StoredChunk) != 3 {
+		t.Fatal("a chunk that two files share is kept twice")
 	}
 	top := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "second", second), plainEntry(t, "first", first)}))
 	root := must[Root](t)(builder.Finish(top, ExtraData{}))
-	if totals := must[*Summary](t)(Verify(store, root)).Record.Totals(); totals.Pieces != 3 || totals.PieceBytes != 42 {
+	if totals := must[*Summary](t)(Verify(store, root)).Record.Totals(); totals.Chunks != 3 || totals.ChunkBytes != 42 {
 		t.Fatalf("%+v", totals)
 	}
 	// The builder sorted the entries by name.
@@ -249,7 +249,7 @@ func TestBuildingWithSeveralWorkersGivesTheSameTree(t *testing.T) {
 	var roots []Root
 	for _, workers := range []int{1, 2, 7, 0} {
 		store := NewMemoryStore()
-		roots = append(roots, must[Root](t)(Build(store, top, BuildOptions{Cutting: smallPieces(t), Workers: workers})))
+		roots = append(roots, must[Root](t)(Build(store, top, BuildOptions{Chunking: smallChunks(t), Workers: workers})))
 		stores = append(stores, store)
 	}
 	for at, store := range stores {
@@ -260,8 +260,8 @@ func TestBuildingWithSeveralWorkersGivesTheSameTree(t *testing.T) {
 	}
 }
 
-func TestFilesAreCutByContentUnlessATestSaysOtherwise(t *testing.T) {
-	// A case of the committed cutting vectors: 3 MiB, cut after 2,118,489.
+func TestFilesAreChunkedByContentUnlessATestSaysOtherwise(t *testing.T) {
+	// A case of the committed chunking vectors: 3 MiB, cut after 2,118,489.
 	data := corpusBytes("scionic-fastcdc-v1:corpus:random_3mib", 3<<20)
 	path := filepath.Join(t.TempDir(), "random.bin")
 	if err := os.WriteFile(path, data, 0o666); err != nil {
@@ -270,17 +270,17 @@ func TestFilesAreCutByContentUnlessATestSaysOtherwise(t *testing.T) {
 	store := NewMemoryStore()
 	root := must[Root](t)(Build(store, path, BuildOptions{}))
 	record := must[*Record](t)(RecordOf(store, root))
-	if tag, _ := record.Extra().Text(CuttingKey); record.Cutting() != FastCDCV1 || tag != "fastcdc-v1" || record.Extra().Len() != 1 || record.Top().Kind != KindFile {
-		t.Fatalf("the record says the tree was cut as %q", tag)
+	if tag, _ := record.Extra().Text(ChunkingKey); record.Chunking() != FastCDCV1 || tag != "fastcdc-v1" || record.Extra().Len() != 1 || record.Top().Kind != KindFile {
+		t.Fatalf("the record says the tree was chunked as %q", tag)
 	}
 	var lengths []uint32
 	for _, item := range fileListOf(t, store, record.Top()).Items() {
 		lengths = append(lengths, item.Length)
 	}
 	if !slices.Equal(lengths, []uint32{2_118_489, 3<<20 - 2_118_489}) {
-		t.Fatalf("the file was cut into %v", lengths)
+		t.Fatalf("the file was split into %v", lengths)
 	}
-	must[*Summary](t)(VerifyWith(store, root, VerifyOptions{Recut: true}))
+	must[*Summary](t)(VerifyWith(store, root, VerifyOptions{Rechunk: true}))
 	// The same bytes, by the builder that is given bytes: the same file.
 	if file := must[Target](t)(NewBuilder(NewMemoryStore(), FastCDCV1).FileFromBytes(data)); file != record.Top() {
 		t.Fatal("the same bytes in memory are another file than on disk")
@@ -293,14 +293,14 @@ func TestTheRecordCarriesWhatTheBuilderWasTold(t *testing.T) {
 	plain := must[Root](t)(Build(plainStore, folder, smallOptions(t)))
 	store := NewMemoryStore()
 	extra := must[ExtraData](t)(ExtraData{}.WithText("name", "my model"))
-	extra = must[ExtraData](t)(extra.WithText(CuttingKey, "not for a caller to say"))
-	root := must[Root](t)(Build(store, folder, BuildOptions{Cutting: smallPieces(t), Extra: extra, Timestamp: true}))
+	extra = must[ExtraData](t)(extra.WithText(ChunkingKey, "not for a caller to say"))
+	root := must[Root](t)(Build(store, folder, BuildOptions{Chunking: smallChunks(t), Extra: extra, Timestamp: true}))
 	if root == plain {
 		t.Fatal("a record with more in it has the same root")
 	}
 	record := must[*Record](t)(RecordOf(store, root))
 	name, _ := record.Extra().Text("name")
-	tag, _ := record.Extra().Text(CuttingKey)
+	tag, _ := record.Extra().Text(ChunkingKey)
 	stamp, stamped := record.Extra().Text(TimestampKey)
 	if name != "my model" || tag != "fixed-16" {
 		t.Fatalf("the record says %q and %q", name, tag)
@@ -338,7 +338,7 @@ func TestEveryEntryCanBeGivenExtraData(t *testing.T) {
 		t.Fatal("entries with extra data have the same root")
 	}
 	slices.Sort(seen)
-	want := []string{"a.bin", "b.bin", "copy-of-model.bin", "data", "empty.bin", "exactly-two-pieces.bin", "model.bin", "nothing-here", "readme.txt", "shards", "weights"}
+	want := []string{"a.bin", "b.bin", "copy-of-model.bin", "data", "empty.bin", "exactly-two-chunks.bin", "model.bin", "nothing-here", "readme.txt", "shards", "weights"}
 	if !slices.Equal(seen, want) {
 		t.Fatalf("%v", seen)
 	}
@@ -405,19 +405,19 @@ func TestALinkIsNeverFollowed(t *testing.T) {
 	secret := HashOf([]byte("not part of the folder"))
 	for _, workers := range []int{1, 4} {
 		store := NewMemoryStore()
-		_, err := Build(store, folder, BuildOptions{Cutting: smallPieces(t), Workers: workers})
+		_, err := Build(store, folder, BuildOptions{Chunking: smallChunks(t), Workers: workers})
 		var told *Error
 		if !errors.Is(err, ErrUnsupportedEntry) || !errors.As(err, &told) || told.Path != link || told.What != "a link" {
 			t.Fatalf("a link was not refused: %v", err)
 		}
-		root := must[Root](t)(Build(store, folder, BuildOptions{Cutting: smallPieces(t), Workers: workers, Links: LinksSkip}))
+		root := must[Root](t)(Build(store, folder, BuildOptions{Chunking: smallChunks(t), Workers: workers, Links: LinksSkip}))
 		if _, found, err := Lookup(store, root, "link.txt"); err != nil || found {
 			t.Fatal(found, err)
 		}
 		if _, found, err := Lookup(store, root, "inside.txt"); err != nil || !found {
 			t.Fatal(found, err)
 		}
-		if held, _ := store.Has(StoredPiece, secret); held {
+		if held, _ := store.Has(StoredChunk, secret); held {
 			t.Fatal("what the link leads to was read")
 		}
 	}
@@ -426,11 +426,11 @@ func TestALinkIsNeverFollowed(t *testing.T) {
 		return
 	}
 	store := NewMemoryStore()
-	root := must[Root](t)(Build(store, folder, BuildOptions{Cutting: smallPieces(t), Links: LinksSkip}))
+	root := must[Root](t)(Build(store, folder, BuildOptions{Chunking: smallChunks(t), Links: LinksSkip}))
 	if summary := must[*Summary](t)(Verify(store, root)); summary.Folders != 1 || summary.Files != 1 {
 		t.Fatalf("%+v", summary)
 	}
-	if held, _ := store.Has(StoredPiece, secret); held {
+	if held, _ := store.Has(StoredChunk, secret); held {
 		t.Fatal("what the link leads to was read")
 	}
 }
@@ -438,7 +438,7 @@ func TestALinkIsNeverFollowed(t *testing.T) {
 func TestAFolderInside128OthersIsTooDeep(t *testing.T) {
 	// Made by hand: a path that long does not fit on every system.
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	file := must[Target](t)(builder.FileFromBytes([]byte("at the bottom")))
 	inner := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "file", file)}))
 	for range 127 {
@@ -462,7 +462,7 @@ func TestAFolderInside128OthersIsTooDeep(t *testing.T) {
 	// 100 folders sit one inside the other. The top reaches them directly,
 	// under near, and again under far, with more folders on the way.
 	hundredDeep := func(wrapped int) (Root, error) {
-		builder := NewBuilder(store, smallPieces(t))
+		builder := NewBuilder(store, smallChunks(t))
 		hundred := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "file", file)}))
 		for range 99 {
 			hundred = must[Target](t)(builder.Folder([]Entry{plainEntry(t, "d", hundred)}))
@@ -492,7 +492,7 @@ func TestAFolderOnDiskThatIsTooDeepIsNotBuilt(t *testing.T) {
 		t.Skipf("this system would not make a path that long: %v", err)
 	}
 	for _, workers := range []int{1, 4} {
-		_, err := Build(NewMemoryStore(), top, BuildOptions{Cutting: smallPieces(t), Workers: workers})
+		_, err := Build(NewMemoryStore(), top, BuildOptions{Chunking: smallChunks(t), Workers: workers})
 		var told *Error
 		if !errors.Is(err, ErrTooDeep) || !errors.As(err, &told) || told.Limit != 128 {
 			t.Fatalf("%d workers: %v", workers, err)

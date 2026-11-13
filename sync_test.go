@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// Syncing by file hash and piece number: a whole tree into a store, parts
+// Syncing by file hash and chunk number: a whole tree into a store, parts
 // of a tree straight from a peer, and a tree as one stream.
 
 func TestATreeIsFetchedWholeIntoAnEmptyStore(t *testing.T) {
@@ -20,16 +20,16 @@ func TestATreeIsFetchedWholeIntoAnEmptyStore(t *testing.T) {
 	if !sameSummary(summary, must[*Summary](t)(Verify(dest, root))) || !sameStores(dest, source) {
 		t.Fatal("what was fetched is not what was held")
 	}
-	// Each thing came once: the record, 5 folders, 6 files, 76 pieces.
-	got := []int{peer.wire.framesOf(FrameRecord), peer.wire.framesOf(FrameFolderList), peer.wire.framesOf(FrameFileList), peer.wire.framesOf(FramePiece), len(peer.wire.frames)}
+	// Each thing came once: the record, 5 folders, 6 files, 76 chunks.
+	got := []int{peer.wire.framesOf(FrameRecord), peer.wire.framesOf(FrameFolderList), peer.wire.framesOf(FrameFileList), peer.wire.framesOf(FrameChunk), len(peer.wire.frames)}
 	if !slices.Equal(got, []int{1, 5, 6, 76, 88}) || summary.Folders != 5 || summary.Files != 6 {
 		t.Fatalf("the frames that came: %v", got)
 	}
 	// From the top down. The record is asked for first, a list only once
-	// the list that names it is in, and pieces only by their file's hash
+	// the list that names it is in, and chunks only by their file's hash
 	// and their numbers in it.
 	known := []Hash{root.Hash()}
-	askedPieces := uint32(0)
+	askedChunks := uint32(0)
 	for _, request := range peer.wire.requests {
 		asked := must[Request](t)(DecodeRequest(request))
 		if asked.Kind != AskRecord && !slices.Contains(known, asked.Hash) {
@@ -46,8 +46,8 @@ func TestATreeIsFetchedWholeIntoAnEmptyStore(t *testing.T) {
 				known = append(known, entry.Hash())
 			}
 		case AskFile:
-		case AskPieces:
-			askedPieces += asked.Count
+		case AskChunks:
+			askedChunks += asked.Count
 		default:
 			t.Fatalf("a whole tree is not fetched by %#x", byte(asked.Kind))
 		}
@@ -55,41 +55,41 @@ func TestATreeIsFetchedWholeIntoAnEmptyStore(t *testing.T) {
 			known = append(known, topOfTree(t, dest, root).Hash)
 		}
 	}
-	if askedPieces != 76 {
-		t.Fatalf("%d pieces were asked for", askedPieces)
+	if askedChunks != 76 {
+		t.Fatalf("%d chunks were asked for", askedChunks)
 	}
 }
 
-func TestPiecesAreAskedForByTheirFileAndTheirNumbers(t *testing.T) {
+func TestChunksAreAskedForByTheirFileAndTheirNumbers(t *testing.T) {
 	source, root := sampleTree(t)
 	peer := newTestPeer(source)
 	must[*Summary](t)(Fetch(NewMemoryStore(), root, peer))
 	model := targetAt(t, source, root, "weights/model.bin")
-	// The file has 63 pieces, and two names. All of its pieces are asked
+	// The file has 63 chunks, and two names. All of its chunks are asked
 	// for once, in one request of 45 bytes.
 	var forModel [][]byte
 	for _, request := range peer.wire.requests {
-		if asked := must[Request](t)(DecodeRequest(request)); asked.Kind == AskPieces && asked.Hash == model.Hash {
+		if asked := must[Request](t)(DecodeRequest(request)); asked.Kind == AskChunks && asked.Hash == model.Hash {
 			forModel = append(forModel, request)
 		}
 	}
 	if len(forModel) != 1 || len(forModel[0]) != 45 {
-		t.Fatalf("the file's pieces were asked for in %d requests", len(forModel))
+		t.Fatalf("the file's chunks were asked for in %d requests", len(forModel))
 	}
-	if asked := must[Request](t)(DecodeRequest(forModel[0])); asked != RequestPieces(model.Hash, 0, 63) {
+	if asked := must[Request](t)(DecodeRequest(forModel[0])); asked != RequestChunks(model.Hash, 0, 63) {
 		t.Fatalf("%+v", asked)
 	}
 }
 
 func TestWhatAReceiverHoldsIsNotAskedForAgain(t *testing.T) {
 	folder := writeTree(t, sampleFiles())
-	options := BuildOptions{Cutting: smallPieces(t)}
+	options := BuildOptions{Chunking: smallChunks(t)}
 	source := NewMemoryStore()
 	first := must[Root](t)(Build(source, folder, options))
 	dest := NewMemoryStore()
 	must[*Summary](t)(Fetch(dest, first, newTestPeer(source)))
-	// A second tree: one piece of one file changed, a file that is there
-	// already under another name, and one new file of two pieces.
+	// A second tree: one chunk of one file changed, a file that is there
+	// already under another name, and one new file of two chunks.
 	model := corpusBytes("model", 1000)
 	copy(model[320:336], corpusBytes("changed", 16))
 	for name, content := range map[string][]byte{
@@ -105,17 +105,17 @@ func TestWhatAReceiverHoldsIsNotAskedForAgain(t *testing.T) {
 	peer := newTestPeer(source)
 	must[*Summary](t)(Fetch(dest, second, peer))
 	// The record, the two folders on the way to the changes, the lists of
-	// the changed file and the new one, and three pieces.
-	got := []int{peer.wire.framesOf(FrameRecord), peer.wire.framesOf(FrameFolderList), peer.wire.framesOf(FrameFileList), peer.wire.framesOf(FramePiece)}
+	// the changed file and the new one, and three chunks.
+	got := []int{peer.wire.framesOf(FrameRecord), peer.wire.framesOf(FrameFolderList), peer.wire.framesOf(FrameFileList), peer.wire.framesOf(FrameChunk)}
 	if !slices.Equal(got, []int{1, 2, 2, 3}) {
 		t.Fatalf("the frames that came: %v", got)
 	}
-	// The one changed piece of the file was asked for by its number.
+	// The one changed chunk of the file was asked for by its number.
 	changed := targetAt(t, source, second, "weights/model.bin")
 	if !slices.ContainsFunc(peer.wire.requests, func(request []byte) bool {
-		return bytes.Equal(request, RequestPieces(changed.Hash, 20, 1).Encode())
+		return bytes.Equal(request, RequestChunks(changed.Hash, 20, 1).Encode())
 	}) {
-		t.Fatal("the changed piece was not asked for by its number")
+		t.Fatal("the changed chunk was not asked for by its number")
 	}
 	must[*Summary](t)(Verify(dest, first))
 	must[*Summary](t)(Verify(dest, second))
@@ -127,19 +127,19 @@ func TestWhatAReceiverHoldsIsNotAskedForAgain(t *testing.T) {
 	}
 }
 
-func TestPiecesHeldFromAnywhereElseAreSkippedByTheirHash(t *testing.T) {
+func TestChunksHeldFromAnywhereElseAreSkippedByTheirHash(t *testing.T) {
 	source, root := sampleTree(t)
 	model := targetAt(t, source, root, "weights/model.bin")
 	dest := NewMemoryStore()
 	// The receiver has the file's bytes from somewhere else, as bare
-	// pieces.
+	// chunks.
 	for _, item := range fileListOf(t, source, model).Items() {
-		dest.Put(StoredPiece, item.Hash, keptIn(t, source, StoredPiece, item.Hash))
+		dest.Put(StoredChunk, item.Hash, keptIn(t, source, StoredChunk, item.Hash))
 	}
 	peer := newTestPeer(source)
 	must[*Summary](t)(Fetch(dest, root, peer))
-	if got := peer.wire.framesOf(FramePiece); got != 76-63 {
-		t.Fatalf("%d pieces came", got)
+	if got := peer.wire.framesOf(FrameChunk); got != 76-63 {
+		t.Fatalf("%d chunks came", got)
 	}
 	must[*Summary](t)(Verify(dest, root))
 }
@@ -194,8 +194,8 @@ func TestOneNameIsLookedUpWithoutTheFolder(t *testing.T) {
 		t.Fatal("a path with two dots in it was looked up")
 	}
 	// The record, and one small frame for each name on the way: no folder's
-	// whole list, no file's list, and no piece.
-	if peer.wire.framesOf(FrameRecord) != 1 || peer.wire.framesOf(FrameFolderRun) != len(peer.wire.frames)-1 {
+	// whole list, no file's list, and no chunk.
+	if peer.wire.framesOf(FrameRecord) != 1 || peer.wire.framesOf(FrameFolderBranch) != len(peer.wire.frames)-1 {
 		t.Fatal("something else than one entry for each name came")
 	}
 	for _, frame := range peer.wire.frames {
@@ -215,16 +215,16 @@ func TestAStretchOfAFileIsReadWithoutTheRest(t *testing.T) {
 	if err := remote.Read(model, 100, 333, &out); err != nil || !bytes.Equal(out.Bytes(), content[100:433]) {
 		t.Fatal(err)
 	}
-	// Bytes 100 to 432 lie in pieces 6 to 27. The record, one run of the
-	// file's list, and those 22 pieces came, and nothing else.
-	got := []int{peer.wire.framesOf(FrameFileRun), peer.wire.framesOf(FramePiece), len(peer.wire.frames)}
+	// Bytes 100 to 432 lie in chunks 6 to 27. The record, one branch of the
+	// file's list, and those 22 chunks came, and nothing else.
+	got := []int{peer.wire.framesOf(FrameFileBranch), peer.wire.framesOf(FrameChunk), len(peer.wire.frames)}
 	if !slices.Equal(got, []int{1, 22, 24}) {
 		t.Fatalf("the frames that came: %v", got)
 	}
 	if !slices.ContainsFunc(peer.wire.requests, func(request []byte) bool {
-		return bytes.Equal(request, RequestPieces(model.Hash, 6, 22).Encode())
+		return bytes.Equal(request, RequestChunks(model.Hash, 6, 22).Encode())
 	}) {
-		t.Fatal("the pieces were not asked for by their numbers")
+		t.Fatal("the chunks were not asked for by their numbers")
 	}
 	remote = must[*Remote](t)(OpenRemote(newTestPeer(source), root))
 	for _, stretch := range [][2]uint64{{0, 1}, {0, 16}, {15, 2}, {16, 16}, {999, 1}, {992, 8}, {0, 1000}, {500, 0}, {1000, 0}} {
@@ -259,7 +259,7 @@ func TestEveryStretchOfASmallFileReadsBackFromAPeer(t *testing.T) {
 	}
 }
 
-func TestARunOfAFoldersEntriesIsListed(t *testing.T) {
+func TestABranchOfAFoldersEntriesIsListed(t *testing.T) {
 	source, root := sampleTree(t)
 	weights := targetAt(t, source, root, "weights")
 	nothing := targetAt(t, source, root, "nothing-here")
@@ -295,12 +295,12 @@ func TestARunOfAFoldersEntriesIsListed(t *testing.T) {
 	}
 }
 
-func TestAPeerSaysWhichPiecesItHolds(t *testing.T) {
+func TestAPeerSaysWhichChunksItHolds(t *testing.T) {
 	source, root := sampleTree(t)
 	model := targetAt(t, source, root, "weights/model.bin")
 	list := fileListOf(t, source, model)
 	for _, gone := range []int{3, 7, 62} {
-		source.Remove(StoredPiece, list.Items()[gone].Hash)
+		source.Remove(StoredChunk, list.Items()[gone].Hash)
 	}
 	remote := must[*Remote](t)(OpenRemote(newTestPeer(source), root))
 	held := must[*HaveMap](t)(remote.Have(model))
@@ -338,7 +338,7 @@ func TestATreeGoesThroughABundleAndBack(t *testing.T) {
 	// Each thing once: 88 frames, each with four bytes for its length, and
 	// all but the record with one byte for its kind.
 	var kept uint64
-	for _, kind := range []Stored{StoredPiece, StoredFileList, StoredFolderList, StoredRecord} {
+	for _, kind := range []Stored{StoredChunk, StoredFileList, StoredFolderList, StoredRecord} {
 		kept += source.Bytes(kind)
 	}
 	if uint64(len(bundle)) != 8+kept+88*4+87 {
@@ -419,13 +419,13 @@ func TestAResponderSaysWhatItDoesNotHoldAndWhatLiesOutside(t *testing.T) {
 		RequestRecord(Root(unknown)),
 		RequestFolder(unknown),
 		RequestFile(unknown),
-		RequestPiece(unknown),
+		RequestChunk(unknown),
 		RequestHave(unknown),
-		RequestFolderRun(unknown, 0, 1),
+		RequestFolderBranch(unknown, 0, 1),
 		RequestFolderName(unknown, "a"),
-		RequestFileRun(unknown, 0, 1),
+		RequestFileBranch(unknown, 0, 1),
 		RequestFileBytes(unknown, 0, 1),
-		RequestPieces(unknown, 0, 1),
+		RequestChunks(unknown, 0, 1),
 		// A folder is not found as a file, nor a file as a folder.
 		RequestFile(weights.Hash),
 		RequestFolder(model.Hash),
@@ -433,29 +433,29 @@ func TestAResponderSaysWhatItDoesNotHoldAndWhatLiesOutside(t *testing.T) {
 		refused(request, RefusalNotHeld)
 	}
 	for _, request := range []Request{
-		RequestFolderRun(weights.Hash, 3, 1),
-		RequestFileRun(model.Hash, 63, 1),
+		RequestFolderBranch(weights.Hash, 3, 1),
+		RequestFileBranch(model.Hash, 63, 1),
 		RequestFileBytes(model.Hash, 1000, 1),
-		RequestPieces(model.Hash, 63, 1),
+		RequestChunks(model.Hash, 63, 1),
 	} {
 		refused(request, RefusalOutOfRange)
 	}
 	// What reaches past the end is cut off at the end.
-	if frames := answer(RequestPieces(model.Hash, 60, 10)); len(frames) != 3 {
-		t.Fatalf("%d pieces came", len(frames))
+	if frames := answer(RequestChunks(model.Hash, 60, 10)); len(frames) != 3 {
+		t.Fatalf("%d chunks came", len(frames))
 	}
 	frames := answer(RequestFileBytes(model.Hash, 990, 10_000))
-	if len(frames) != 1 || frames[0].Kind != FrameFileRun {
+	if len(frames) != 1 || frames[0].Kind != FrameFileBranch {
 		t.Fatalf("%+v", frames)
 	}
-	run := frames[0].FileRun
-	if at, err := run.Check(model); err != nil || at != 976 || run.Start() != 61 || len(run.Items()) != 2 {
-		t.Fatal(at, err, run.Start(), len(run.Items()))
+	branch := frames[0].FileBranch
+	if at, err := branch.Check(model); err != nil || at != 976 || branch.Start() != 61 || len(branch.Items()) != 2 {
+		t.Fatal(at, err, branch.Start(), len(branch.Items()))
 	}
-	// Pieces come in order, up to the first one that is not held.
-	source.Remove(StoredPiece, fileListOf(t, source, model).Items()[12].Hash)
-	frames = answer(RequestPieces(model.Hash, 10, 5))
-	if len(frames) != 3 || frames[0].Kind != FramePiece || frames[1].Kind != FramePiece ||
+	// Chunks come in order, up to the first one that is not held.
+	source.Remove(StoredChunk, fileListOf(t, source, model).Items()[12].Hash)
+	frames = answer(RequestChunks(model.Hash, 10, 5))
+	if len(frames) != 3 || frames[0].Kind != FrameChunk || frames[1].Kind != FrameChunk ||
 		frames[2].Kind != FrameRefused || frames[2].Refusal != RefusalNotHeld {
 		t.Fatalf("%+v", frames)
 	}

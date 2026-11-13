@@ -29,9 +29,9 @@ func Example_damageIsFoundAndMended() {
 	}
 
 	// A chunk is harmed where the mirror keeps it.
-	chunk := mirror.Hashes(scionic.StoredPiece)[0]
-	mirror.Remove(scionic.StoredPiece, chunk)
-	mirror.Put(scionic.StoredPiece, chunk, []byte("not what the hash says"))
+	chunk := mirror.Hashes(scionic.StoredChunk)[0]
+	mirror.Remove(scionic.StoredChunk, chunk)
+	mirror.Put(scionic.StoredChunk, chunk, []byte("not what the hash says"))
 
 	// Verifying finds the damage, and the error names what was harmed.
 	_, err = scionic.Verify(mirror, root)

@@ -13,16 +13,16 @@ import (
 
 // The things a tree is made of, and their exact bytes.
 //
-//   - A piece is a run of a file's bytes. Its hash is the SHA-256 of those
+//   - A chunk is a range of a file's bytes. Its hash is the SHA-256 of those
 //     bytes, and nothing else.
-//   - A file is the list of its pieces, in the file's order.
+//   - A file is the list of its chunks, in the file's order.
 //   - A folder is the list of its entries, sorted by name. An entry holds a
 //     name, and the file or folder under it.
 //   - The record says what a tree's root stands for.
 //
 // A thing's hash covers what the thing is, and its parent's hash covers where
-// it sits. So a file has no name of its own and a piece has no number of its
-// own: the name is in the folder, and the number is the piece's place in the
+// it sits. So a file has no name of its own and a chunk has no number of its
+// own: the name is in the folder, and the number is the chunk's place in the
 // file's list.
 //
 // A value of one of these types is always well formed. It is checked when it
@@ -30,8 +30,8 @@ import (
 // could be written in two ways are read in one way only.
 
 const (
-	// MaxPieceBytes is the most bytes a piece may hold: 8 MiB.
-	MaxPieceBytes = FastCDCMaxSize
+	// MaxChunkBytes is the most bytes a chunk may hold: 8 MiB.
+	MaxChunkBytes = FastCDCMaxSize
 	// ListItemBytes is how many bytes one item of a file's list takes: a
 	// hash and a length.
 	ListItemBytes = 36
@@ -47,7 +47,7 @@ const (
 	// MaxFolderDepth is the most folders that may sit inside one another,
 	// the top one counted.
 	MaxFolderDepth = 128
-	// MaxCarriedNodes is the most nodes an opening may carry: 40 on each
+	// MaxCarriedNodes is the most nodes a branch may carry: 40 on each
 	// side of what it shows.
 	MaxCarriedNodes = 80
 	// MaxExtraBytes is the most bytes a set of extra data may take: how
@@ -59,17 +59,17 @@ const (
 	// MaxEntryBytes is the most bytes a folder's entry may take: its fixed
 	// part, the longest name, and extra data that is as full as it can be.
 	MaxEntryBytes = 43 + MaxNameBytes + MaxExtraBytes
-	// CuttingKey names the extra value of a record that says how the tree's
-	// files were cut.
-	CuttingKey = "chunking"
+	// ChunkingKey names the extra value of a record that says how the tree's
+	// files were chunked.
+	ChunkingKey = "chunking"
 	// TimestampKey names the extra value of a record that says when the
 	// tree was built.
 	TimestampKey = "timestamp"
-	// CuttingFastCDCV1 is how a tree says that its files were cut by
+	// ChunkingFastCDCV1 is how a tree says that its files were chunked by
 	// content.
-	CuttingFastCDCV1 = "fastcdc-v1"
+	ChunkingFastCDCV1 = "fastcdc-v1"
 
-	cuttingFixedPrefix = "fixed-"
+	chunkingFixedPrefix = "fixed-"
 
 	fileLeafMark   = 0x00
 	folderLeafMark = 0x02
@@ -82,7 +82,7 @@ const (
 	leastEntryBytes = 45
 )
 
-// reader reads numbers and runs of bytes off the front of a slice. Once a
+// reader reads numbers and bytes off the front of a slice. Once a
 // read fails, err is set, and every later read gives zero values: a caller
 // looks at err before it trusts what it read.
 type reader struct {
@@ -163,7 +163,7 @@ func (r *reader) finish() error {
 type Kind uint8
 
 const (
-	// KindFile is a file: a list of pieces.
+	// KindFile is a file: a list of chunks.
 	KindFile Kind = 1
 	// KindFolder is a folder: a list of entries.
 	KindFolder Kind = 2
@@ -419,53 +419,53 @@ func decodeExtraData(r *reader) (ExtraData, error) {
 	return ExtraData{pairs}, nil
 }
 
-// PieceRef is one item of a file's list: a piece's hash, and how many bytes
+// ChunkRef is one item of a file's list: a chunk's hash, and how many bytes
 // it holds.
-type PieceRef struct {
+type ChunkRef struct {
 	Hash   Hash
 	Length uint32
 }
 
-// PieceRefOf is the item for a piece with these bytes. A piece holds 1 byte
+// ChunkRefOf is the item for a chunk with these bytes. A chunk holds 1 byte
 // to 8 MiB.
-func PieceRefOf(bytes []byte) (PieceRef, error) {
-	if len(bytes) == 0 || len(bytes) > MaxPieceBytes {
-		return PieceRef{}, invalid("a piece does not hold 1 byte to 8 MiB")
+func ChunkRefOf(bytes []byte) (ChunkRef, error) {
+	if len(bytes) == 0 || len(bytes) > MaxChunkBytes {
+		return ChunkRef{}, invalid("a chunk does not hold 1 byte to 8 MiB")
 	}
-	return PieceRef{Hash: HashOf(bytes), Length: uint32(len(bytes))}, nil
+	return ChunkRef{Hash: HashOf(bytes), Length: uint32(len(bytes))}, nil
 }
 
-func (p PieceRef) check() error {
-	if p.Length == 0 || p.Length > MaxPieceBytes {
-		return invalid("a piece does not hold 1 byte to 8 MiB")
+func (p ChunkRef) check() error {
+	if p.Length == 0 || p.Length > MaxChunkBytes {
+		return invalid("a chunk does not hold 1 byte to 8 MiB")
 	}
 	return nil
 }
 
-// Matches reports whether bytes are the piece this item names: of its
+// Matches reports whether bytes are the chunk this item names: of its
 // length, and with its hash.
-func (p PieceRef) Matches(bytes []byte) bool {
+func (p ChunkRef) Matches(bytes []byte) bool {
 	return uint64(len(bytes)) == uint64(p.Length) && HashOf(bytes) == p.Hash
 }
 
-func (p PieceRef) appendTo(out []byte) []byte {
+func (p ChunkRef) appendTo(out []byte) []byte {
 	out = append(out, p.Hash[:]...)
 	return binary.BigEndian.AppendUint32(out, p.Length)
 }
 
-func decodePieceRef(r *reader) (PieceRef, error) {
-	item := PieceRef{Hash: r.hash(), Length: r.u32()}
+func decodeChunkRef(r *reader) (ChunkRef, error) {
+	item := ChunkRef{Hash: r.hash(), Length: r.u32()}
 	if r.err != nil {
-		return PieceRef{}, r.err
+		return ChunkRef{}, r.err
 	}
 	if err := item.check(); err != nil {
-		return PieceRef{}, err
+		return ChunkRef{}, err
 	}
 	return item, nil
 }
 
 // leaf is the item's leaf in its file's tree.
-func (p PieceRef) leaf() node {
+func (p ChunkRef) leaf() node {
 	var message [1 + ListItemBytes]byte
 	message[0] = fileLeafMark
 	copy(message[1:33], p.Hash[:])
@@ -592,7 +592,7 @@ func leavesOf(entries []Entry) []leaf {
 }
 
 // leavesOfItems gives the leaves of a file's items. They have no names.
-func leavesOfItems(items []PieceRef) []leaf {
+func leavesOfItems(items []ChunkRef) []leaf {
 	leaves := make([]leaf, len(items))
 	for at := range items {
 		leaves[at].node = items[at].leaf()
@@ -609,7 +609,7 @@ func ownerHash(mark byte, count, size uint64, list Hash) Hash {
 	return sha256.Sum256(message[:])
 }
 
-// FileHash is the hash of a file with count pieces and size bytes, whose
+// FileHash is the hash of a file with count chunks and size bytes, whose
 // list's tree has list on top.
 func FileHash(count, size uint64, list Hash) Hash {
 	return ownerHash(fileMark, count, size, list)
@@ -639,58 +639,58 @@ func confirm(target Target, count uint64, top node) error {
 	return nil
 }
 
-// Cutting is how a tree's files are cut into pieces. The zero value is
+// Chunking is how a tree's files are split into chunks. The zero value is
 // FastCDCV1.
-type Cutting struct {
-	// fixed is the size of a piece when every piece has one size, and zero
-	// when files are cut by content.
+type Chunking struct {
+	// fixed is the size of a chunk when every chunk has one size, and zero
+	// when files are chunked by content.
 	fixed uint32
 }
 
-// FastCDCV1 cuts by content: pieces of more than 512 KiB, about 2 MiB on
-// average, and 8 MiB at most. Only a file's last piece may be smaller.
-var FastCDCV1 = Cutting{}
+// FastCDCV1 chunks by content: chunks of more than 512 KiB, about 2 MiB on
+// average, and 8 MiB at most. Only a file's last chunk may be smaller.
+var FastCDCV1 = Chunking{}
 
-// FixedCutting cuts at a fixed size, of 1 byte to 8 MiB: every piece but a
+// FixedChunking chunks at a fixed size, of 1 byte to 8 MiB: every chunk but a
 // file's last holds exactly this many bytes. It is for tests.
-func FixedCutting(size uint32) (Cutting, error) {
-	if size == 0 || size > MaxPieceBytes {
-		return Cutting{}, invalid("a fixed piece size is not 1 byte to 8 MiB")
+func FixedChunking(size uint32) (Chunking, error) {
+	if size == 0 || size > MaxChunkBytes {
+		return Chunking{}, invalid("a fixed chunk size is not 1 byte to 8 MiB")
 	}
-	return Cutting{fixed: size}, nil
+	return Chunking{fixed: size}, nil
 }
 
-// Fixed gives the size of a piece when every piece has one size.
-func (c Cutting) Fixed() (size uint32, fixed bool) {
+// Fixed gives the size of a chunk when every chunk has one size.
+func (c Chunking) Fixed() (size uint32, fixed bool) {
 	return c.fixed, c.fixed != 0
 }
 
 // Tag is how a record says this: "fastcdc-v1", or "fixed-" and the size.
-func (c Cutting) Tag() string {
+func (c Chunking) Tag() string {
 	if c.fixed == 0 {
-		return CuttingFastCDCV1
+		return ChunkingFastCDCV1
 	}
-	return cuttingFixedPrefix + strconv.FormatUint(uint64(c.fixed), 10)
+	return chunkingFixedPrefix + strconv.FormatUint(uint64(c.fixed), 10)
 }
 
-func (c Cutting) String() string {
+func (c Chunking) String() string {
 	return c.Tag()
 }
 
-// CuttingFromTag reads what a record says. A size is written in digits with
-// no zero in front, so each way of cutting has one spelling.
-func CuttingFromTag(tag []byte) (Cutting, error) {
-	return cuttingFromTag(string(tag))
+// ChunkingFromTag reads what a record says. A size is written in digits with
+// no zero in front, so each way of chunking has one spelling.
+func ChunkingFromTag(tag []byte) (Chunking, error) {
+	return chunkingFromTag(string(tag))
 }
 
-func cuttingFromTag(tag string) (Cutting, error) {
-	unknown := func() (Cutting, error) {
-		return Cutting{}, invalid("a record names a way of cutting that is not known")
+func chunkingFromTag(tag string) (Chunking, error) {
+	unknown := func() (Chunking, error) {
+		return Chunking{}, invalid("a record names a way of chunking that is not known")
 	}
-	if tag == CuttingFastCDCV1 {
+	if tag == ChunkingFastCDCV1 {
 		return FastCDCV1, nil
 	}
-	digits, found := strings.CutPrefix(tag, cuttingFixedPrefix)
+	digits, found := strings.CutPrefix(tag, chunkingFixedPrefix)
 	if !found || digits == "" || len(digits) > 7 || digits[0] == '0' {
 		return unknown()
 	}
@@ -701,16 +701,16 @@ func cuttingFromTag(tag string) (Cutting, error) {
 		}
 		size = size*10 + uint32(digits[at]-'0')
 	}
-	cutting, err := FixedCutting(size)
+	chunking, err := FixedChunking(size)
 	if err != nil {
 		return unknown()
 	}
-	return cutting, nil
+	return chunking, nil
 }
 
-// CheckLength reports whether a piece of length bytes fits, as a file's last
-// piece or as one before it.
-func (c Cutting) CheckLength(length uint32, isLast bool) error {
+// CheckLength reports whether a chunk of length bytes fits, as a file's last
+// chunk or as one before it.
+func (c Chunking) CheckLength(length uint32, isLast bool) error {
 	var fits bool
 	if c.fixed == 0 {
 		fits = length >= 1 && length <= FastCDCMaxSize && (isLast || length > FastCDCMinSize)
@@ -720,14 +720,14 @@ func (c Cutting) CheckLength(length uint32, isLast bool) error {
 		fits = length == c.fixed
 	}
 	if !fits {
-		return invalid("a piece has a length that the tree's way of cutting does not give")
+		return invalid("a chunk has a length that the tree's way of chunking does not give")
 	}
 	return nil
 }
 
-// CountBounds gives the fewest and the most pieces that a file of size bytes
+// CountBounds gives the fewest and the most chunks that a file of size bytes
 // can have.
-func (c Cutting) CountBounds(size uint64) (fewest, most uint64) {
+func (c Chunking) CountBounds(size uint64) (fewest, most uint64) {
 	if size == 0 {
 		return 0, 0
 	}
@@ -738,30 +738,30 @@ func (c Cutting) CountBounds(size uint64) (fewest, most uint64) {
 	return count, count
 }
 
-// CheckCount reports whether a file of size bytes can have count pieces.
-func (c Cutting) CheckCount(size, count uint64) error {
+// CheckCount reports whether a file of size bytes can have count chunks.
+func (c Chunking) CheckCount(size, count uint64) error {
 	fewest, most := c.CountBounds(size)
 	if count < fewest || count > most {
-		return invalid("a file has a number of pieces that its size does not allow")
+		return invalid("a file has a number of chunks that its size does not allow")
 	}
 	return nil
 }
 
-// FileList is a file: the list of its pieces, in the file's order.
+// FileList is a file: the list of its chunks, in the file's order.
 type FileList struct {
-	items []PieceRef
+	items []ChunkRef
 	size  uint64
 	hash  Hash
 }
 
-// NewFileList is the file with these pieces, in this order. A piece that
-// occurs twice is listed twice. No pieces at all is the empty file.
-func NewFileList(items []PieceRef) (*FileList, error) {
-	return newFileList(append([]PieceRef(nil), items...))
+// NewFileList is the file with these chunks, in this order. A chunk that
+// occurs twice is listed twice. No chunks at all is the empty file.
+func NewFileList(items []ChunkRef) (*FileList, error) {
+	return newFileList(append([]ChunkRef(nil), items...))
 }
 
 // newFileList is NewFileList for items that nothing else holds.
-func newFileList(items []PieceRef) (*FileList, error) {
+func newFileList(items []ChunkRef) (*FileList, error) {
 	for at := range items {
 		if err := items[at].check(); err != nil {
 			return nil, err
@@ -778,15 +778,15 @@ func newFileList(items []PieceRef) (*FileList, error) {
 	}, nil
 }
 
-// itemsOf reads the items of a whole list: 36 bytes for each piece.
-func itemsOf(bytes []byte) ([]PieceRef, error) {
+// itemsOf reads the items of a whole list: 36 bytes for each chunk.
+func itemsOf(bytes []byte) ([]ChunkRef, error) {
 	if len(bytes)%ListItemBytes != 0 {
 		return nil, invalid("a file's list is not a whole number of items")
 	}
 	r := reader{bytes: bytes, what: "a file's list"}
-	items := make([]PieceRef, 0, len(bytes)/ListItemBytes)
+	items := make([]ChunkRef, 0, len(bytes)/ListItemBytes)
 	for !r.isEmpty() {
-		item, err := decodePieceRef(&r)
+		item, err := decodeChunkRef(&r)
 		if err != nil {
 			return nil, err
 		}
@@ -795,7 +795,7 @@ func itemsOf(bytes []byte) ([]PieceRef, error) {
 	return items, nil
 }
 
-// DecodeFileList reads a whole list: 36 bytes for each piece.
+// DecodeFileList reads a whole list: 36 bytes for each chunk.
 func DecodeFileList(bytes []byte) (*FileList, error) {
 	items, err := itemsOf(bytes)
 	if err != nil {
@@ -813,13 +813,13 @@ func (l *FileList) Encode() []byte {
 	return out
 }
 
-// Items gives the file's pieces, in order. The slice is the list's own, and
+// Items gives the file's chunks, in order. The slice is the list's own, and
 // must not be changed.
-func (l *FileList) Items() []PieceRef {
+func (l *FileList) Items() []ChunkRef {
 	return l.items
 }
 
-// Count is how many pieces the file has.
+// Count is how many chunks the file has.
 func (l *FileList) Count() uint64 {
 	return uint64(len(l.items))
 }
@@ -829,7 +829,7 @@ func (l *FileList) Size() uint64 {
 	return l.size
 }
 
-// Hash is the file's hash. It covers the pieces, their order, how many there
+// Hash is the file's hash. It covers the chunks, their order, how many there
 // are and the size, and nothing about where the file sits.
 func (l *FileList) Hash() Hash {
 	return l.hash
@@ -845,23 +845,23 @@ func (l *FileList) EncodedLen() uint64 {
 	return uint64(len(l.items)) * ListItemBytes
 }
 
-// CheckCutting reports whether every piece has a length that cutting gives.
-func (l *FileList) CheckCutting(cutting Cutting) error {
-	if err := cutting.CheckCount(l.size, l.Count()); err != nil {
+// CheckChunking reports whether every chunk has a length that chunking gives.
+func (l *FileList) CheckChunking(chunking Chunking) error {
+	if err := chunking.CheckCount(l.size, l.Count()); err != nil {
 		return err
 	}
 	last := len(l.items) - 1
 	for at := range l.items {
-		if err := cutting.CheckLength(l.items[at].Length, at == last); err != nil {
+		if err := chunking.CheckLength(l.items[at].Length, at == last); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Open shows pieces start up to, not including, end. This hashes the whole
+// Open shows chunks start up to, not including, end. This hashes the whole
 // list each time: keep an OpenFile to show many parts.
-func (l *FileList) Open(start, end uint64) (*FileRun, error) {
+func (l *FileList) Open(start, end uint64) (*FileBranch, error) {
 	tree, err := buildListTree(fileTree, leavesOfItems(l.items))
 	if err != nil {
 		return nil, err
@@ -869,25 +869,25 @@ func (l *FileList) Open(start, end uint64) (*FileRun, error) {
 	return l.openWith(tree, start, end)
 }
 
-func (l *FileList) openWith(tree *listTree, start, end uint64) (*FileRun, error) {
+func (l *FileList) openWith(tree *listTree, start, end uint64) (*FileBranch, error) {
 	nodes, err := tree.open(start, end)
 	if err != nil {
 		return nil, err
 	}
-	return &FileRun{
+	return &FileBranch{
 		count:   l.Count(),
 		start:   start,
-		items:   append([]PieceRef(nil), l.items[start:end]...),
+		items:   append([]ChunkRef(nil), l.items[start:end]...),
 		carried: nodes,
 	}, nil
 }
 
 // OpenFile is a file's list with its tree kept, for showing many parts of
-// it, and for finding the pieces that hold a stretch of bytes.
+// it, and for finding the chunks that hold a stretch of bytes.
 type OpenFile struct {
 	list *FileList
 	tree *listTree
-	// starts is where each piece starts, and after the last one the file's
+	// starts is where each chunk starts, and after the last one the file's
 	// size.
 	starts []uint64
 }
@@ -940,7 +940,7 @@ func (f *OpenFile) List() *FileList {
 	return f.list
 }
 
-// StartOf gives the byte at which piece index starts. The count gives the
+// StartOf gives the byte at which chunk index starts. The count gives the
 // size.
 func (f *OpenFile) StartOf(index uint64) (uint64, bool) {
 	if index >= uint64(len(f.starts)) {
@@ -949,61 +949,61 @@ func (f *OpenFile) StartOf(index uint64) (uint64, bool) {
 	return f.starts[index], true
 }
 
-// PiecesFor gives the pieces that hold the length bytes from offset: the
+// ChunksFor gives the chunks that hold the length bytes from offset: the
 // first one's number, and the number after the last one. The stretch must
 // lie inside the file and hold at least one byte.
-func (f *OpenFile) PiecesFor(offset, length uint64) (first, after uint64, err error) {
+func (f *OpenFile) ChunksFor(offset, length uint64) (first, after uint64, err error) {
 	end := offset + length
 	if length == 0 || end < offset || end > f.list.size {
 		return 0, 0, invalid("a stretch of bytes is outside the file")
 	}
-	// Every piece holds a byte, so the starts ascend and each is found.
+	// Every chunk holds a byte, so the starts ascend and each is found.
 	first = uint64(sort.Search(len(f.starts), func(index int) bool { return f.starts[index] > offset }) - 1)
 	after = uint64(sort.Search(len(f.starts), func(index int) bool { return f.starts[index] >= end }))
 	return first, after, nil
 }
 
-// Open shows pieces start up to, not including, end.
-func (f *OpenFile) Open(start, end uint64) (*FileRun, error) {
+// Open shows chunks start up to, not including, end.
+func (f *OpenFile) Open(start, end uint64) (*FileBranch, error) {
 	return f.list.openWith(f.tree, start, end)
 }
 
-// OpenBytes shows the pieces that hold the length bytes from offset.
-func (f *OpenFile) OpenBytes(offset, length uint64) (*FileRun, error) {
-	start, end, err := f.PiecesFor(offset, length)
+// OpenBytes shows the chunks that hold the length bytes from offset.
+func (f *OpenFile) OpenBytes(offset, length uint64) (*FileBranch, error) {
+	start, end, err := f.ChunksFor(offset, length)
 	if err != nil {
 		return nil, err
 	}
 	return f.Open(start, end)
 }
 
-// FileRun is a run of a file's list, with the nodes that stand for the rest
+// FileBranch is a branch of a file's list, with the nodes that stand for the rest
 // of it.
-type FileRun struct {
+type FileBranch struct {
 	count   uint64
 	start   uint64
-	items   []PieceRef
+	items   []ChunkRef
 	carried []carried
 }
 
-// Count is how many pieces the whole file is said to have.
-func (r *FileRun) Count() uint64 {
+// Count is how many chunks the whole file is said to have.
+func (r *FileBranch) Count() uint64 {
 	return r.count
 }
 
-// Start is the number of the first piece shown.
-func (r *FileRun) Start() uint64 {
+// Start is the number of the first chunk shown.
+func (r *FileBranch) Start() uint64 {
 	return r.start
 }
 
-// Items gives the pieces shown. The slice is the run's own, and must not be
+// Items gives the chunks shown. The slice is the branch's own, and must not be
 // changed.
-func (r *FileRun) Items() []PieceRef {
+func (r *FileBranch) Items() []ChunkRef {
 	return r.items
 }
 
-// Encode gives the run's bytes.
-func (r *FileRun) Encode() []byte {
+// Encode gives the branch's bytes.
+func (r *FileBranch) Encode() []byte {
 	out := make([]byte, 0, 22+len(r.items)*ListItemBytes+len(r.carried)*40)
 	out = binary.BigEndian.AppendUint64(out, r.count)
 	out = binary.BigEndian.AppendUint64(out, r.start)
@@ -1019,19 +1019,19 @@ func (r *FileRun) Encode() []byte {
 	return out
 }
 
-// DecodeFileRun reads a run of a file's list.
-func DecodeFileRun(bytes []byte) (*FileRun, error) {
-	r := reader{bytes: bytes, what: "a run of a file's list"}
-	count, start, shownItems, err := runHeader(&r)
+// DecodeFileBranch reads a branch of a file's list.
+func DecodeFileBranch(bytes []byte) (*FileBranch, error) {
+	r := reader{bytes: bytes, what: "a branch of a file's list"}
+	count, start, shownItems, err := branchHeader(&r)
 	if err != nil {
 		return nil, err
 	}
 	if shownItems == 0 || r.remaining()/ListItemBytes < shownItems {
-		return nil, invalid("a run of a file's list is cut short, or shows nothing")
+		return nil, invalid("a branch of a file's list is cut short, or shows nothing")
 	}
-	items := make([]PieceRef, 0, shownItems)
+	items := make([]ChunkRef, 0, shownItems)
 	for index := 0; index < shownItems; index++ {
-		item, err := decodePieceRef(&r)
+		item, err := decodeChunkRef(&r)
 		if err != nil {
 			return nil, err
 		}
@@ -1052,37 +1052,37 @@ func DecodeFileRun(bytes []byte) (*FileRun, error) {
 	if err := r.finish(); err != nil {
 		return nil, err
 	}
-	return &FileRun{count: count, start: start, items: items, carried: nodes}, nil
+	return &FileBranch{count: count, start: start, items: items, carried: nodes}, nil
 }
 
-// Check checks the run against the file it is said to be a part of, and
-// gives the byte of the file at which the run starts.
-func (r *FileRun) Check(file Target) (uint64, error) {
+// Check checks the branch against the file it is said to be a part of, and
+// gives the byte of the file at which the branch starts.
+func (r *FileBranch) Check(file Target) (uint64, error) {
 	return r.check(file, nil)
 }
 
-// CheckWithCutting is Check, with the pieces' lengths and their number held
-// to a way of cutting too.
-func (r *FileRun) CheckWithCutting(file Target, cutting Cutting) (uint64, error) {
-	return r.check(file, &cutting)
+// CheckWithChunking is Check, with the chunks' lengths and their number held
+// to a way of chunking too.
+func (r *FileBranch) CheckWithChunking(file Target, chunking Chunking) (uint64, error) {
+	return r.check(file, &chunking)
 }
 
-func (r *FileRun) check(file Target, cutting *Cutting) (uint64, error) {
+func (r *FileBranch) check(file Target, chunking *Chunking) (uint64, error) {
 	if err := file.require(KindFile); err != nil {
 		return 0, err
 	}
-	if cutting != nil {
-		if err := cutting.CheckCount(file.Size, r.count); err != nil {
+	if chunking != nil {
+		if err := chunking.CheckCount(file.Size, r.count); err != nil {
 			return 0, err
 		}
 		for at := range r.items {
 			place := r.start + uint64(at)
-			if err := cutting.CheckLength(r.items[at].Length, place+1 == r.count); err != nil {
+			if err := chunking.CheckLength(r.items[at].Length, place+1 == r.count); err != nil {
 				return 0, err
 			}
 		}
 	}
-	result, err := checkOpening(fileTree, r.count, r.start, leavesOfItems(r.items), r.carried)
+	result, err := checkBranch(fileTree, r.count, r.start, leavesOfItems(r.items), r.carried)
 	if err != nil {
 		return 0, err
 	}
@@ -1092,9 +1092,9 @@ func (r *FileRun) check(file Target, cutting *Cutting) (uint64, error) {
 	return result.offset, nil
 }
 
-// runHeader reads what every run starts with: how many items the whole list
+// branchHeader reads what every branch starts with: how many items the whole list
 // has, the place of the first one shown, and how many are shown.
-func runHeader(r *reader) (count, start uint64, shownItems int, err error) {
+func branchHeader(r *reader) (count, start uint64, shownItems int, err error) {
 	count = r.u64()
 	start = r.u64()
 	number := r.u32()
@@ -1103,10 +1103,10 @@ func runHeader(r *reader) (count, start uint64, shownItems int, err error) {
 	}
 	end := start + uint64(number)
 	if count > MaxListItems || end < start || end > count {
-		return 0, 0, 0, invalid("a run lies outside its list")
+		return 0, 0, 0, invalid("a branch lies outside its list")
 	}
 	if uint64(number) > uint64(maxInt) {
-		return 0, 0, 0, invalid("a run lies outside its list")
+		return 0, 0, 0, invalid("a branch lies outside its list")
 	}
 	return count, start, int(number), nil
 }
@@ -1119,7 +1119,7 @@ func carriedCount(r *reader) (int, error) {
 		return 0, r.err
 	}
 	if count > MaxCarriedNodes {
-		return 0, invalid("a run carries more nodes than any list needs")
+		return 0, invalid("a branch carries more nodes than any list needs")
 	}
 	return count, nil
 }
@@ -1250,7 +1250,7 @@ func (l *FolderList) PlaceOf(name string) (uint64, bool) {
 
 // Open shows entries start up to, not including, end. This hashes the whole
 // list each time: keep an OpenFolder to show many parts.
-func (l *FolderList) Open(start, end uint64) (*FolderRun, error) {
+func (l *FolderList) Open(start, end uint64) (*FolderBranch, error) {
 	tree, err := buildListTree(folderTree, leavesOf(l.entries))
 	if err != nil {
 		return nil, err
@@ -1260,7 +1260,7 @@ func (l *FolderList) Open(start, end uint64) (*FolderRun, error) {
 
 // OpenName shows the entry at the one place where name can be. It answers
 // whether the folder has the name, whichever way the answer falls.
-func (l *FolderList) OpenName(name string) (*FolderRun, error) {
+func (l *FolderList) OpenName(name string) (*FolderBranch, error) {
 	tree, err := buildListTree(folderTree, leavesOf(l.entries))
 	if err != nil {
 		return nil, err
@@ -1268,12 +1268,12 @@ func (l *FolderList) OpenName(name string) (*FolderRun, error) {
 	return l.openNameWith(tree, name)
 }
 
-func (l *FolderList) openWith(tree *listTree, start, end uint64) (*FolderRun, error) {
+func (l *FolderList) openWith(tree *listTree, start, end uint64) (*FolderBranch, error) {
 	nodes, err := tree.open(start, end)
 	if err != nil {
 		return nil, err
 	}
-	return &FolderRun{
+	return &FolderBranch{
 		count:   l.Count(),
 		start:   start,
 		entries: append([]Entry(nil), l.entries[start:end]...),
@@ -1281,13 +1281,13 @@ func (l *FolderList) openWith(tree *listTree, start, end uint64) (*FolderRun, er
 	}, nil
 }
 
-func (l *FolderList) openNameWith(tree *listTree, name string) (*FolderRun, error) {
+func (l *FolderList) openNameWith(tree *listTree, name string) (*FolderBranch, error) {
 	if err := CheckName(name); err != nil {
 		return nil, err
 	}
 	place, found := l.PlaceOf(name)
 	if !found {
-		return &FolderRun{}, nil
+		return &FolderBranch{}, nil
 	}
 	return l.openWith(tree, place, place+1)
 }
@@ -1342,19 +1342,19 @@ func (f *OpenFolder) List() *FolderList {
 }
 
 // Open shows entries start up to, not including, end.
-func (f *OpenFolder) Open(start, end uint64) (*FolderRun, error) {
+func (f *OpenFolder) Open(start, end uint64) (*FolderBranch, error) {
 	return f.list.openWith(f.tree, start, end)
 }
 
 // OpenName shows the entry at the one place where name can be.
-func (f *OpenFolder) OpenName(name string) (*FolderRun, error) {
+func (f *OpenFolder) OpenName(name string) (*FolderBranch, error) {
 	return f.list.openNameWith(f.tree, name)
 }
 
-// FolderRun is a run of a folder's list, with the nodes that stand for the
-// rest of it. A run of an empty folder shows nothing, and carries nothing:
-// the zero value is that run.
-type FolderRun struct {
+// FolderBranch is a branch of a folder's list, with the nodes that stand for the
+// rest of it. A branch of an empty folder shows nothing, and carries nothing:
+// the zero value is that branch.
+type FolderBranch struct {
 	count   uint64
 	start   uint64
 	entries []Entry
@@ -1362,23 +1362,23 @@ type FolderRun struct {
 }
 
 // Count is how many entries the whole folder is said to have.
-func (r *FolderRun) Count() uint64 {
+func (r *FolderBranch) Count() uint64 {
 	return r.count
 }
 
 // Start is the place of the first entry shown.
-func (r *FolderRun) Start() uint64 {
+func (r *FolderBranch) Start() uint64 {
 	return r.start
 }
 
-// Entries gives the entries shown. The slice is the run's own, and must not
+// Entries gives the entries shown. The slice is the branch's own, and must not
 // be changed.
-func (r *FolderRun) Entries() []Entry {
+func (r *FolderBranch) Entries() []Entry {
 	return r.entries
 }
 
-// Encode gives the run's bytes.
-func (r *FolderRun) Encode() []byte {
+// Encode gives the branch's bytes.
+func (r *FolderBranch) Encode() []byte {
 	var out []byte
 	out = binary.BigEndian.AppendUint64(out, r.count)
 	out = binary.BigEndian.AppendUint64(out, r.start)
@@ -1396,19 +1396,19 @@ func (r *FolderRun) Encode() []byte {
 	return out
 }
 
-// DecodeFolderRun reads a run of a folder's list.
-func DecodeFolderRun(bytes []byte) (*FolderRun, error) {
-	r := reader{bytes: bytes, what: "a run of a folder's list"}
-	count, start, shownEntries, err := runHeader(&r)
+// DecodeFolderBranch reads a branch of a folder's list.
+func DecodeFolderBranch(bytes []byte) (*FolderBranch, error) {
+	r := reader{bytes: bytes, what: "a branch of a folder's list"}
+	count, start, shownEntries, err := branchHeader(&r)
 	if err != nil {
 		return nil, err
 	}
 	if (shownEntries == 0) != (count == 0) {
-		return nil, invalid("a run of a folder's list shows nothing")
+		return nil, invalid("a branch of a folder's list shows nothing")
 	}
 	// An entry takes 45 bytes at least, so a count is held to the bytes.
 	if r.remaining()/leastEntryBytes < shownEntries {
-		return nil, invalid("a run of a folder's list is cut short")
+		return nil, invalid("a branch of a folder's list is cut short")
 	}
 	entries := make([]Entry, 0, shownEntries)
 	for index := 0; index < shownEntries; index++ {
@@ -1429,7 +1429,7 @@ func DecodeFolderRun(bytes []byte) (*FolderRun, error) {
 		if r.err != nil {
 			return nil, r.err
 		}
-		// The first carried node of a run that does not start the list is
+		// The first carried node of a branch that does not start the list is
 		// the node that begins the list. No fork hashes a name for it, so
 		// it comes with none. Every other one comes with a name.
 		beginsTheList := index == 0 && start > 0
@@ -1452,36 +1452,36 @@ func DecodeFolderRun(bytes []byte) (*FolderRun, error) {
 		return nil, err
 	}
 	if count == 0 && len(nodes) != 0 {
-		return nil, invalid("a run of an empty folder carries nodes")
+		return nil, invalid("a branch of an empty folder carries nodes")
 	}
-	return &FolderRun{count: count, start: start, entries: entries, carried: nodes}, nil
+	return &FolderBranch{count: count, start: start, entries: entries, carried: nodes}, nil
 }
 
-// Check checks the run against the folder it is said to be a part of. Every
+// Check checks the branch against the folder it is said to be a part of. Every
 // entry shown is then an entry of that folder, at the place where a search
 // for its name ends.
-func (r *FolderRun) Check(folder Target) error {
+func (r *FolderBranch) Check(folder Target) error {
 	if err := folder.require(KindFolder); err != nil {
 		return err
 	}
 	if r.count == 0 {
 		if len(r.entries) != 0 || len(r.carried) != 0 || r.start != 0 {
-			return invalid("a run of an empty folder shows something")
+			return invalid("a branch of an empty folder shows something")
 		}
 		return confirm(folder, 0, node{})
 	}
-	result, err := checkOpening(folderTree, r.count, r.start, leavesOf(r.entries), r.carried)
+	result, err := checkBranch(folderTree, r.count, r.start, leavesOf(r.entries), r.carried)
 	if err != nil {
 		return err
 	}
 	return confirm(folder, r.count, result.top)
 }
 
-// CheckName checks the run as the answer to "what is under name in this
+// CheckName checks the branch as the answer to "what is under name in this
 // folder". It gives the entry, or false when the folder has no entry of that
-// name. Either answer is proven: the run must show the one place where the
+// name. Either answer is proven: the branch must show the one place where the
 // name can be.
-func (r *FolderRun) CheckName(folder Target, name string) (Entry, bool, error) {
+func (r *FolderBranch) CheckName(folder Target, name string) (Entry, bool, error) {
 	if err := CheckName(name); err != nil {
 		return Entry{}, false, err
 	}
@@ -1512,10 +1512,10 @@ func (r *FolderRun) CheckName(folder Target, name string) (Entry, bool, error) {
 // Totals is what a tree says about itself as a whole: how much a store has
 // to keep for it. Each counts a thing once, however often the tree uses it.
 type Totals struct {
-	// Pieces is how many different pieces the tree has.
-	Pieces uint64
-	// PieceBytes is how many bytes those pieces hold.
-	PieceBytes uint64
+	// Chunks is how many different chunks the tree has.
+	Chunks uint64
+	// ChunkBytes is how many bytes those chunks hold.
+	ChunkBytes uint64
 	// ListBytes is how many bytes the lists of its different files and
 	// folders take.
 	ListBytes uint64
@@ -1524,27 +1524,27 @@ type Totals struct {
 // Record is a tree's record: the file or folder on top, the tree's totals,
 // and its extra data. The hash of the record is the tree's root.
 type Record struct {
-	top     Target
-	totals  Totals
-	extra   ExtraData
-	cutting Cutting
+	top      Target
+	totals   Totals
+	extra    ExtraData
+	chunking Chunking
 }
 
-// NewRecord is the record of a tree with top on top. How the tree was cut is
+// NewRecord is the record of a tree with top on top. How the tree was chunked is
 // written into the extra data, in place of anything the caller put under
 // that name.
-func NewRecord(top Target, totals Totals, cutting Cutting, extra ExtraData) (*Record, error) {
+func NewRecord(top Target, totals Totals, chunking Chunking, extra ExtraData) (*Record, error) {
 	if _, err := kindFromByte(byte(top.Kind)); err != nil {
 		return nil, err
 	}
-	extra, err := extra.Without(CuttingKey).WithText(CuttingKey, cutting.Tag())
+	extra, err := extra.Without(ChunkingKey).WithText(ChunkingKey, chunking.Tag())
 	if err != nil {
 		return nil, err
 	}
 	if err := checkTotals(top, totals); err != nil {
 		return nil, err
 	}
-	return &Record{top: top, totals: totals, extra: extra, cutting: cutting}, nil
+	return &Record{top: top, totals: totals, extra: extra, chunking: chunking}, nil
 }
 
 // DecodeRecord reads a record.
@@ -1568,8 +1568,8 @@ func DecodeRecord(bytes []byte) (*Record, error) {
 	size := r.u64()
 	hash := r.hash()
 	var totals Totals
-	totals.Pieces = r.u64()
-	totals.PieceBytes = r.u64()
+	totals.Chunks = r.u64()
+	totals.ChunkBytes = r.u64()
 	totals.ListBytes = r.u64()
 	if r.err != nil {
 		return nil, r.err
@@ -1581,11 +1581,11 @@ func DecodeRecord(bytes []byte) (*Record, error) {
 	if err := r.finish(); err != nil {
 		return nil, err
 	}
-	tag, found := extra.raw(CuttingKey)
+	tag, found := extra.raw(ChunkingKey)
 	if !found {
-		return nil, invalid("a record does not say how the tree was cut")
+		return nil, invalid("a record does not say how the tree was chunked")
 	}
-	cutting, err := cuttingFromTag(tag)
+	chunking, err := chunkingFromTag(tag)
 	if err != nil {
 		return nil, err
 	}
@@ -1593,7 +1593,7 @@ func DecodeRecord(bytes []byte) (*Record, error) {
 	if err := checkTotals(top, totals); err != nil {
 		return nil, err
 	}
-	return &Record{top: top, totals: totals, extra: extra, cutting: cutting}, nil
+	return &Record{top: top, totals: totals, extra: extra, chunking: chunking}, nil
 }
 
 // Encode gives the record's bytes.
@@ -1602,8 +1602,8 @@ func (r *Record) Encode() []byte {
 	out = append(out, recordMark, byte(r.top.Kind))
 	out = binary.BigEndian.AppendUint64(out, r.top.Size)
 	out = append(out, r.top.Hash[:]...)
-	out = binary.BigEndian.AppendUint64(out, r.totals.Pieces)
-	out = binary.BigEndian.AppendUint64(out, r.totals.PieceBytes)
+	out = binary.BigEndian.AppendUint64(out, r.totals.Chunks)
+	out = binary.BigEndian.AppendUint64(out, r.totals.ChunkBytes)
 	out = binary.BigEndian.AppendUint64(out, r.totals.ListBytes)
 	return r.extra.appendTo(out)
 }
@@ -1628,19 +1628,19 @@ func (r *Record) Extra() ExtraData {
 	return r.extra
 }
 
-// Cutting is how the tree's files were cut.
-func (r *Record) Cutting() Cutting {
-	return r.cutting
+// Chunking is how the tree's files were chunked.
+func (r *Record) Chunking() Chunking {
+	return r.chunking
 }
 
 // checkTotals holds a record's numbers to what must hold between them in
 // any tree. Whether the totals are right is checked against the whole tree.
 func checkTotals(top Target, totals Totals) error {
-	fits := totals.Pieces <= totals.PieceBytes && totals.PieceBytes <= top.Size
-	if high, most := bits.Mul64(totals.Pieces, MaxPieceBytes); high == 0 && totals.PieceBytes > most {
+	fits := totals.Chunks <= totals.ChunkBytes && totals.ChunkBytes <= top.Size
+	if high, most := bits.Mul64(totals.Chunks, MaxChunkBytes); high == 0 && totals.ChunkBytes > most {
 		fits = false
 	}
-	if high, least := bits.Mul64(totals.Pieces, ListItemBytes); high != 0 || totals.ListBytes < least {
+	if high, least := bits.Mul64(totals.Chunks, ListItemBytes); high != 0 || totals.ListBytes < least {
 		fits = false
 	}
 	if top.Kind != KindFolder && totals.ListBytes%ListItemBytes != 0 {

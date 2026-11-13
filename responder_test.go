@@ -32,8 +32,8 @@ func listsReadFor(t *testing.T, store *countingStore, responder *Responder, file
 	for round := range uint64(20) {
 		for _, file := range files {
 			for _, request := range []Request{
-				RequestPieces(file, round, 2),
-				RequestFileRun(file, round, 3),
+				RequestChunks(file, round, 2),
+				RequestFileBranch(file, round, 3),
 				RequestFileBytes(file, round*16, 20),
 			} {
 				frames := 0
@@ -52,7 +52,7 @@ func listsReadFor(t *testing.T, store *countingStore, responder *Responder, file
 
 func TestListsThatWereAskedAboutAreNotReadAgain(t *testing.T) {
 	store := &countingStore{MemoryStore: NewMemoryStore()}
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	first := must[Target](t)(builder.FileFromBytes(corpusBytes("responder-a", 1600)))
 	second := must[Target](t)(builder.FileFromBytes(corpusBytes("responder-b", 1600)))
 	files := [2]Hash{first.Hash, second.Hash}
@@ -68,9 +68,9 @@ func TestListsThatWereAskedAboutAreNotReadAgain(t *testing.T) {
 	store.Remove(StoredFileList, first.Hash)
 	store.Put(StoredFileList, first.Hash, bytes.Repeat([]byte{7}, 72))
 	for _, request := range []Request{
-		RequestFileRun(first.Hash, 0, 1),
+		RequestFileBranch(first.Hash, 0, 1),
 		RequestFileBytes(first.Hash, 0, 1),
-		RequestPieces(first.Hash, 0, 1),
+		RequestChunks(first.Hash, 0, 1),
 		RequestHave(first.Hash),
 	} {
 		err := NewResponder(store).Answer(request.Encode(), func([]byte) error { return nil })
@@ -81,9 +81,9 @@ func TestListsThatWereAskedAboutAreNotReadAgain(t *testing.T) {
 	}
 }
 
-func TestAResponderCanKeepToItselfWhichPiecesItHolds(t *testing.T) {
+func TestAResponderCanKeepToItselfWhichChunksItHolds(t *testing.T) {
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	file := must[Target](t)(builder.FileFromBytes(corpusBytes("responder-have", 160)))
 	request := RequestHave(file.Hash).Encode()
 	answer := func(responder *Responder) Frame {
@@ -110,26 +110,26 @@ func TestAResponderCanKeepToItselfWhichPiecesItHolds(t *testing.T) {
 
 func TestAListReadWithItsTreeIsTheListReadAlone(t *testing.T) {
 	for _, count := range []int{0, 1, 2, 3, 5, 8, 13, 100} {
-		var items []PieceRef
+		var items []ChunkRef
 		for number := range count {
-			items = append(items, must[PieceRef](t)(PieceRefOf(corpusBytes(fmt.Sprintf("piece-%d", number), 16))))
+			items = append(items, must[ChunkRef](t)(ChunkRefOf(corpusBytes(fmt.Sprintf("chunk-%d", number), 16))))
 		}
 		list := must[*FileList](t)(NewFileList(items))
 		open := must[*OpenFile](t)(DecodeOpenFile(list.Encode()))
 		if open.List().Hash() != list.Hash() || !bytes.Equal(open.List().Encode(), list.Encode()) {
-			t.Fatalf("%d pieces: the list read with its tree is another list", count)
+			t.Fatalf("%d chunks: the list read with its tree is another list", count)
 		}
 		if count > 0 {
 			end := uint64(min(count, 3))
-			read := must[*FileRun](t)(open.Open(0, end))
-			built := must[*FileRun](t)(must[*OpenFile](t)(NewOpenFile(list)).Open(0, end))
-			alone := must[*FileRun](t)(list.Open(0, end))
+			read := must[*FileBranch](t)(open.Open(0, end))
+			built := must[*FileBranch](t)(must[*OpenFile](t)(NewOpenFile(list)).Open(0, end))
+			alone := must[*FileBranch](t)(list.Open(0, end))
 			if !bytes.Equal(read.Encode(), built.Encode()) || !bytes.Equal(read.Encode(), alone.Encode()) {
-				t.Fatalf("%d pieces: a run is shown otherwise", count)
+				t.Fatalf("%d chunks: a branch is shown otherwise", count)
 			}
 		}
 	}
-	file := must[*FileList](t)(NewFileList([]PieceRef{must[PieceRef](t)(PieceRefOf([]byte("some bytes")))})).Target()
+	file := must[*FileList](t)(NewFileList([]ChunkRef{must[ChunkRef](t)(ChunkRefOf([]byte("some bytes")))})).Target()
 	entry := func(number int) Entry {
 		return plainEntry(t, fmt.Sprintf("name-%03d", number), file)
 	}
@@ -144,9 +144,9 @@ func TestAListReadWithItsTreeIsTheListReadAlone(t *testing.T) {
 			t.Fatalf("%d entries: the list read with its tree is another list", count)
 		}
 		for _, name := range []string{"name-000", "name-025", "not-there"} {
-			read := must[*FolderRun](t)(open.OpenName(name))
-			built := must[*FolderRun](t)(must[*OpenFolder](t)(NewOpenFolder(list)).OpenName(name))
-			alone := must[*FolderRun](t)(list.OpenName(name))
+			read := must[*FolderBranch](t)(open.OpenName(name))
+			built := must[*FolderBranch](t)(must[*OpenFolder](t)(NewOpenFolder(list)).OpenName(name))
+			alone := must[*FolderBranch](t)(list.OpenName(name))
 			if !bytes.Equal(read.Encode(), built.Encode()) || !bytes.Equal(read.Encode(), alone.Encode()) {
 				t.Fatalf("%d entries: %s is shown otherwise", count, name)
 			}

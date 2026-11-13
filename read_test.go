@@ -17,7 +17,7 @@ import (
 func TestAStretchIsReadFromAnOpenFileWithoutAPassOverItsList(t *testing.T) {
 	store := NewMemoryStore()
 	data := corpusBytes("open", 100)
-	file := must[Target](t)(NewBuilder(store, smallPieces(t)).FileFromBytes(data))
+	file := must[Target](t)(NewBuilder(store, smallChunks(t)).FileFromBytes(data))
 	open := must[*OpenFile](t)(NewOpenFile(fileListOf(t, store, file)))
 	var out bytes.Buffer
 	for offset := 0; offset <= 100; offset++ {
@@ -32,14 +32,14 @@ func TestAStretchIsReadFromAnOpenFileWithoutAPassOverItsList(t *testing.T) {
 	if ReadOpen(store, open, 0, 101, &out) == nil || ReadOpen(store, open, 101, 0, &out) == nil || ReadOpen(store, open, ^uint64(0), 2, &out) == nil {
 		t.Fatal("a stretch outside the file was read")
 	}
-	// A piece that is missing: an error, and no byte.
-	piece := open.List().Items()[3]
-	store.Remove(StoredPiece, piece.Hash)
+	// A chunk that is missing: an error, and no byte.
+	chunk := open.List().Items()[3]
+	store.Remove(StoredChunk, chunk.Hash)
 	if err := ReadOpen(store, open, 40, 30, &out); !errors.Is(err, ErrMissing) || out.Len() != 0 {
 		t.Fatalf("%d bytes (%v)", out.Len(), err)
 	}
 	// An empty file has one stretch: none of its bytes, from its start.
-	empty := must[Target](t)(NewBuilder(store, smallPieces(t)).FileFromBytes(nil))
+	empty := must[Target](t)(NewBuilder(store, smallChunks(t)).FileFromBytes(nil))
 	open = must[*OpenFile](t)(NewOpenFile(fileListOf(t, store, empty)))
 	if err := ReadOpen(store, open, 0, 0, &out); err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func exists(path string) bool {
 
 func TestASmallTreeThatStandsForMoreFoldersThanADiskHoldsIsNotWritten(t *testing.T) {
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	// An empty folder, and above it 100 folders that each hold the one
 	// below under two names.
 	folder := must[Target](t)(builder.Folder(nil))
@@ -85,7 +85,7 @@ func TestASmallTreeThatStandsForMoreFoldersThanADiskHoldsIsNotWritten(t *testing
 		t.Fatal("something was made before the folders were counted")
 	}
 	// Twenty levels of it are counted exactly: 2^21 - 1 folders.
-	builder = NewBuilder(store, smallPieces(t))
+	builder = NewBuilder(store, smallChunks(t))
 	folder = must[Target](t)(builder.Folder(nil))
 	for range 20 {
 		folder = must[Target](t)(builder.Folder([]Entry{plainEntry(t, "a", folder), plainEntry(t, "b", folder)}))
@@ -124,7 +124,7 @@ func TestWritingOutStaysWithinWhatItIsGiven(t *testing.T) {
 	}
 	// A file on top is one thing to make, and takes its own size.
 	file := targetAt(t, store, root, "weights/model.bin")
-	alone := must[Root](t)(NewBuilder(store, smallPieces(t)).Finish(file, ExtraData{}))
+	alone := must[Root](t)(NewBuilder(store, smallChunks(t)).Finish(file, ExtraData{}))
 	dest := filepath.Join(temp, "alone.bin")
 	if err := WriteToDiskWith(store, alone, dest, WriteOptions{MaxBytes: 999}); !errors.Is(err, ErrLimitExceeded) || exists(dest) {
 		t.Fatal(err)
@@ -140,7 +140,7 @@ func TestWritingOutStaysWithinWhatItIsGiven(t *testing.T) {
 func TestEveryStretchOfAFileReadsBack(t *testing.T) {
 	store := NewMemoryStore()
 	data := corpusBytes("stretch", 100)
-	file := must[Target](t)(NewBuilder(store, smallPieces(t)).FileFromBytes(data))
+	file := must[Target](t)(NewBuilder(store, smallChunks(t)).FileFromBytes(data))
 	var out bytes.Buffer
 	for offset := 0; offset <= 100; offset++ {
 		for length := 0; length <= 100-offset; length++ {
@@ -159,14 +159,14 @@ func TestEveryStretchOfAFileReadsBack(t *testing.T) {
 	}
 }
 
-func TestAFileWithAPieceMissingGivesAnErrorAndNoBytes(t *testing.T) {
+func TestAFileWithAChunkMissingGivesAnErrorAndNoBytes(t *testing.T) {
 	store := NewMemoryStore()
 	data := corpusBytes("holed", 100)
-	file := must[Target](t)(NewBuilder(store, smallPieces(t)).FileFromBytes(data))
-	// Piece 3 holds bytes 48 to 63.
-	piece := fileListOf(t, store, file).Items()[3]
-	honest := keptIn(t, store, StoredPiece, piece.Hash)
-	store.Remove(StoredPiece, piece.Hash)
+	file := must[Target](t)(NewBuilder(store, smallChunks(t)).FileFromBytes(data))
+	// Chunk 3 holds bytes 48 to 63.
+	chunk := fileListOf(t, store, file).Items()[3]
+	honest := keptIn(t, store, StoredChunk, chunk.Hash)
+	store.Remove(StoredChunk, chunk.Hash)
 	var out bytes.Buffer
 	if err := ReadFile(store, file, &out); !errors.Is(err, ErrMissing) || out.Len() != 0 {
 		t.Fatalf("%d bytes came back, and never a shorter file (%v)", out.Len(), err)
@@ -179,15 +179,15 @@ func TestAFileWithAPieceMissingGivesAnErrorAndNoBytes(t *testing.T) {
 			t.Fatalf("%v: %d bytes (%v)", stretch, out.Len(), err)
 		}
 	}
-	// What does not need the piece is still read.
+	// What does not need the chunk is still read.
 	if err := errors.Join(ReadRange(store, file, 0, 48, &out), ReadRange(store, file, 64, 36, &out)); err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(out.Bytes(), joined(data[:48], data[64:])) {
-		t.Fatal("the bytes around the missing piece do not read back")
+		t.Fatal("the bytes around the missing chunk do not read back")
 	}
-	// Other bytes under the piece's hash are no piece of the file.
-	store.Put(StoredPiece, piece.Hash, corpusBytes("other", 16))
+	// Other bytes under the chunk's hash are no chunk of the file.
+	store.Put(StoredChunk, chunk.Hash, corpusBytes("other", 16))
 	if _, err := ReadFileBytes(store, file); !errors.Is(err, ErrCorrupt) {
 		t.Fatal(err)
 	}
@@ -195,12 +195,12 @@ func TestAFileWithAPieceMissingGivesAnErrorAndNoBytes(t *testing.T) {
 	if err := ReadFile(store, file, &out); !errors.Is(err, ErrCorrupt) || !bytes.Equal(out.Bytes(), data[:48]) {
 		t.Fatalf("%d bytes (%v)", out.Len(), err)
 	}
-	swapIn(store, StoredPiece, piece.Hash, corpusBytes("other", 5))
+	swapIn(store, StoredChunk, chunk.Hash, corpusBytes("other", 5))
 	out.Reset()
 	if err := ReadFile(store, file, &out); !errors.Is(err, ErrSizeMismatch) || out.Len() != 0 {
 		t.Fatalf("%d bytes (%v)", out.Len(), err)
 	}
-	swapIn(store, StoredPiece, piece.Hash, honest)
+	swapIn(store, StoredChunk, chunk.Hash, honest)
 	if content := must[[]byte](t)(ReadFileBytes(store, file)); !bytes.Equal(content, data) {
 		t.Fatal("the file does not read back")
 	}
@@ -271,7 +271,7 @@ func filesUnder(t *testing.T, folder string) []fileOnDisk {
 
 func TestATreeWrittenToDiskBuildsToTheSameRoot(t *testing.T) {
 	sample := writeTree(t, sampleFiles())
-	options := BuildOptions{Cutting: smallPieces(t)}
+	options := BuildOptions{Chunking: smallChunks(t)}
 	store := NewMemoryStore()
 	root := must[Root](t)(Build(store, sample, options))
 	temp := t.TempDir()
@@ -292,7 +292,7 @@ func TestATreeWrittenToDiskBuildsToTheSameRoot(t *testing.T) {
 	}
 	// A tree with a file on top is written as that file.
 	file := targetAt(t, store, root, "weights/model.bin")
-	alone := must[Root](t)(NewBuilder(store, smallPieces(t)).Finish(file, ExtraData{}))
+	alone := must[Root](t)(NewBuilder(store, smallChunks(t)).Finish(file, ExtraData{}))
 	destFile := filepath.Join(temp, "written.bin")
 	if err := WriteToDisk(store, alone, destFile); err != nil {
 		t.Fatal(err)
@@ -316,8 +316,8 @@ func TestATreeWrittenToDiskBuildsToTheSameRoot(t *testing.T) {
 func TestNothingIsWrittenWhenAPartIsMissing(t *testing.T) {
 	store, root := sampleTree(t)
 	shard := targetAt(t, store, root, "weights/shards/b.bin")
-	piece := fileListOf(t, store, shard).Items()[2]
-	store.Remove(StoredPiece, piece.Hash)
+	chunk := fileListOf(t, store, shard).Items()[2]
+	store.Remove(StoredChunk, chunk.Hash)
 	dest := filepath.Join(t.TempDir(), "written")
 	if err := WriteToDisk(store, root, dest); !errors.Is(err, ErrMissing) || exists(dest) {
 		t.Fatalf("the lack has to be found before anything is written: %v", err)
@@ -338,7 +338,7 @@ func TestTwoNamesThatOneSystemTakesForOneAreRefusedThere(t *testing.T) {
 	temp := t.TempDir()
 	folds := foldsCase(t, temp)
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	upper := must[Target](t)(builder.FileFromBytes([]byte("under the capital")))
 	lower := must[Target](t)(builder.FileFromBytes([]byte("under the small letter")))
 	inner := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "x", upper)}))
@@ -351,7 +351,7 @@ func TestTwoNamesThatOneSystemTakesForOneAreRefusedThere(t *testing.T) {
 		{"folder-and-file", []Entry{plainEntry(t, "Name", lower), plainEntry(t, "name", inner)}},
 		{"two-folders", []Entry{plainEntry(t, "Dir", inner), plainEntry(t, "dir", inner)}},
 	} {
-		builder := NewBuilder(store, smallPieces(t))
+		builder := NewBuilder(store, smallChunks(t))
 		top := must[Target](t)(builder.Folder(names.entries))
 		// Held in a tree, the two names are two names.
 		root := must[Root](t)(builder.Finish(top, ExtraData{}))
@@ -361,7 +361,7 @@ func TestTwoNamesThatOneSystemTakesForOneAreRefusedThere(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s: %v", names.what, err)
 			}
-			if again := must[Root](t)(Build(NewMemoryStore(), dest, BuildOptions{Cutting: smallPieces(t)})); again != root {
+			if again := must[Root](t)(Build(NewMemoryStore(), dest, BuildOptions{Chunking: smallChunks(t)})); again != root {
 				t.Fatalf("%s: what was written builds to another root", names.what)
 			}
 			continue
@@ -412,7 +412,7 @@ func TestNamesThatWindowsCannotHoldAreFound(t *testing.T) {
 
 func TestANameThisSystemCannotHoldIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	file := must[Target](t)(builder.FileFromBytes([]byte("content")))
 	inner := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "fine", file), plainEntry(t, "nul.txt", file)}))
 	top := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "a-fine-name", file), plainEntry(t, "sub", inner)}))

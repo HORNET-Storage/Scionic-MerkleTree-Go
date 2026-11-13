@@ -10,10 +10,10 @@ import (
 // What a receiver asks, and the frames that answer it.
 //
 // A receiver asks from the top down: for the record of a root, for a
-// folder's entries, for a file's list, and for pieces. It asks for pieces by
-// the file's hash and their numbers in it, or for one piece by its hash.
+// folder's entries, for a file's list, and for chunks. It asks for chunks by
+// the file's hash and their numbers in it, or for one chunk by its hash.
 //
-// An answer is one frame, or for pieces one frame for each piece. A frame
+// An answer is one frame, or for chunks one frame for each chunk. A frame
 // never says which hash it belongs under: the receiver works the hash out
 // from the frame's bytes, and holds it against a hash it already trusts.
 //
@@ -31,15 +31,15 @@ const (
 	FrameFileList FrameKind = 0x21
 	// FrameFolderList is a folder's whole list.
 	FrameFolderList FrameKind = 0x22
-	// FrameFileRun is a run of a file's list, with the nodes that stand for
+	// FrameFileBranch is a branch of a file's list, with the nodes that stand for
 	// the rest.
-	FrameFileRun FrameKind = 0x23
-	// FrameFolderRun is a run of a folder's list, with the nodes that stand
+	FrameFileBranch FrameKind = 0x23
+	// FrameFolderBranch is a branch of a folder's list, with the nodes that stand
 	// for the rest.
-	FrameFolderRun FrameKind = 0x24
-	// FramePiece is a piece's bytes.
-	FramePiece FrameKind = 0x25
-	// FrameHave says which pieces of a file a peer holds.
+	FrameFolderBranch FrameKind = 0x24
+	// FrameChunk is a chunk's bytes.
+	FrameChunk FrameKind = 0x25
+	// FrameHave says which chunks of a file a peer holds.
 	FrameHave FrameKind = 0x26
 	// FrameRefused: the peer does not answer, and why.
 	FrameRefused FrameKind = 0x27
@@ -53,24 +53,24 @@ const (
 	AskRecord RequestKind = 0x30
 	// AskFolder asks for all of a folder's entries.
 	AskFolder RequestKind = 0x31
-	// AskFolderRun asks for Count of a folder's entries, from place Start.
-	AskFolderRun RequestKind = 0x32
+	// AskFolderBranch asks for Count of a folder's entries, from place Start.
+	AskFolderBranch RequestKind = 0x32
 	// AskFolderName asks what is under one name in a folder, or that the
 	// name is not there.
 	AskFolderName RequestKind = 0x33
 	// AskFile asks for all of a file's list.
 	AskFile RequestKind = 0x34
-	// AskFileRun asks for Count items of a file's list, from piece number
+	// AskFileBranch asks for Count items of a file's list, from chunk number
 	// Start.
-	AskFileRun RequestKind = 0x35
+	AskFileBranch RequestKind = 0x35
 	// AskFileBytes asks for the items of a file's list that hold Length
 	// bytes from Offset.
 	AskFileBytes RequestKind = 0x36
-	// AskPieces asks for Count pieces of a file, from piece number Start.
-	AskPieces RequestKind = 0x37
-	// AskPiece asks for one piece, by its hash.
-	AskPiece RequestKind = 0x38
-	// AskHave asks which pieces of a file the peer holds.
+	// AskChunks asks for Count chunks of a file, from chunk number Start.
+	AskChunks RequestKind = 0x37
+	// AskChunk asks for one chunk, by its hash.
+	AskChunk RequestKind = 0x38
+	// AskHave asks which chunks of a file the peer holds.
 	AskHave RequestKind = 0x39
 )
 
@@ -89,12 +89,12 @@ const MaxRequestBytes = 35 + MaxNameBytes
 const readStepBytes = 1 << 20
 
 // Request is what a receiver asks a peer for. Kind says what, and Hash says
-// of which thing: the root, the folder, the file or the piece. The other
+// of which thing: the root, the folder, the file or the chunk. The other
 // fields are used by the kinds that their names are given with above.
 type Request struct {
 	Kind RequestKind
 	Hash Hash
-	// Start and Count: for AskFolderRun, AskFileRun and AskPieces.
+	// Start and Count: for AskFolderBranch, AskFileBranch and AskChunks.
 	Start uint64
 	Count uint32
 	// Name: for AskFolderName.
@@ -114,9 +114,9 @@ func RequestFolder(folder Hash) Request {
 	return Request{Kind: AskFolder, Hash: folder}
 }
 
-// RequestFolderRun asks for count of a folder's entries, from place start.
-func RequestFolderRun(folder Hash, start uint64, count uint32) Request {
-	return Request{Kind: AskFolderRun, Hash: folder, Start: start, Count: count}
+// RequestFolderBranch asks for count of a folder's entries, from place start.
+func RequestFolderBranch(folder Hash, start uint64, count uint32) Request {
+	return Request{Kind: AskFolderBranch, Hash: folder, Start: start, Count: count}
 }
 
 // RequestFolderName asks what is under one name in a folder, or that the
@@ -130,10 +130,10 @@ func RequestFile(file Hash) Request {
 	return Request{Kind: AskFile, Hash: file}
 }
 
-// RequestFileRun asks for count items of a file's list, from piece number
+// RequestFileBranch asks for count items of a file's list, from chunk number
 // start.
-func RequestFileRun(file Hash, start uint64, count uint32) Request {
-	return Request{Kind: AskFileRun, Hash: file, Start: start, Count: count}
+func RequestFileBranch(file Hash, start uint64, count uint32) Request {
+	return Request{Kind: AskFileBranch, Hash: file, Start: start, Count: count}
 }
 
 // RequestFileBytes asks for the items of a file's list that hold length
@@ -142,17 +142,17 @@ func RequestFileBytes(file Hash, offset, length uint64) Request {
 	return Request{Kind: AskFileBytes, Hash: file, Offset: offset, Length: length}
 }
 
-// RequestPieces asks for count pieces of a file, from piece number start.
-func RequestPieces(file Hash, start uint64, count uint32) Request {
-	return Request{Kind: AskPieces, Hash: file, Start: start, Count: count}
+// RequestChunks asks for count chunks of a file, from chunk number start.
+func RequestChunks(file Hash, start uint64, count uint32) Request {
+	return Request{Kind: AskChunks, Hash: file, Start: start, Count: count}
 }
 
-// RequestPiece asks for one piece, by its hash.
-func RequestPiece(piece Hash) Request {
-	return Request{Kind: AskPiece, Hash: piece}
+// RequestChunk asks for one chunk, by its hash.
+func RequestChunk(chunk Hash) Request {
+	return Request{Kind: AskChunk, Hash: chunk}
 }
 
-// RequestHave asks which pieces of a file the peer holds.
+// RequestHave asks which chunks of a file the peer holds.
 func RequestHave(file Hash) Request {
 	return Request{Kind: AskHave, Hash: file}
 }
@@ -163,7 +163,7 @@ func (r Request) Encode() []byte {
 	out = append(out, byte(r.Kind))
 	out = append(out, r.Hash[:]...)
 	switch r.Kind {
-	case AskFolderRun, AskFileRun, AskPieces:
+	case AskFolderBranch, AskFileBranch, AskChunks:
 		out = binary.BigEndian.AppendUint64(out, r.Start)
 		out = binary.BigEndian.AppendUint32(out, r.Count)
 	case AskFolderName:
@@ -185,8 +185,8 @@ func DecodeRequest(bytes []byte) (Request, error) {
 		return Request{}, r.err
 	}
 	switch request.Kind {
-	case AskRecord, AskFolder, AskFile, AskPiece, AskHave:
-	case AskFolderRun, AskFileRun, AskPieces:
+	case AskRecord, AskFolder, AskFile, AskChunk, AskHave:
+	case AskFolderBranch, AskFileBranch, AskChunks:
 		request.Start = r.u64()
 		request.Count = r.u32()
 		if r.err != nil {
@@ -247,45 +247,45 @@ func (r Refusal) String() string {
 	return "a refusal of an unknown kind"
 }
 
-// HaveMap says which pieces of a file a peer holds: one bit a piece, in the
+// HaveMap says which chunks of a file a peer holds: one bit a chunk, in the
 // file's order. A peer says this about itself, and nothing proves it.
 type HaveMap struct {
 	count uint64
 	bits  []byte
 }
 
-// NewHaveMap makes a map for a file of count pieces, with none held.
+// NewHaveMap makes a map for a file of count chunks, with none held.
 func NewHaveMap(count uint64) (*HaveMap, error) {
 	if count > MaxListItems {
-		return nil, invalid("a map for more pieces than a file can have")
+		return nil, invalid("a map for more chunks than a file can have")
 	}
 	length := (count + 7) / 8
 	if length > uint64(maxInt) {
-		return nil, limitExceeded("a map of held pieces", uint64(maxInt), length)
+		return nil, limitExceeded("a map of held chunks", uint64(maxInt), length)
 	}
 	return &HaveMap{count: count, bits: make([]byte, length)}, nil
 }
 
-// Count is how many pieces the file has.
+// Count is how many chunks the file has.
 func (m *HaveMap) Count() uint64 {
 	return m.count
 }
 
-// Get reports whether piece index is held. A piece beyond the count is not.
+// Get reports whether chunk index is held. A chunk beyond the count is not.
 func (m *HaveMap) Get(index uint64) bool {
 	return index < m.count && m.bits[index/8]&(0x80>>(index%8)) != 0
 }
 
-// Set marks piece index as held.
+// Set marks chunk index as held.
 func (m *HaveMap) Set(index uint64) error {
 	if index >= m.count {
-		return invalid("a piece beyond the end of the file")
+		return invalid("a chunk beyond the end of the file")
 	}
 	m.bits[index/8] |= 0x80 >> (index % 8)
 	return nil
 }
 
-// Held is how many pieces are held.
+// Held is how many chunks are held.
 func (m *HaveMap) Held() uint64 {
 	var held uint64
 	for _, value := range m.bits {
@@ -301,21 +301,21 @@ func (m *HaveMap) Encode() []byte {
 	return append(out, m.bits...)
 }
 
-// DecodeHaveMap reads a map. It has one bit for each piece and no more, and
+// DecodeHaveMap reads a map. It has one bit for each chunk and no more, and
 // the bits left over in its last byte are zero.
 func DecodeHaveMap(bytes []byte) (*HaveMap, error) {
-	r := reader{bytes: bytes, what: "a map of held pieces"}
+	r := reader{bytes: bytes, what: "a map of held chunks"}
 	count := r.u64()
 	if r.err != nil {
 		return nil, r.err
 	}
 	if count > MaxListItems || uint64(r.remaining()) != (count+7)/8 {
-		return nil, invalid("a map of held pieces does not fit its count")
+		return nil, invalid("a map of held chunks does not fit its count")
 	}
 	held := append([]byte(nil), r.take(r.remaining())...)
 	spare := (8 - count%8) % 8
 	if len(held) > 0 && held[len(held)-1]&(1<<spare-1) != 0 {
-		return nil, invalid("a map of held pieces has bits past its count")
+		return nil, invalid("a map of held chunks has bits past its count")
 	}
 	return &HaveMap{count: count, bits: held}, nil
 }
@@ -325,13 +325,13 @@ func DecodeHaveMap(bytes []byte) (*HaveMap, error) {
 type Frame struct {
 	Kind FrameKind
 	// Bytes is the whole frame for a record, the list for a file's or a
-	// folder's whole list, and the piece's bytes for a piece. It is a part
+	// folder's whole list, and the chunk's bytes for a chunk. It is a part
 	// of the bytes that were read, and not a copy.
 	Bytes []byte
-	// FileRun: for FrameFileRun.
-	FileRun *FileRun
-	// FolderRun: for FrameFolderRun.
-	FolderRun *FolderRun
+	// FileBranch: for FrameFileBranch.
+	FileBranch *FileBranch
+	// FolderBranch: for FrameFolderBranch.
+	FolderBranch *FolderBranch
 	// Have: for FrameHave.
 	Have *HaveMap
 	// Refusal: for FrameRefused.
@@ -351,21 +351,21 @@ func DecodeFrame(bytes []byte) (Frame, error) {
 		return Frame{Kind: kind, Bytes: bytes}, nil
 	case FrameFileList, FrameFolderList:
 		return Frame{Kind: kind, Bytes: body}, nil
-	case FrameFileRun:
-		run, err := DecodeFileRun(body)
+	case FrameFileBranch:
+		branch, err := DecodeFileBranch(body)
 		if err != nil {
 			return Frame{}, err
 		}
-		return Frame{Kind: kind, FileRun: run}, nil
-	case FrameFolderRun:
-		run, err := DecodeFolderRun(body)
+		return Frame{Kind: kind, FileBranch: branch}, nil
+	case FrameFolderBranch:
+		branch, err := DecodeFolderBranch(body)
 		if err != nil {
 			return Frame{}, err
 		}
-		return Frame{Kind: kind, FolderRun: run}, nil
-	case FramePiece:
-		if len(body) == 0 || len(body) > MaxPieceBytes {
-			return Frame{}, invalid("a piece does not hold 1 byte to 8 MiB")
+		return Frame{Kind: kind, FolderBranch: branch}, nil
+	case FrameChunk:
+		if len(body) == 0 || len(body) > MaxChunkBytes {
+			return Frame{}, invalid("a chunk does not hold 1 byte to 8 MiB")
 		}
 		return Frame{Kind: kind, Bytes: body}, nil
 	case FrameHave:
@@ -399,22 +399,22 @@ func FolderListFrame(list []byte) []byte {
 	return framed(FrameFolderList, list)
 }
 
-// FileRunFrame is the frame for a run of a file's list.
-func FileRunFrame(run *FileRun) []byte {
-	return framed(FrameFileRun, run.Encode())
+// FileBranchFrame is the frame for a branch of a file's list.
+func FileBranchFrame(branch *FileBranch) []byte {
+	return framed(FrameFileBranch, branch.Encode())
 }
 
-// FolderRunFrame is the frame for a run of a folder's list.
-func FolderRunFrame(run *FolderRun) []byte {
-	return framed(FrameFolderRun, run.Encode())
+// FolderBranchFrame is the frame for a branch of a folder's list.
+func FolderBranchFrame(branch *FolderBranch) []byte {
+	return framed(FrameFolderBranch, branch.Encode())
 }
 
-// PieceFrame is the frame for a piece's bytes.
-func PieceFrame(piece []byte) []byte {
-	return framed(FramePiece, piece)
+// ChunkFrame is the frame for a chunk's bytes.
+func ChunkFrame(chunk []byte) []byte {
+	return framed(FrameChunk, chunk)
 }
 
-// HaveFrame is the frame for a map of held pieces.
+// HaveFrame is the frame for a map of held chunks.
 func HaveFrame(held *HaveMap) []byte {
 	return framed(FrameHave, held.Encode())
 }

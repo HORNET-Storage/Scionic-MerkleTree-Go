@@ -14,7 +14,7 @@ import (
 func TestAStoreThatFallsOverDoesNotLeaveWhatWasWrittenHeld(t *testing.T) {
 	store, root := sampleTree(t)
 	dest := filepath.Join(t.TempDir(), "written")
-	// The store falls over when the first piece is read, which is when the
+	// The store falls over when the first chunk is read, which is when the
 	// first file is open and being written into its new folder.
 	raised := endsByFalling(t, "writing a tree out", func() {
 		WriteToDisk(fallingOnGet{store}, root, dest)
@@ -33,7 +33,7 @@ func TestAStoreThatFallsOverDoesNotLeaveWhatWasWrittenHeld(t *testing.T) {
 	}
 	// The same for a tree that is one file.
 	file := targetAt(t, store, root, "weights/model.bin")
-	alone := must[Root](t)(NewBuilder(store, smallPieces(t)).Finish(file, ExtraData{}))
+	alone := must[Root](t)(NewBuilder(store, smallChunks(t)).Finish(file, ExtraData{}))
 	destFile := filepath.Join(t.TempDir(), "written.bin")
 	raised = endsByFalling(t, "writing a file out", func() {
 		WriteToDisk(fallingOnGet{store}, alone, destFile)

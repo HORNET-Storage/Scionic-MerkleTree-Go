@@ -18,12 +18,12 @@ import (
 // work.
 
 // trickyStore plays a trick in the middle of the library's work: when the
-// first piece is put, or when the thing it watches for is asked for. It has
+// first chunk is put, or when the thing it watches for is asked for. It has
 // the three methods that a store has to have, and no others.
 type trickyStore struct {
 	inner *MemoryStore
 	// watched is the thing whose asking for plays the trick. Without it,
-	// the trick is played when a piece is put.
+	// the trick is played when a chunk is put.
 	watched *storedKey
 	lock    sync.Mutex
 	// trick is given the bytes that are being put. It says whether it was
@@ -40,7 +40,7 @@ func (s *trickyStore) play(content []byte) {
 }
 
 func (s *trickyStore) Put(kind Stored, hash Hash, content []byte) error {
-	if s.watched == nil && kind == StoredPiece {
+	if s.watched == nil && kind == StoredChunk {
 		s.play(content)
 	}
 	return s.inner.Put(kind, hash, content)
@@ -61,8 +61,8 @@ func (s *trickyStore) Remove(kind Stored, hash Hash) error {
 // or a folder after its folder was read.
 const linkNow = "a link now, where a file or a folder was when the build began"
 
-func holdsPiece(store *MemoryStore, content []byte) bool {
-	held, _ := store.Has(StoredPiece, HashOf(content))
+func holdsChunk(store *MemoryStore, content []byte) bool {
+	held, _ := store.Has(StoredChunk, HashOf(content))
 	return held
 }
 
@@ -90,7 +90,7 @@ func TestAFolderThatBecomesALinkWhileItsFolderIsReadIsNotEntered(t *testing.T) {
 		writeFiles(t, top, map[string][]byte{"a-file": corpusBytes("swap-a", 64), "z-dir/inside": corpusBytes("swap-mine", 16)})
 		dir, moved := filepath.Join(top, "z-dir"), filepath.Join(top, "moved")
 		played := false
-		// When the first piece is kept, the folder is given another name,
+		// When the first chunk is kept, the folder is given another name,
 		// and its own name is given to a link that leads to the secret.
 		store := &trickyStore{inner: NewMemoryStore(), trick: func([]byte) bool {
 			if os.Rename(dir, moved) == nil {
@@ -98,9 +98,9 @@ func TestAFolderThatBecomesALinkWhileItsFolderIsReadIsNotEntered(t *testing.T) {
 			}
 			return true
 		}}
-		_, err := Build(store, top, BuildOptions{Cutting: smallPieces(t), Workers: threads})
+		_, err := Build(store, top, BuildOptions{Chunking: smallChunks(t), Workers: threads})
 		// Whatever the timing, the secret is not in the tree.
-		if holdsPiece(store.inner, secret) {
+		if holdsChunk(store.inner, secret) {
 			t.Fatalf("%d threads: the secret was read through a link", threads)
 		}
 		// One thread reads the folder's files before it goes down into the
@@ -127,22 +127,22 @@ func TestAFileThatBecomesALinkWhileItsFolderIsReadIsNotRead(t *testing.T) {
 	removeLink(t, probe)
 	top := filepath.Join(temp, "top")
 	played := false
-	// Whichever file is cut first, the other one is swapped for a link to
+	// Whichever file is chunked first, the other one is swapped for a link to
 	// the secret before its turn comes.
-	store := &trickyStore{inner: NewMemoryStore(), trick: func(piece []byte) bool {
+	store := &trickyStore{inner: NewMemoryStore(), trick: func(chunk []byte) bool {
 		other := filepath.Join(top, "x")
-		if bytes.Equal(piece, x) {
+		if bytes.Equal(chunk, x) {
 			other = filepath.Join(top, "y")
 		}
 		played = os.Remove(other) == nil && linkToFile(other, secretPath)
 		return true
 	}}
-	_, err := Build(store, top, BuildOptions{Cutting: smallPieces(t), Workers: 1})
+	_, err := Build(store, top, BuildOptions{Chunking: smallChunks(t), Workers: 1})
 	var told *Error
 	if !played || !errors.Is(err, ErrUnsupportedEntry) || !errors.As(err, &told) || told.What != linkNow {
 		t.Fatalf("the trick was played: %v, and the build gave: %v", played, err)
 	}
-	if holdsPiece(store.inner, secret) {
+	if holdsChunk(store.inner, secret) {
 		t.Fatal("the secret was read through a link")
 	}
 }
@@ -161,7 +161,7 @@ func TestNothingIsWrittenThroughALinkThatTakesANewFoldersPlace(t *testing.T) {
 		t.Skip("this system would not make such a link")
 	}
 	removeLink(t, probe)
-	options := BuildOptions{Cutting: smallPieces(t)}
+	options := BuildOptions{Chunking: smallChunks(t)}
 	plain := NewMemoryStore()
 	root := must[Root](t)(Build(plain, source, options))
 	folder := targetAt(t, plain, root, "z-dir")
@@ -173,7 +173,7 @@ func TestNothingIsWrittenThroughALinkThatTakesANewFoldersPlace(t *testing.T) {
 		watched storedKey
 	}{
 		{"held", storedKey{StoredFolderList, folder.Hash}},
-		{"waiting", storedKey{StoredPiece, HashOf(last)}},
+		{"waiting", storedKey{StoredChunk, HashOf(last)}},
 	} {
 		dest := filepath.Join(temp, "dest-"+moment.what)
 		dir, moved := filepath.Join(dest, "z-dir"), filepath.Join(dest, "moved")

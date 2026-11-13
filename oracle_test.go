@@ -10,7 +10,7 @@ import (
 // Nothing here is shared with the library: not a type, not a function, and
 // the hash is the standard library's. Each function is the rule as
 // spec/FORMAT.md states it, with no shortcut: a tree is hashed by halving,
-// an opening is found by walking. It does two jobs. It says what the
+// a branch is found by walking. It does two jobs. It says what the
 // library's hashes have to be, from another hand. And it forges: it hashes
 // lists that the library refuses to make, such as a folder that is out of
 // order on purpose, the way an author with code of his own could.
@@ -108,7 +108,7 @@ func oracleEntriesOf(entries []Entry) []oracleEntry {
 	return out
 }
 
-func oracleItemsOf(items []PieceRef) []oracleItem {
+func oracleItemsOf(items []ChunkRef) []oracleItem {
 	out := make([]oracleItem, len(items))
 	for at, item := range items {
 		out[at] = oracleItem{hash: item.Hash, length: item.Length}
@@ -184,7 +184,7 @@ func (l oracleLeaves) top() oracleNode {
 	return l.node(0, len(l.nodes))
 }
 
-// oracleCarried is a node that stands for a run that is left out, with the
+// oracleCarried is a node that stands for a branch that is left out, with the
 // first name under it.
 type oracleCarried struct {
 	node oracleNode
@@ -192,7 +192,7 @@ type oracleCarried struct {
 }
 
 // carried gives the nodes to carry when items start up to end are shown:
-// one for each run that is left out, in the order a checker meets them,
+// one for each branch that is left out, in the order a checker meets them,
 // each with the first name under it. The node that begins the list has no
 // name: it is in no right half, so no fork hashes one for it.
 func (l oracleLeaves) carried(start, end int) []oracleCarried {
@@ -256,26 +256,26 @@ func oracleFolderListBytes(entries []oracleEntry) []byte {
 }
 
 // oracleRecordBytes gives a record's bytes. Its hash is the root. The
-// totals are the pieces, the pieces' bytes and the lists' bytes.
+// totals are the chunks, the chunks' bytes and the lists' bytes.
 func oracleRecordBytes(kind byte, size uint64, hash oracleHash, totals [3]uint64, extra []oracleValue) []byte {
 	return joined([]byte{0x20, kind}, be64(size), hash[:], be64(totals[0]), be64(totals[1]), be64(totals[2]), oracleExtraBytes(extra))
 }
 
-// oracleCutTag gives the extra data of a record that says only how the
-// tree was cut.
-func oracleCutTag(tag string) []oracleValue {
+// oracleChunkingTag gives the extra data of a record that says only how the
+// tree was chunked.
+func oracleChunkingTag(tag string) []oracleValue {
 	return []oracleValue{{[]byte("chunking"), []byte(tag)}}
 }
 
-// oracleFileRunFrame gives the frame that shows items start up to end of a
+// oracleFileBranchFrame gives the frame that shows items start up to end of a
 // file's list.
-func oracleFileRunFrame(items []oracleItem, start, end int) []byte {
-	return oracleFileRunFrameAs(uint64(len(items)), uint64(start), items[start:end], oracleFileLeaves(items).carried(start, end))
+func oracleFileBranchFrame(items []oracleItem, start, end int) []byte {
+	return oracleFileBranchFrameAs(uint64(len(items)), uint64(start), items[start:end], oracleFileLeaves(items).carried(start, end))
 }
 
-// oracleFileRunFrameAs gives a file-run frame from its parts, whatever
+// oracleFileBranchFrameAs gives a file-branch frame from its parts, whatever
 // they say.
-func oracleFileRunFrameAs(count, start uint64, shown []oracleItem, carried []oracleCarried) []byte {
+func oracleFileBranchFrameAs(count, start uint64, shown []oracleItem, carried []oracleCarried) []byte {
 	out := joined([]byte{0x23}, be64(count), be64(start), be32(uint32(len(shown))), oracleFileListBytes(shown), be16(len(carried)))
 	for _, node := range carried {
 		out = joined(out, node.node.hash[:], be64(node.node.size))
@@ -283,15 +283,15 @@ func oracleFileRunFrameAs(count, start uint64, shown []oracleItem, carried []ora
 	return out
 }
 
-// oracleFolderRunFrame gives the frame that shows entries start up to end
+// oracleFolderBranchFrame gives the frame that shows entries start up to end
 // of a folder's list.
-func oracleFolderRunFrame(entries []oracleEntry, start, end int) []byte {
-	return oracleFolderRunFrameAs(uint64(len(entries)), uint64(start), entries[start:end], oracleFolderLeaves(entries).carried(start, end))
+func oracleFolderBranchFrame(entries []oracleEntry, start, end int) []byte {
+	return oracleFolderBranchFrameAs(uint64(len(entries)), uint64(start), entries[start:end], oracleFolderLeaves(entries).carried(start, end))
 }
 
-// oracleFolderRunFrameAs gives a folder-run frame from its parts, whatever
+// oracleFolderBranchFrameAs gives a folder-branch frame from its parts, whatever
 // they say.
-func oracleFolderRunFrameAs(count, start uint64, shown []oracleEntry, carried []oracleCarried) []byte {
+func oracleFolderBranchFrameAs(count, start uint64, shown []oracleEntry, carried []oracleCarried) []byte {
 	out := joined([]byte{0x24}, be64(count), be64(start), be32(uint32(len(shown))), oracleFolderListBytes(shown), be16(len(carried)))
 	for _, node := range carried {
 		out = joined(out, node.node.hash[:], be64(node.node.size), be16(len(node.name)), node.name)

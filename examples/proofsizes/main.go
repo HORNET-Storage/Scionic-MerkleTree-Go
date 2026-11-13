@@ -44,11 +44,11 @@ func nameOf(number int) string {
 // list takes, and how many a branch that shows one entry by its name.
 func folderRow(count int) (list, branch int, err error) {
 	store := scionic.NewMemoryStore()
-	cutting, err := scionic.FixedCutting(16)
+	chunking, err := scionic.FixedChunking(16)
 	if err != nil {
 		return 0, 0, err
 	}
-	builder := scionic.NewBuilder(store, cutting)
+	builder := scionic.NewBuilder(store, chunking)
 	file, err := builder.FileFromBytes([]byte("the same small file"))
 	if err != nil {
 		return 0, 0, err
@@ -78,7 +78,7 @@ func folderRow(count int) (list, branch int, err error) {
 func fileRow(count int) (list, branch int, err error) {
 	// Chunks of one byte, so that a file of many chunks is small.
 	store := scionic.NewMemoryStore()
-	cutting, err := scionic.FixedCutting(1)
+	chunking, err := scionic.FixedChunking(1)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -86,7 +86,7 @@ func fileRow(count int) (list, branch int, err error) {
 	for at := range content {
 		content[at] = byte(at % 251)
 	}
-	file, err := scionic.NewBuilder(store, cutting).FileFromBytes(content)
+	file, err := scionic.NewBuilder(store, chunking).FileFromBytes(content)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -94,7 +94,7 @@ func fileRow(count int) (list, branch int, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	branch, err = answerBytes(store, scionic.RequestFileRun(file.Hash, uint64(count/2), 1))
+	branch, err = answerBytes(store, scionic.RequestFileBranch(file.Hash, uint64(count/2), 1))
 	return len(kept), branch, err
 }
 

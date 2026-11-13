@@ -68,18 +68,18 @@ func mustHash(t *testing.T, text string) Hash {
 	return hash
 }
 
-// smallPieces cuts into pieces of 16 bytes, so that small files have many
-// pieces.
-func smallPieces(t *testing.T) Cutting {
+// smallChunks splits into chunks of 16 bytes, so that small files have many
+// chunks.
+func smallChunks(t *testing.T) Chunking {
 	t.Helper()
-	cutting, err := FixedCutting(16)
+	chunking, err := FixedChunking(16)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return cutting
+	return chunking
 }
 
-func piecesEqual(left, right [][]byte) bool {
+func chunksEqual(left, right [][]byte) bool {
 	if len(left) != len(right) {
 		return false
 	}

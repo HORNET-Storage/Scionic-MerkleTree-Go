@@ -66,7 +66,7 @@ func Example_syncOverAConnection() {
 	if err := <-served; err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(mirror.Bytes(scionic.StoredPiece), "bytes of chunks arrived")
+	fmt.Println(mirror.Bytes(scionic.StoredChunk), "bytes of chunks arrived")
 	// Output:
 	// 3145728 bytes of chunks arrived
 }

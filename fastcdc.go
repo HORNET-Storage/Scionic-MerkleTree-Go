@@ -5,24 +5,24 @@ import (
 	"encoding/binary"
 )
 
-// fastcdc-v1: cutting a file into pieces by its content (FastCDC, Xia et al.
-// 2016). It is the way a tree's files are cut. The Rust library's code and
+// fastcdc-v1: chunking a file by its content (FastCDC, Xia et al.
+// 2016). It is the way a tree's files are chunked. The Rust library's code and
 // the vectors under spec/fastcdc-vectors define its exact bytes, and this
 // file is held to them.
 //
 // Every constant here is frozen as fastcdc-v1. A change to a size, a mask, a
-// gear entry or the boundary loop would be another way of cutting under
+// gear entry or the boundary loop would be another way of chunking under
 // another name, never a change to this one: two builders give the same file
 // the same hash only when both cut at the same bytes.
 const (
 	// FastCDCMinSize is the floor below which no boundary is looked for: the
-	// first FastCDCMinSize bytes of a piece are not hashed at all. Every piece
+	// first FastCDCMinSize bytes of a chunk are not hashed at all. Every chunk
 	// but a file's last is therefore at least FastCDCMinSize + 1 bytes.
 	FastCDCMinSize = 512 * 1024
 	// FastCDCTargetSize is where the strict mask gives way to the loose one,
-	// which squeezes the sizes of pieces toward this size.
+	// which squeezes the sizes of chunks toward this size.
 	FastCDCTargetSize = 2048 * 1024
-	// FastCDCMaxSize is where a piece is cut whatever its bytes are.
+	// FastCDCMaxSize is where a chunk is cut whatever its bytes are.
 	FastCDCMaxSize = 8192 * 1024
 	// FastCDCStrictMask selects the top 23 bits of the rolling hash. It
 	// judges positions before FastCDCTargetSize.
@@ -47,13 +47,13 @@ var fastcdcGear = func() (gear [256]uint64) {
 	return gear
 }()
 
-// fastcdcBoundary gives the length of the next piece cut from data. The
+// fastcdcBoundary gives the length of the next chunk cut from data. The
 // caller makes sure that data is at least FastCDCMaxSize bytes long, or ends
-// where the file ends. Then the answer is final: where a piece ends never
+// where the file ends. Then the answer is final: where a chunk ends never
 // depends on bytes past the forced maximum.
 //
 // The rule, one byte a step: the rolling hash starts at zero for every
-// piece, bytes [0, FastCDCMinSize) are passed over without hashing, each
+// chunk, bytes [0, FastCDCMinSize) are passed over without hashing, each
 // later byte b turns the hash h into (h << 1) + G[b] in wrapping 64-bit
 // arithmetic, and the first byte index i whose hash has no bit of the mask
 // set cuts after that byte, at length i + 1. The strict mask judges indexes
@@ -191,49 +191,49 @@ func fastcdcBoundaryPlain(data []byte) int {
 	return limit
 }
 
-// Cut cuts data into pieces. The pieces are parts of data, in order, and
-// nothing is copied. No bytes give no pieces.
+// Cut cuts data into chunks. The chunks are parts of data, in order, and
+// nothing is copied. No bytes give no chunks.
 //
 // A caller that holds a file in memory cuts it with this, so that every
 // builder cuts the same bytes at the same places.
-func (c Cutting) Cut(data []byte) [][]byte {
+func (c Chunking) Cut(data []byte) [][]byte {
 	if size, fixed := c.Fixed(); fixed {
-		pieces := make([][]byte, 0, len(data)/int(size)+1)
+		chunks := make([][]byte, 0, len(data)/int(size)+1)
 		for len(data) > 0 {
 			cut := min(len(data), int(size))
-			pieces = append(pieces, data[:cut:cut])
+			chunks = append(chunks, data[:cut:cut])
 			data = data[cut:]
 		}
-		return pieces
+		return chunks
 	}
-	pieces := make([][]byte, 0, len(data)/FastCDCTargetSize+1)
+	chunks := make([][]byte, 0, len(data)/FastCDCTargetSize+1)
 	for len(data) > 0 {
 		cut := fastcdcBoundary(data)
-		pieces = append(pieces, data[:cut:cut])
+		chunks = append(chunks, data[:cut:cut])
 		data = data[cut:]
 	}
-	return pieces
+	return chunks
 }
 
 const (
-	// windowStart is what a cutter's window holds when it starts on its
+	// windowStart is what a chunker's window holds when it starts on its
 	// first stream. The window grows only as a stream turns out to be
 	// longer, so a small file never costs a large window.
 	windowStart = 64 * 1024
-	// fixedPiecesAtATime is the most pieces of a fixed size that are handed
+	// fixedChunksAtATime is the most chunks of a fixed size that are handed
 	// on at a time.
-	fixedPiecesAtATime = 1024
+	fixedChunksAtATime = 1024
 )
 
-// streamCutter cuts a stream into pieces, holding a window of it and no
-// more. One cutter serves many files, one after another, with the same
+// streamChunker cuts a stream into chunks, holding a window of it and no
+// more. One chunker serves many files, one after another, with the same
 // window.
-type streamCutter struct {
+type streamChunker struct {
 	window []byte
 }
 
 // grow makes the window longer: twice as long, and never longer than room.
-func (c *streamCutter) grow(room int) {
+func (c *streamChunker) grow(room int) {
 	length := min(max(len(c.window)*2, windowStart), room)
 	if length > len(c.window) {
 		longer := make([]byte, length)
@@ -242,39 +242,39 @@ func (c *streamCutter) grow(room int) {
 	}
 }
 
-// cut reads with read until it gives no more bytes, and hands the pieces to
-// onPieces in order: each time, all the pieces that the window holds whole.
-// The pieces are lent only for the call.
+// cut reads with read until it gives no more bytes, and hands the chunks to
+// onChunks in order: each time, all the chunks that the window holds whole.
+// The chunks are lent only for the call.
 //
-// room is the most bytes the window may hold. It always holds one piece of
-// the longest kind; with more room, more pieces are handed on at a time, and
+// room is the most bytes the window may hold. It always holds one chunk of
+// the longest kind; with more room, more chunks are handed on at a time, and
 // fewer bytes are moved to make room for the next ones.
 //
 // read gives how many bytes it put into the buffer, and zero when the
 // stream has ended.
 //
-// The windowing rule: where a piece ends is settled only once the window
-// holds FastCDCMaxSize bytes from the piece's start, or the input has
-// ended. That is what makes cutting a stream the same as cutting the whole
+// The windowing rule: where a chunk ends is settled only once the window
+// holds FastCDCMaxSize bytes from the chunk's start, or the input has
+// ended. That is what makes chunking a stream the same as chunking the whole
 // of it at once.
-func (c *streamCutter) cut(
-	cutting Cutting,
+func (c *streamChunker) cut(
+	chunking Chunking,
 	room int,
 	read func(buffer []byte) (int, error),
-	onPieces func(pieces [][]byte) error,
+	onChunks func(chunks [][]byte) error,
 ) error {
 	longest := FastCDCMaxSize
-	size, fixed := cutting.Fixed()
+	size, fixed := chunking.Fixed()
 	if fixed {
 		longest = int(size)
-		most := longest * fixedPiecesAtATime
+		most := longest * fixedChunksAtATime
 		room = max(min(room, most), longest)
 	} else {
 		room = max(room, FastCDCMaxSize)
 	}
 	filled := 0
 	ended := false
-	var pieces [][]byte
+	var chunks [][]byte
 	for {
 		for !ended && filled < room {
 			if filled == len(c.window) {
@@ -295,7 +295,7 @@ func (c *streamCutter) cut(
 			}
 		}
 		window := c.window[:filled]
-		pieces = pieces[:0]
+		chunks = chunks[:0]
 		start := 0
 		for start < filled {
 			rest := window[start:]
@@ -306,11 +306,11 @@ func (c *streamCutter) cut(
 			if !fixed {
 				cut = fastcdcBoundary(rest)
 			}
-			pieces = append(pieces, rest[:cut:cut])
+			chunks = append(chunks, rest[:cut:cut])
 			start += cut
 		}
-		if len(pieces) != 0 {
-			if err := onPieces(pieces); err != nil {
+		if len(chunks) != 0 {
+			if err := onChunks(chunks); err != nil {
 				return err
 			}
 		}

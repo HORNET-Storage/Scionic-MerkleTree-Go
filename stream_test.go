@@ -100,7 +100,7 @@ func TestRequestsAreSentAheadOfTheirAnswersAndNeverTooFar(t *testing.T) {
 	// A folder of 150 small files: more lists than one round asks for, and
 	// more requests in a round than are sent ahead at once.
 	source := NewMemoryStore()
-	builder := NewBuilder(source, smallPieces(t))
+	builder := NewBuilder(source, smallChunks(t))
 	var entries []Entry
 	for index := range 150 {
 		file, err := builder.FileFromBytes(corpusBytes(fmt.Sprintf("file-%d", index), 20))
@@ -135,7 +135,7 @@ func TestRequestsAreSentAheadOfTheirAnswersAndNeverTooFar(t *testing.T) {
 	if !sameStores(dest, source) {
 		t.Fatal("what was fetched is not what was held")
 	}
-	// 1 record, 1 folder, 150 lists and 150 requests for pieces.
+	// 1 record, 1 folder, 150 lists and 150 requests for chunks.
 	total := 0
 	for _, flight := range sent.sizes {
 		total += flight

@@ -42,8 +42,8 @@ type dirStore struct {
 func (s *dirStore) path(kind scionic.Stored, hash scionic.Hash) string {
 	folder := "records"
 	switch kind {
-	case scionic.StoredPiece:
-		folder = "pieces"
+	case scionic.StoredChunk:
+		folder = "chunks"
 	case scionic.StoredFileList:
 		folder = "files"
 	case scionic.StoredFolderList:
@@ -175,15 +175,15 @@ func roundtrip(folder, work string, out io.Writer) (scionic.Root, error) {
 	size, totals := record.Top().Size, record.Totals()
 	report(out, "built", started, size)
 	fmt.Fprintf(out, "root         %s\n", root)
-	fmt.Fprintf(out, "the tree     %d bytes; kept once: %d pieces of %d bytes, and %d bytes of lists\n",
-		size, totals.Pieces, totals.PieceBytes, totals.ListBytes)
+	fmt.Fprintf(out, "the tree     %d bytes; kept once: %d chunks of %d bytes, and %d bytes of lists\n",
+		size, totals.Chunks, totals.ChunkBytes, totals.ListBytes)
 
 	started = time.Now()
 	summary, err := scionic.Verify(source, root)
 	if err != nil {
 		return none, err
 	}
-	report(out, "checked", started, totals.PieceBytes)
+	report(out, "checked", started, totals.ChunkBytes)
 	fmt.Fprintf(out, "             %d different files in %d different folders\n", summary.Files, summary.Folders)
 
 	fetched := &dirStore{dir: filepath.Join(work, "fetched-store")}
@@ -191,7 +191,7 @@ func roundtrip(folder, work string, out io.Writer) (scionic.Root, error) {
 	if _, err := scionic.Fetch(fetched, root, scionic.NewResponder(source)); err != nil {
 		return none, err
 	}
-	report(out, "fetched", started, totals.PieceBytes)
+	report(out, "fetched", started, totals.ChunkBytes)
 
 	file, found, err := largestFile(source, record.Top())
 	if err != nil {

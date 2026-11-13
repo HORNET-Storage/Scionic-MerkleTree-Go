@@ -25,16 +25,16 @@ func sampleFiles() map[string][]byte {
 		"weights/copy-of-model.bin":   corpusBytes("model", 1000),
 		"weights/shards/a.bin":        corpusBytes("shard-a", 100),
 		"weights/shards/b.bin":        corpusBytes("shard-b", 33),
-		"data/exactly-two-pieces.bin": corpusBytes("two", 32),
+		"data/exactly-two-chunks.bin": corpusBytes("two", 32),
 		"nothing-here/":               nil,
 	}
 }
 
-// sampleTree builds the sample folder into a new store with small pieces.
+// sampleTree builds the sample folder into a new store with small chunks.
 func sampleTree(t *testing.T) (*MemoryStore, Root) {
 	t.Helper()
 	store := NewMemoryStore()
-	root, err := Build(store, writeTree(t, sampleFiles()), BuildOptions{Cutting: smallPieces(t)})
+	root, err := Build(store, writeTree(t, sampleFiles()), BuildOptions{Chunking: smallChunks(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ type storedThing struct {
 // comparing two stores.
 func contentsOf(store *MemoryStore) []storedThing {
 	var all []storedThing
-	for _, kind := range []Stored{StoredPiece, StoredFileList, StoredFolderList, StoredRecord} {
+	for _, kind := range []Stored{StoredChunk, StoredFileList, StoredFolderList, StoredRecord} {
 		for _, hash := range store.Hashes(kind) {
 			kept, _, _ := store.Get(kind, hash)
 			all = append(all, storedThing{kind, hash, string(kept)})

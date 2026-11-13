@@ -17,23 +17,23 @@ func swapIn(store *MemoryStore, kind Stored, hash Hash, content []byte) {
 func TestAWholeTreeChecksAndAMissingPartIsNamed(t *testing.T) {
 	store, root := sampleTree(t)
 	must[*Summary](t)(Verify(store, root))
-	must[*Summary](t)(VerifyWith(store, root, VerifyOptions{Recut: true}))
+	must[*Summary](t)(VerifyWith(store, root, VerifyOptions{Rechunk: true}))
 	model := targetAt(t, store, root, "weights/model.bin")
 	weights := targetAt(t, store, root, "weights")
-	piece := fileListOf(t, store, model).Items()[5]
+	chunk := fileListOf(t, store, model).Items()[5]
 	for _, part := range []struct {
 		kind Stored
 		hash Hash
 		what string
 	}{
-		{StoredPiece, piece.Hash, "the piece"},
+		{StoredChunk, chunk.Hash, "the chunk"},
 		{StoredFileList, model.Hash, "the list of the file"},
 		{StoredFolderList, weights.Hash, "the list of the folder"},
 		{StoredRecord, root.Hash(), "the record of"},
 	} {
 		kept := keptIn(t, store, part.kind, part.hash)
 		store.Remove(part.kind, part.hash)
-		for _, options := range []VerifyOptions{{}, {Recut: true}, {Workers: 1}} {
+		for _, options := range []VerifyOptions{{}, {Rechunk: true}, {Workers: 1}} {
 			_, err := VerifyWith(store, root, options)
 			var told *Error
 			if !errors.Is(err, ErrMissing) || !errors.As(err, &told) || told.What != part.what || told.Hash != part.hash {
@@ -51,16 +51,16 @@ func TestBytesThatChangedInTheStoreAreFound(t *testing.T) {
 	shard := targetAt(t, store, root, "weights/shards/a.bin")
 	weights := targetAt(t, store, root, "weights")
 	data := targetAt(t, store, root, "data")
-	piece := fileListOf(t, store, model).Items()[5]
+	chunk := fileListOf(t, store, model).Items()[5]
 	for _, change := range []struct {
 		kind   Stored
 		hash   Hash
 		forged []byte
 		what   string
 	}{
-		{StoredPiece, piece.Hash, corpusBytes("other", 16), "a piece's bytes"},
-		{StoredPiece, piece.Hash, corpusBytes("other", 15), "a piece cut short"},
-		{StoredPiece, piece.Hash, corpusBytes("other", 17), "a piece made longer"},
+		{StoredChunk, chunk.Hash, corpusBytes("other", 16), "a chunk's bytes"},
+		{StoredChunk, chunk.Hash, corpusBytes("other", 15), "a chunk cut short"},
+		{StoredChunk, chunk.Hash, corpusBytes("other", 17), "a chunk made longer"},
 		{StoredFileList, model.Hash, keptIn(t, store, StoredFileList, shard.Hash), "another file's list"},
 		{StoredFileList, model.Hash, bytes.Repeat([]byte{7}, 35), "no list at all"},
 		{StoredFolderList, weights.Hash, keptIn(t, store, StoredFolderList, data.Hash), "another folder's list"},
@@ -86,14 +86,14 @@ func TestARecordWithWrongTotalsIsRefused(t *testing.T) {
 		field  string
 		totals Totals
 	}{
-		{"pieces", Totals{right.Pieces - 1, right.PieceBytes, right.ListBytes}},
-		{"pieces", Totals{right.Pieces + 1, right.PieceBytes, right.ListBytes}},
-		{"piece bytes", Totals{right.Pieces, right.PieceBytes - 1, right.ListBytes}},
-		{"piece bytes", Totals{right.Pieces, right.PieceBytes + 1, right.ListBytes}},
-		{"list bytes", Totals{right.Pieces, right.PieceBytes, right.ListBytes - 1}},
-		{"list bytes", Totals{right.Pieces, right.PieceBytes, right.ListBytes + 1}},
+		{"chunks", Totals{right.Chunks - 1, right.ChunkBytes, right.ListBytes}},
+		{"chunks", Totals{right.Chunks + 1, right.ChunkBytes, right.ListBytes}},
+		{"chunk bytes", Totals{right.Chunks, right.ChunkBytes - 1, right.ListBytes}},
+		{"chunk bytes", Totals{right.Chunks, right.ChunkBytes + 1, right.ListBytes}},
+		{"list bytes", Totals{right.Chunks, right.ChunkBytes, right.ListBytes - 1}},
+		{"list bytes", Totals{right.Chunks, right.ChunkBytes, right.ListBytes + 1}},
 	} {
-		forged := must[*Record](t)(NewRecord(record.Top(), wrong.totals, record.Cutting(), ExtraData{}))
+		forged := must[*Record](t)(NewRecord(record.Top(), wrong.totals, record.Chunking(), ExtraData{}))
 		forgedRoot := forged.Root()
 		if forgedRoot == root {
 			t.Fatal("a record with other totals has the same root")
@@ -109,7 +109,7 @@ func TestARecordWithWrongTotalsIsRefused(t *testing.T) {
 
 func TestAnEntryCannotGiveWhatIsUnderItAnotherSize(t *testing.T) {
 	store := NewMemoryStore()
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	file := must[Target](t)(builder.FileFromBytes(corpusBytes("sized", 70)))
 	folder := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "f", file)}))
 	grown := func(target Target) Target {
@@ -123,13 +123,13 @@ func TestAnEntryCannotGiveWhatIsUnderItAnotherSize(t *testing.T) {
 		{plainEntry(t, "a", file), plainEntry(t, "b", grown(file))},
 		{plainEntry(t, "a", grown(file)), plainEntry(t, "b", file)},
 	} {
-		builder := NewBuilder(store, smallPieces(t))
+		builder := NewBuilder(store, smallChunks(t))
 		top := must[Target](t)(builder.Folder(entries))
 		if _, err := builder.Finish(top, ExtraData{}); !errors.Is(err, ErrSizeMismatch) {
 			t.Fatalf("%v: %v", entries, err)
 		}
 	}
-	builder = NewBuilder(store, smallPieces(t))
+	builder = NewBuilder(store, smallChunks(t))
 	top := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "d", folder), plainEntry(t, "f", file)}))
 	root := must[Root](t)(builder.Finish(top, ExtraData{}))
 	if size := must[*Summary](t)(Verify(store, root)).Record.Top().Size; size != 140 {
@@ -137,14 +137,14 @@ func TestAnEntryCannotGiveWhatIsUnderItAnotherSize(t *testing.T) {
 	}
 }
 
-// fileByHand puts a file into a store by hand, with whatever pieces it is
+// fileByHand puts a file into a store by hand, with whatever chunks it is
 // given.
-func fileByHand(t *testing.T, store Store, pieces ...[]byte) Target {
+func fileByHand(t *testing.T, store Store, chunks ...[]byte) Target {
 	t.Helper()
-	var items []PieceRef
-	for _, piece := range pieces {
-		item := must[PieceRef](t)(PieceRefOf(piece))
-		if err := store.Put(StoredPiece, item.Hash, piece); err != nil {
+	var items []ChunkRef
+	for _, chunk := range chunks {
+		item := must[ChunkRef](t)(ChunkRefOf(chunk))
+		if err := store.Put(StoredChunk, item.Hash, chunk); err != nil {
 			t.Fatal(err)
 		}
 		items = append(items, item)
@@ -156,47 +156,47 @@ func fileByHand(t *testing.T, store Store, pieces ...[]byte) Target {
 	return list.Target()
 }
 
-func TestEveryFileIsHeldToTheWayItsTreeWasCut(t *testing.T) {
+func TestEveryFileIsHeldToTheWayItsTreeWasChunked(t *testing.T) {
 	store := NewMemoryStore()
 	first, short, last := corpusBytes("p0", 16), corpusBytes("p1", 9), corpusBytes("p2", 16)
-	// A piece in the middle that is shorter than the tree's pieces.
+	// A chunk in the middle that is shorter than the tree's chunks.
 	uneven := fileByHand(t, store, first, short, last)
-	// A last piece that is longer than the tree's pieces.
+	// A last chunk that is longer than the tree's chunks.
 	longTail := fileByHand(t, store, first, corpusBytes("tail", 17))
 	for _, file := range []Target{uneven, longTail} {
-		builder := NewBuilder(store, smallPieces(t))
+		builder := NewBuilder(store, smallChunks(t))
 		top := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "f", file)}))
 		if _, err := builder.Finish(top, ExtraData{}); !errors.Is(err, ErrInvalidData) {
 			t.Fatal(err)
 		}
 		// A tree of the file alone is refused as well.
-		if _, err := NewBuilder(store, smallPieces(t)).Finish(file, ExtraData{}); err == nil {
-			t.Fatal("a file that was cut another way was taken as a tree")
+		if _, err := NewBuilder(store, smallChunks(t)).Finish(file, ExtraData{}); err == nil {
+			t.Fatal("a file that was chunked another way was taken as a tree")
 		}
 	}
-	// Small pieces are no pieces of a tree that is cut by content.
+	// Small chunks are no chunks of a tree that is chunked by content.
 	even := fileByHand(t, store, first, last, short)
-	must[Root](t)(NewBuilder(store, smallPieces(t)).Finish(even, ExtraData{}))
+	must[Root](t)(NewBuilder(store, smallChunks(t)).Finish(even, ExtraData{}))
 	if _, err := NewBuilder(store, FastCDCV1).Finish(even, ExtraData{}); err == nil {
-		t.Fatal("small pieces were taken as pieces that were cut by content")
+		t.Fatal("small chunks were taken as chunks that were cut by content")
 	}
-	// A file of one small piece fits either way.
+	// A file of one small chunk fits either way.
 	single := fileByHand(t, store, short)
-	for _, cutting := range []Cutting{smallPieces(t), FastCDCV1} {
-		root := must[Root](t)(NewBuilder(store, cutting).Finish(single, ExtraData{}))
+	for _, chunking := range []Chunking{smallChunks(t), FastCDCV1} {
+		root := must[Root](t)(NewBuilder(store, chunking).Finish(single, ExtraData{}))
 		must[*Summary](t)(Verify(store, root))
 	}
 }
 
-func TestCuttingAgainFindsAFileThatWasCutAnotherWay(t *testing.T) {
+func TestChunkingAgainFindsAFileThatWasChunkedAnotherWay(t *testing.T) {
 	data := corpusBytes("scionic-fastcdc-v1:corpus:random_3mib", 3<<20)
 	store := NewMemoryStore()
 	builder := NewBuilder(store, FastCDCV1)
 	honest := must[Target](t)(builder.FileFromBytes(data))
 	root := must[Root](t)(builder.Finish(honest, ExtraData{}))
-	must[*Summary](t)(VerifyWith(store, root, VerifyOptions{Recut: true}))
+	must[*Summary](t)(VerifyWith(store, root, VerifyOptions{Rechunk: true}))
 	// The same bytes, cut in the middle. Each half is long enough to pass
-	// for a piece that the cutter made, so its lengths alone give nothing
+	// for a chunk that the chunker made, so its lengths alone give nothing
 	// away. It is another file: the same bytes under another hash.
 	forged := fileByHand(t, store, data[:3<<19], data[3<<19:])
 	if forged.Size != honest.Size || forged.Hash == honest.Hash {
@@ -205,38 +205,38 @@ func TestCuttingAgainFindsAFileThatWasCutAnotherWay(t *testing.T) {
 	forgedRoot := must[Root](t)(NewBuilder(store, FastCDCV1).Finish(forged, ExtraData{}))
 	must[*Summary](t)(Verify(store, forgedRoot))
 	for _, workers := range []int{0, 1} {
-		if _, err := VerifyWith(store, forgedRoot, VerifyOptions{Recut: true, Workers: workers}); !errors.Is(err, ErrInvalidData) {
+		if _, err := VerifyWith(store, forgedRoot, VerifyOptions{Rechunk: true, Workers: workers}); !errors.Is(err, ErrInvalidData) {
 			t.Fatal(err)
 		}
 	}
 }
 
-func TestAPieceCannotBeListedWithTwoLengths(t *testing.T) {
+func TestAChunkCannotBeListedWithTwoLengths(t *testing.T) {
 	store := NewMemoryStore()
 	whole := corpusBytes("whole", 16)
 	right := fileByHand(t, store, whole)
-	item := must[PieceRef](t)(PieceRefOf(whole))
-	shorter := must[*FileList](t)(NewFileList([]PieceRef{{Hash: item.Hash, Length: 15}}))
+	item := must[ChunkRef](t)(ChunkRefOf(whole))
+	shorter := must[*FileList](t)(NewFileList([]ChunkRef{{Hash: item.Hash, Length: 15}}))
 	store.Put(StoredFileList, shorter.Hash(), shorter.Encode())
-	// The piece is held with 16 bytes, so a list that gives it 15 is wrong
+	// The chunk is held with 16 bytes, so a list that gives it 15 is wrong
 	// on its own, and wrong beside a list that gives it 16.
 	for _, entries := range [][]Entry{
 		{plainEntry(t, "wrong", shorter.Target())},
 		{plainEntry(t, "a-right", right), plainEntry(t, "b-wrong", shorter.Target())},
 		{plainEntry(t, "a-wrong", shorter.Target()), plainEntry(t, "b-right", right)},
 	} {
-		builder := NewBuilder(store, smallPieces(t))
+		builder := NewBuilder(store, smallChunks(t))
 		top := must[Target](t)(builder.Folder(entries))
 		if _, err := builder.Finish(top, ExtraData{}); !errors.Is(err, ErrSizeMismatch) {
 			t.Fatalf("%v: %v", entries, err)
 		}
 	}
-	// Without the piece's bytes, two lists that disagree are still refused.
+	// Without the chunk's bytes, two lists that disagree are still refused.
 	bare := NewMemoryStore()
-	for _, list := range []*FileList{shorter, must[*FileList](t)(NewFileList([]PieceRef{item}))} {
+	for _, list := range []*FileList{shorter, must[*FileList](t)(NewFileList([]ChunkRef{item}))} {
 		bare.Put(StoredFileList, list.Hash(), list.Encode())
 	}
-	builder := NewBuilder(bare, smallPieces(t))
+	builder := NewBuilder(bare, smallChunks(t))
 	top := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "a", right), plainEntry(t, "b", shorter.Target())}))
 	if _, err := builder.Finish(top, ExtraData{}); !errors.Is(err, ErrSizeMismatch) {
 		t.Fatal(err)
@@ -259,7 +259,7 @@ func TestATreeIsCheckedByItsRootAndByNothingElse(t *testing.T) {
 	}
 	// A folder is checked once, however many names it has.
 	weights := targetAt(t, store, root, "weights")
-	builder := NewBuilder(store, smallPieces(t))
+	builder := NewBuilder(store, smallChunks(t))
 	top := must[Target](t)(builder.Folder([]Entry{plainEntry(t, "one", weights), plainEntry(t, "two", weights)}))
 	twice := must[Root](t)(builder.Finish(top, ExtraData{}))
 	summary := must[*Summary](t)(Verify(store, twice))
