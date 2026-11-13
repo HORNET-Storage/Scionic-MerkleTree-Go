@@ -106,29 +106,38 @@ func fastcdcScan(data []byte, from, to int, mask uint64, state *uint64) (int, bo
 	hash := *state
 	at := from
 	for to-at >= 4*gearStride {
-		first := (*[gearStride]byte)(data[at:])
-		second := (*[gearStride]byte)(data[at+gearStride:])
-		third := (*[gearStride]byte)(data[at+2*gearStride:])
-		fourth := (*[gearStride]byte)(data[at+3*gearStride:])
+		// One block of four stretches, read through one pointer: the four
+		// hashes and what they need then fit into the machine's registers.
+		block := (*[4 * gearStride]byte)(data[at:])
 		h0 := hash
 		var h1, h2, h3 uint64
-		for _, value := range first[gearStride-gearWindow:] {
+		for _, value := range block[gearStride-gearWindow : gearStride] {
 			h1 = h1<<1 + gear[value]
 		}
-		for _, value := range second[gearStride-gearWindow:] {
+		for _, value := range block[2*gearStride-gearWindow : 2*gearStride] {
 			h2 = h2<<1 + gear[value]
 		}
-		for _, value := range third[gearStride-gearWindow:] {
+		for _, value := range block[3*gearStride-gearWindow : 3*gearStride] {
 			h3 = h3<<1 + gear[value]
 		}
+		// Two bytes of each stretch a round, so that the loop's own counting
+		// is a smaller part of the work. gearStride is even.
 		steps := 0
-		for step := 0; step < gearStride; step++ {
-			h0 = h0<<1 + gear[first[step]]
-			h1 = h1<<1 + gear[second[step]]
-			h2 = h2<<1 + gear[third[step]]
-			h3 = h3<<1 + gear[fourth[step]]
+		for step := 0; step < gearStride-1; step += 2 {
+			h0 = h0<<1 + gear[block[step]]
+			h1 = h1<<1 + gear[block[step+gearStride]]
+			h2 = h2<<1 + gear[block[step+2*gearStride]]
+			h3 = h3<<1 + gear[block[step+3*gearStride]]
 			if h0&mask == 0 || h1&mask == 0 || h2&mask == 0 || h3&mask == 0 {
 				steps = step + 1
+				break
+			}
+			h0 = h0<<1 + gear[block[step+1]]
+			h1 = h1<<1 + gear[block[step+gearStride+1]]
+			h2 = h2<<1 + gear[block[step+2*gearStride+1]]
+			h3 = h3<<1 + gear[block[step+3*gearStride+1]]
+			if h0&mask == 0 || h1&mask == 0 || h2&mask == 0 || h3&mask == 0 {
+				steps = step + 2
 				break
 			}
 		}
