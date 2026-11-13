@@ -6,6 +6,8 @@
 
 We've designed a [new type of Merkle DAG/Merkle Tree hybrid](https://www.hornet.storage/) known as the Scionic Merkle Tree. Scionic Merkle Trees contain small branches like Classic Merkle Trees, the folder storage support of Merkle DAGs, and numbered file chunks, so anyone can sync a file by its hash and request the range of chunk numbers they are missing. Identical chunks, files and folders have identical hashes wherever they appear, so each one is stored once and sent once.
 
+![Tree Comparison Diagram](https://static.wixstatic.com/media/e9326a_ee5ee567806d439b93eaf3ce49afe072~mv2.png)
+
 This repository is the **Go implementation**, at **version 2.5.6**. The Scionic tree format is specified in [`spec/FORMAT.md`](spec/FORMAT.md). The Rust library is the reference for it, and this library is held to the same test vectors, under [`spec/`](spec), byte for byte.
 
 ```mermaid
@@ -110,6 +112,14 @@ If a user wants to download a specific file chunk within a Scionic Merkle Tree, 
 ### One Place for Every Name
 
 A folder's entries are sorted by name, and every fork of the folder's Merkle tree records the name at which its right half begins. A name can therefore sit in exactly one place. One branch proves that a name is in a folder and what it holds, and the same kind of branch proves that a name is *not* in the folder. A publisher cannot show one file under a name to a reviewer and a different file under the same name to everyone else.
+
+### Scionic Merkle Tree
+
+![Scionic Merkle Tree Diagram](https://i.ibb.co/XJjbwmP/Scionic-Merkle-Tree.jpg)
+
+### Scionic Merkle Branch
+
+![Scionic Merkle Branch Diagram](https://i.ibb.co/nLcNLw1/Merkle-Branch.png)
 
 ## Scionic Merkle Branch Statistics
 

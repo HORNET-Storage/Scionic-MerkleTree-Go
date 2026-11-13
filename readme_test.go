@@ -80,6 +80,24 @@ func TestEveryProgramTheReadmeRunsIsThere(t *testing.T) {
 	}
 }
 
+// The README's three pictures are its author's own, and stay through every
+// rewrite of the text around them: the one under the opening, and the two
+// that have a heading each. Which picture stands there is the author's to
+// change, so this holds the places and not the pictures.
+func TestTheReadmeKeepsItsPictures(t *testing.T) {
+	text := readme(t)
+	opening, _, found := strings.Cut(text, "\n## Contents\n")
+	if !found || !strings.Contains(opening, "\n![") {
+		t.Fatal("the README has no picture under its opening")
+	}
+	for _, heading := range []string{"### Scionic Merkle Tree", "### Scionic Merkle Branch"} {
+		_, after, found := strings.Cut(text, "\n"+heading+"\n")
+		if !found || !strings.HasPrefix(strings.TrimLeft(after, "\n"), "![") {
+			t.Fatalf("the README has no picture under %q", heading)
+		}
+	}
+}
+
 func TestEveryFileTheReadmePointsToIsThere(t *testing.T) {
 	text := readme(t)
 	links := 0
