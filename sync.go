@@ -1,7 +1,9 @@
 package scionic
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/binary"
 	"io"
 	"strings"
 	"sync"
@@ -49,10 +51,13 @@ const (
 )
 
 // RequestsAheadBytes is how many bytes of requests a StreamPeer sends ahead
-// of their answers. It is small on purpose. The other end answers one
-// request before it reads the next, so requests that are sent ahead wait in
-// the connection, and a connection that could not hold them would leave
-// both ends waiting for each other. Every connection holds this much.
+// of their answers, and the most that the format lets anyone send ahead. It
+// is small on purpose. The other end answers one request before it reads the
+// next, so requests that are sent ahead wait in the connection, and a
+// connection that could not hold them would leave both ends waiting for each
+// other. A connection over a network holds this much. One that holds
+// nothing, as Go's net.Pipe and io.Pipe do, needs [StreamPeer.Ahead] set to
+// zero.
 const RequestsAheadBytes = 2048
 
 func otherKind() error {
@@ -835,7 +840,8 @@ type writtenList struct {
 
 // Export writes a whole tree to out as one stream: the bundle's first
 // bytes, the record, and then every list and every piece once, each after
-// what names it. Import reads it back.
+// what names it. Import reads it back. If out has a Flush method, as a
+// buffered writer has, it is called once the bundle is written.
 func Export(store Store, root Root, out io.Writer) error {
 	record, err := RecordOf(store, root)
 	if err != nil {
@@ -892,7 +898,7 @@ func Export(store Store, root Root, out io.Writer) error {
 			}
 		}
 	}
-	return nil
+	return flush(out, "write a bundle")
 }
 
 // Import reads a bundle that Export wrote, and takes the tree with this
@@ -941,6 +947,10 @@ func flush(output io.Writer, operation string) error {
 	return nil
 }
 
+// serveBufferBytes is how many bytes of requests Serve takes off a
+// connection at once: more than an asker may send ahead.
+const serveBufferBytes = 2 * RequestsAheadBytes
+
 // Serve answers the requests that come in on a connection, until it ends.
 //
 // A request comes as a frame does: its length in four bytes, and then its
@@ -951,8 +961,16 @@ func flush(output io.Writer, operation string) error {
 //
 // A request that is malformed or too long ends the serving with an error.
 // What is not held is answered with a refusal, and the serving goes on.
+//
+// Serve reads from the connection until it ends, and may read requests
+// before it answers the ones before them.
 func Serve(store Store, from io.Reader, output io.Writer) error {
-	input := steadied(from)
+	// Requests are read through a buffer that holds more than an asker may
+	// send ahead. What was sent ahead is taken off the connection as soon as
+	// the connection hands it over, and waits here while its answers are
+	// written. So a connection that holds nothing of its own, as net.Pipe,
+	// leaves no two ends waiting for each other.
+	input := steadied(bufio.NewReaderSize(steadied(from), serveBufferBytes))
 	responder := NewResponder(store)
 	for {
 		next, request, err := readNext(input, MaxRequestBytes)
@@ -989,14 +1007,41 @@ func Serve(store Store, from io.Reader, output io.Writer) error {
 type StreamPeer struct {
 	input  *steady
 	output io.Writer
+	// ahead is how many bytes of requests are sent ahead of their answers.
+	ahead  int
 	broken bool
 }
 
 // NewStreamPeer makes a peer of a connection: input is what the other end
 // sends, and output is what it reads. If output has a Flush method, as a
 // buffered writer has, it is called once requests are written.
+//
+// Requests are sent ahead of their answers, up to RequestsAheadBytes of
+// them, and the connection has to hold that much on the way: see Ahead.
 func NewStreamPeer(input io.Reader, output io.Writer) *StreamPeer {
-	return &StreamPeer{input: steadied(input), output: output}
+	return &StreamPeer{input: steadied(input), output: output, ahead: RequestsAheadBytes}
+}
+
+// Ahead sets how many bytes of requests are sent ahead of their answers:
+// RequestsAheadBytes unless it is set, and never more than that. It is set
+// before the peer is used, and gives the peer back.
+//
+// Requests that are sent ahead save a wait for each answer, which is most of
+// the time a fetch of many small files takes on a slow connection. While the
+// other end answers the first of them, the rest have to wait somewhere. A
+// connection over a network holds them. Go's net.Pipe and io.Pipe hold
+// nothing, and hand a write over only as the other end reads it: there Serve
+// holds them, which reads requests through a buffer of its own. So a
+// StreamPeer and a Serve do not wait for each other on any of these.
+//
+// Zero sends one request at a time, and waits for its answer. It is for an
+// answerer of another make, which reads one request at a time from a
+// connection that holds nothing. With requests sent ahead there, this end
+// would wait to send its next request while the other end waits to send its
+// first answer, for ever.
+func (p *StreamPeer) Ahead(bytes int) *StreamPeer {
+	p.ahead = min(max(bytes, 0), RequestsAheadBytes)
+	return p
 }
 
 // Ask sends one request, and reads its answer.
@@ -1006,29 +1051,43 @@ func (p *StreamPeer) Ask(request []byte, limit int, onFrame func(frame []byte) e
 	})
 }
 
-// AskAll sends requests ahead of their answers, as far as every connection
-// is sure to hold them, and reads the answers in the order of the requests.
+// AskAll sends requests ahead of their answers, as far as Ahead lets it,
+// and reads the answers in the order of the requests.
+//
+// A request that no answerer takes, because it is empty or longer than a
+// request may be, is an error before anything is sent.
 func (p *StreamPeer) AskAll(requests []Asked, onFrame func(place int, frame []byte) error) error {
 	if p.broken {
 		return peerError("is on a connection that an earlier answer left half read")
 	}
+	for _, asked := range requests {
+		switch length := len(asked.Request); {
+		case length == 0:
+			return invalid("a request is empty")
+		case length > MaxRequestBytes:
+			return limitExceeded("a request", MaxRequestBytes, uint64(length))
+		}
+	}
 	p.broken = true
 	answered := 0
+	var flight []byte
 	for answered < len(requests) {
 		// Send ahead what the connection is sure to hold, and one request
-		// at the least.
+		// at the least. They go out in one write, so that a connection
+		// which hands a write over whole hands them over together.
 		sent := answered
-		ahead := 0
+		flight = flight[:0]
 		for sent < len(requests) {
-			length := len(requests[sent].Request) + 4
-			if sent > answered && ahead+length > RequestsAheadBytes {
+			request := requests[sent].Request
+			if sent > answered && len(flight)+len(request)+4 > p.ahead {
 				break
 			}
-			if err := WriteFrame(p.output, requests[sent].Request); err != nil {
-				return err
-			}
-			ahead += length
+			flight = binary.BigEndian.AppendUint32(flight, uint32(len(request)))
+			flight = append(flight, request...)
 			sent++
+		}
+		if err := writeAll(p.output, flight); err != nil {
+			return streamError("send a request", err)
 		}
 		if err := flush(p.output, "send a request"); err != nil {
 			return err
