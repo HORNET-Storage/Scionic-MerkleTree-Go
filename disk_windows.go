@@ -182,7 +182,7 @@ func openHeldInner(path string) (heldInner, error) {
 	return heldInner{exact: exact, pin: pin}, nil
 }
 
-func makeFolder(exact string) error {
+func makeFolderAt(exact string) error {
 	pointer, err := windows.UTF16PtrFromString(exact)
 	if err != nil {
 		return err
@@ -195,7 +195,7 @@ func createHeldInner(path string) (heldInner, error) {
 	if err != nil {
 		return heldInner{}, err
 	}
-	if err := makeFolder(exact); err != nil {
+	if err := makeFolderAt(exact); err != nil {
 		return heldInner{}, err
 	}
 	pin, err := pinFolder(exact, false)
@@ -305,16 +305,8 @@ func (i heldInner) openFile(name, _ string) (io.ReadCloser, error) {
 	return os.Open(exact)
 }
 
-func (i heldInner) createFolder(above *held, name, _ string) (heldInner, error) {
-	exact := i.within(name)
-	if err := makeFolder(exact); err != nil {
-		return heldInner{}, err
-	}
-	pin, err := pinFolder(exact, false)
-	if err != nil {
-		return heldInner{}, asSystemError(err)
-	}
-	return heldInner{exact: exact, pin: pin, above: above.retain()}, nil
+func (i heldInner) makeFolder(name, _ string) error {
+	return makeFolderAt(i.within(name))
 }
 
 func (i heldInner) createFile(name, _ string) (io.WriteCloser, error) {

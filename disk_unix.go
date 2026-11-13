@@ -169,15 +169,8 @@ func (i heldInner) openFile(name, _ string) (io.ReadCloser, error) {
 	return &rawFile{fd: fd}, nil
 }
 
-func (i heldInner) createFolder(_ *held, name, path string) (heldInner, error) {
-	if err := mkdirat(i.fd, name); err != nil {
-		return heldInner{}, err
-	}
-	fd, err := openat(i.fd, name, folderFlags, 0)
-	if err != nil {
-		return heldInner{}, err
-	}
-	return heldInnerOf(fd, path), nil
+func (i heldInner) makeFolder(name, _ string) error {
+	return mkdirat(i.fd, name)
 }
 
 func (i heldInner) createFile(name, _ string) (io.WriteCloser, error) {

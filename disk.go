@@ -142,18 +142,16 @@ func (h *held) openFile(name string) (io.ReadCloser, error) {
 	return file, err
 }
 
-// createFolder makes the new folder name in this one, and holds it.
-func (h *held) createFolder(name string) (*held, error) {
+// makeFolder makes the new folder name in this one. It is opened when it is
+// needed, as any folder is: from this one, by its name, and never through a
+// link.
+func (h *held) makeFolder(name string) error {
 	if err := oneName(name); err != nil {
-		return nil, err
+		return err
 	}
-	path := pathWithin(h.path, name)
-	inner, err := h.inner.createFolder(h, name, path)
+	err := h.inner.makeFolder(name, pathWithin(h.path, name))
 	runtime.KeepAlive(h)
-	if err != nil {
-		return nil, err
-	}
-	return newHeld(path, inner), nil
+	return err
 }
 
 // createFile makes the new file name in this folder, to write. Anything

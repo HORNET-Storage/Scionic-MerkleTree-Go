@@ -79,8 +79,8 @@ func (heldInner) openFile(_, path string) (io.ReadCloser, error) {
 	return os.Open(path)
 }
 
-func (heldInner) createFolder(_ *held, _, path string) (heldInner, error) {
-	return heldInner{}, os.Mkdir(path, 0o777)
+func (heldInner) makeFolder(_, path string) error {
+	return os.Mkdir(path, 0o777)
 }
 
 func (heldInner) createFile(_, path string) (io.WriteCloser, error) {
