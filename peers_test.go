@@ -41,22 +41,29 @@ func sampleTree(t *testing.T) (*MemoryStore, Root) {
 	return store, root
 }
 
-// sameStores reports whether two stores hold the same things.
-func sameStores(left, right *MemoryStore) bool {
+// storedThing is one thing that a store holds.
+type storedThing struct {
+	kind    Stored
+	hash    Hash
+	content string
+}
+
+// contentsOf gives everything a store holds, by kind and hash, for
+// comparing two stores.
+func contentsOf(store *MemoryStore) []storedThing {
+	var all []storedThing
 	for _, kind := range []Stored{StoredPiece, StoredFileList, StoredFolderList, StoredRecord} {
-		hashes := left.Hashes(kind)
-		if !slices.Equal(hashes, right.Hashes(kind)) {
-			return false
-		}
-		for _, hash := range hashes {
-			ours, _, _ := left.Get(kind, hash)
-			theirs, _, _ := right.Get(kind, hash)
-			if !bytes.Equal(ours, theirs) {
-				return false
-			}
+		for _, hash := range store.Hashes(kind) {
+			kept, _, _ := store.Get(kind, hash)
+			all = append(all, storedThing{kind, hash, string(kept)})
 		}
 	}
-	return true
+	return all
+}
+
+// sameStores reports whether two stores hold the same things.
+func sameStores(left, right *MemoryStore) bool {
+	return slices.Equal(contentsOf(left), contentsOf(right))
 }
 
 // wire is what went over the wire to one peer: every request, the longest
