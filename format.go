@@ -1429,8 +1429,18 @@ func DecodeFolderRun(bytes []byte) (*FolderRun, error) {
 		if r.err != nil {
 			return nil, r.err
 		}
-		if nameLen == 0 || nameLen > MaxNameBytes {
-			return nil, invalid("a carried name is not 1 to 255 bytes")
+		// The first carried node of a run that does not start the list is
+		// the node that begins the list. No fork hashes a name for it, so
+		// it comes with none. Every other one comes with a name.
+		beginsTheList := index == 0 && start > 0
+		if beginsTheList != (nameLen == 0) {
+			if beginsTheList {
+				return nil, invalid("the carried node that begins a folder's list has a name")
+			}
+			return nil, invalid("a carried node of a folder's list has no name")
+		}
+		if nameLen > MaxNameBytes {
+			return nil, invalid("a carried name is longer than 255 bytes")
 		}
 		name := r.take(nameLen)
 		if r.err != nil {

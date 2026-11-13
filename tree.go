@@ -63,7 +63,13 @@ type leaf struct {
 }
 
 // carried is a node sent in place of the items under it. In a folder's tree
-// it comes with the first name under it.
+// it comes with the first name under it, which the fork above it hashes as
+// the first name of its right half.
+//
+// One carried node is in no right half: the one that begins with the list's
+// first item. No hash covers a name for it, so it has none, and a checker
+// takes none. That way every byte of an opening is covered by the hash it is
+// held against.
 type carried struct {
 	node      node
 	firstName string
@@ -296,7 +302,13 @@ func (t *listTree) collect(offset, width, start, end int, nodes *[]carried) erro
 		if err != nil {
 			return err
 		}
-		*nodes = append(*nodes, carried{node: over, firstName: t.name(offset)})
+		// The node that begins the list is in no right half, and so has no
+		// name that a fork hashes.
+		firstName := ""
+		if offset != 0 {
+			firstName = t.name(offset)
+		}
+		*nodes = append(*nodes, carried{node: over, firstName: firstName})
 		return nil
 	}
 	if start <= offset && after <= end {
@@ -400,6 +412,14 @@ func (w *listWalk) node(offset, width uint64) (node, string, error) {
 		}
 		over := &w.carried[w.next]
 		w.next++
+		// In a folder's tree, the node that begins the list has no name, and
+		// every other carried node has one: see carried.
+		if w.kind == folderTree && (offset == 0) != (over.firstName == "") {
+			if offset == 0 {
+				return node{}, "", invalid("the carried node that begins a folder's list has a name")
+			}
+			return node{}, "", invalid("a carried node of a folder's tree has no name")
+		}
 		if after <= w.start {
 			before := w.before + over.node.size
 			if before < w.before {

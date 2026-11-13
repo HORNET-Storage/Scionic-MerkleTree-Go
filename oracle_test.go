@@ -193,7 +193,8 @@ type oracleCarried struct {
 
 // carried gives the nodes to carry when items start up to end are shown:
 // one for each run that is left out, in the order a checker meets them,
-// each with the first name under it.
+// each with the first name under it. The node that begins the list has no
+// name: it is in no right half, so no fork hashes one for it.
 func (l oracleLeaves) carried(start, end int) []oracleCarried {
 	var out []oracleCarried
 	l.collect(0, len(l.nodes), start, end, &out)
@@ -202,7 +203,11 @@ func (l oracleLeaves) carried(start, end int) []oracleCarried {
 
 func (l oracleLeaves) collect(offset, width, start, end int, out *[]oracleCarried) {
 	if offset+width <= start || end <= offset {
-		*out = append(*out, oracleCarried{l.node(offset, width), l.firstName(offset)})
+		var name []byte
+		if offset != 0 {
+			name = l.firstName(offset)
+		}
+		*out = append(*out, oracleCarried{l.node(offset, width), name})
 	} else if width > 1 {
 		half := oracleLeftHalf(width)
 		l.collect(offset, half, start, end, out)

@@ -20,7 +20,7 @@ import (
 // bytes: every root, record, list, piece, run, answer and exchange. And it
 // has to refuse every input that the manifest says must be refused.
 
-const vectorsManifestSHA256 = "ee39b52e1923d1a6dd92bf574ac5e6358caebeb40a51e27487f5fb7ad41ed8c1"
+const vectorsManifestSHA256 = "2bdf12f2f0db4c83e9f8156ca6322222d31920c32a52898ed969c1d6fe2e020e"
 
 type vectorsManifest struct {
 	Format     string           `json:"format"`
@@ -610,7 +610,7 @@ func TestTheExchangeOfTheSharedVectorsIsTheSameOnAConnection(t *testing.T) {
 
 func TestEverythingTheSharedVectorsSayMustBeRefusedIsRefused(t *testing.T) {
 	manifest := readVectors(t)
-	if len(manifest.Refused) < 74 {
+	if len(manifest.Refused) < 76 {
 		t.Fatal("the manifest lists too few inputs that must be refused")
 	}
 	kinds := map[string]int{}

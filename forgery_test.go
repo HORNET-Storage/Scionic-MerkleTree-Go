@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 )
@@ -177,6 +178,77 @@ func TestAnyChangedByteOfAnyFrameIsRefused(t *testing.T) {
 				t.Fatalf("frame %d, place %d: the tree counts as whole", target, place)
 			}
 		}
+	}
+}
+
+func TestEveryByteOfARunIsCoveredByTheHashItIsHeldAgainst(t *testing.T) {
+	// A run shows a part of a list, and carries nodes for the rest. If one
+	// of its bytes could change and the run still pass, two different runs
+	// would show the same thing, and that byte would be nobody's to vouch
+	// for. So every byte of every run of a list of nine is changed here, one
+	// at a time, in its lowest bit and in its highest.
+	store := NewMemoryStore()
+	builder := NewBuilder(store, smallPieces(t))
+	file := must[Target](t)(builder.FileFromBytes(corpusBytes("covered", 9*16)))
+	entries := make([]Entry, 9)
+	for index := range entries {
+		entries[index] = plainEntry(t, fmt.Sprintf("n%02d", index), file)
+	}
+	folder := must[Target](t)(builder.Folder(entries))
+	fileList := fileListOf(t, store, file)
+	folderList := folderListOf(t, store, folder)
+	if fileList.Count() != 9 || folderList.Count() != 9 {
+		t.Fatal(fileList.Count(), folderList.Count())
+	}
+	changes := 0
+	eachChange := func(run []byte, what string, taken func(run []byte) bool) {
+		t.Helper()
+		if !taken(run) {
+			t.Fatalf("%s is refused as it was made", what)
+		}
+		for at := range run {
+			for _, bit := range []byte{0x01, 0x80} {
+				changed := slices.Clone(run)
+				changed[at] ^= bit
+				if taken(changed) {
+					t.Fatalf("%s: byte %d of %d was changed, and the run was taken", what, at, len(run))
+				}
+				changes++
+			}
+		}
+	}
+	for start := range uint64(9) {
+		for end := start + 1; end <= 9; end++ {
+			run := must[*FolderRun](t)(folderList.Open(start, end)).Encode()
+			eachChange(run, fmt.Sprintf("entries %d up to %d", start, end), func(run []byte) bool {
+				read, err := DecodeFolderRun(run)
+				return err == nil && read.Check(folder) == nil
+			})
+			run = must[*FileRun](t)(fileList.Open(start, end)).Encode()
+			eachChange(run, fmt.Sprintf("pieces %d up to %d", start, end), func(run []byte) bool {
+				read, err := DecodeFileRun(run)
+				if err != nil {
+					return false
+				}
+				_, err = read.Check(file)
+				return err == nil
+			})
+		}
+	}
+	// The answer to a name is a run too, whether the name is there or not.
+	for _, name := range []string{"n00", "n04", "n08", "a", "n04x", "z"} {
+		answer := must[*FolderRun](t)(folderList.OpenName(name)).Encode()
+		eachChange(answer, fmt.Sprintf("the answer for %q", name), func(run []byte) bool {
+			read, err := DecodeFolderRun(run)
+			if err != nil {
+				return false
+			}
+			_, _, err = read.CheckName(folder, name)
+			return err == nil
+		})
+	}
+	if changes < 30_000 {
+		t.Fatalf("only %d changes were tried", changes)
 	}
 }
 

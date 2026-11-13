@@ -847,6 +847,21 @@ func TestEveryRunOfAFolderChecksAndReadsBack(t *testing.T) {
 	}
 	_, err := DecodeFolderRun(joined(encoded, []byte{0}))
 	refuses(t, "a byte after a run", err)
+	// The carried node that begins the list comes with no name, and every
+	// other one with a name: a run is read in one way only. Here each entry
+	// takes 48 bytes, and a carried node's name follows its 40 bytes.
+	nameAt := 20 + 2*48 + 2 + 40
+	if !bytes.Equal(encoded[nameAt:nameAt+2], []byte{0, 0}) {
+		t.Fatalf("the node that begins the list is carried with a name of %d bytes", encoded[nameAt+1])
+	}
+	_, err = DecodeFolderRun(joined(encoded[:nameAt], []byte{0, 3}, []byte("n00"), encoded[nameAt+2:]))
+	refuses(t, "a name for the carried node that begins the list", err)
+	fromTheStart := must[*FolderRun](t)(list.Open(0, 2)).Encode()
+	if !bytes.Equal(fromTheStart[nameAt:nameAt+5], joined([]byte{0, 3}, []byte("n02"))) {
+		t.Fatalf("the first carried node of a run from the start is carried as % x", fromTheStart[nameAt:nameAt+5])
+	}
+	_, err = DecodeFolderRun(joined(fromTheStart[:nameAt], []byte{0, 0}, fromTheStart[nameAt+5:]))
+	refuses(t, "no name for a carried node that is not the one that begins the list", err)
 }
 
 func TestANameIsShownToBeThereOrNotThereByItsOnePlace(t *testing.T) {

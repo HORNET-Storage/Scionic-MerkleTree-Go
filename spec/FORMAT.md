@@ -109,10 +109,12 @@ Every carried node must be used, in that order, and none may be left over. The t
 
 **In a folder,** a carried node comes with the name of the first entry under it. At each fork, every entry of the run on the left must sort before the name of the first entry on the right, and every entry of the run on the right at or after it. The entries of a run must themselves be in order, with no name twice.
 
+**One carried node has no name:** the one that begins with the list's first entry. A run has it when `start` is more than 0, and it is then the first carried node. A fork's hash covers the first name of its right half, and this node is in no right half, so no hash would cover a name for it. It is sent with a name length of 0, and a run that gives it a name is refused. Every other carried node has a name of 1 to 255 bytes, and a run that gives one of them no name is refused. So every byte of a run is covered by the hash the run is checked against: no two runs show the same thing.
+
 **To answer for one name,** the sender shows the one entry that a search for the name ends at: left of each fork when the name sorts before the fork's name, and right otherwise. The receiver follows the same search as it checks the opening. If the entry shown has the name, that is the entry. If it has another name, the folder has no entry of that name. Either answer is proven, and a folder that was put together out of order cannot show a name at two places.
 
 - **A run of a file's list:** `count (8) + start (8) + shown (4) + the items shown + carried (2)`, then for each carried node `hash (32) + size (8)`. It shows one item at least.
-- **A run of a folder's list:** `count (8) + start (8) + shown (4) + the entries shown + carried (2)`, then for each carried node `hash (32) + size (8) + name length (2) + name`. The run of an empty folder has a count of 0, shows nothing and carries nothing.
+- **A run of a folder's list:** `count (8) + start (8) + shown (4) + the entries shown + carried (2)`, then for each carried node `hash (32) + size (8) + name length (2) + name`. The name length is 0 for the carried node that begins the list, and 1 to 255 for every other. The run of an empty folder has a count of 0, shows nothing and carries nothing.
 - A run carries 80 nodes at most, and lies inside its list: `start + shown` is no more than `count`.
 - The size of everything before a run is the sum of the sizes of the carried nodes on its left. For a file, that is the byte at which the run starts.
 

@@ -503,3 +503,44 @@ func TestAFilesTreeCarriesNoNames(t *testing.T) {
 		t.Fatal("a node of a file's tree was taken with a name")
 	}
 }
+
+func TestTheCarriedNodeThatBeginsAFoldersListHasNoName(t *testing.T) {
+	// A fork hashes the first name of its right half. The node that begins
+	// the list is in no right half, so nothing would cover a name for it:
+	// it has none, and one that comes with a name is refused. Every other
+	// carried node has the name its fork hashes, and no other.
+	for count := 2; count <= 20; count++ {
+		leaves := sortedFolder(count)
+		tree := must[*listTree](t)(buildListTree(folderTree, leaves))
+		top := must[node](t)(tree.top())
+		for start := 0; start < count; start++ {
+			for end := start + 1; end <= count; end++ {
+				nodes := must[[]carried](t)(tree.open(uint64(start), uint64(end)))
+				rebuilds := func(nodes []carried) bool {
+					result, err := checkOpening(folderTree, uint64(count), uint64(start), leaves[start:end], nodes)
+					return err == nil && result.top == top
+				}
+				if !rebuilds(nodes) {
+					t.Fatalf("%d entries, %d up to %d: the opening does not rebuild to the top", count, start, end)
+				}
+				for index := range nodes {
+					what := fmt.Sprintf("%d entries, %d up to %d, carried node %d", count, start, end, index)
+					beginsTheList := index == 0 && start > 0
+					if (nodes[index].firstName == "") != beginsTheList {
+						t.Fatalf("%s is carried under the name %q", what, nodes[index].firstName)
+					}
+					renamed := slices.Clone(nodes)
+					renamed[index].firstName = "name-9999"
+					if rebuilds(renamed) {
+						t.Fatalf("%s rebuilds to the top under another name", what)
+					}
+					nameless := slices.Clone(nodes)
+					nameless[index].firstName = ""
+					if rebuilds(nameless) != beginsTheList {
+						t.Fatalf("%s, with no name, rebuilds to the top: %v", what, !beginsTheList)
+					}
+				}
+			}
+		}
+	}
+}
