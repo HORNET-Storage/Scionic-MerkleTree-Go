@@ -3,6 +3,7 @@ package scionic
 import (
 	"errors"
 	"slices"
+	"sync/atomic"
 	"testing"
 )
 
@@ -95,6 +96,46 @@ func TestAStoreNeedsNoMoreThanThreeMethods(t *testing.T) {
 	}
 	if size, held, err := storeSize(store, StoredPiece, hash); size != 3 || !held || err != nil {
 		t.Fatal(size, held, err)
+	}
+}
+
+// sizedStore is a store that says how long a thing is, and counts how often
+// a thing is read from it.
+type sizedStore struct {
+	plainStore
+	read *atomic.Int64
+}
+
+func (s sizedStore) Get(kind Stored, hash Hash) ([]byte, bool, error) {
+	s.read.Add(1)
+	return s.inner.Get(kind, hash)
+}
+
+func (s sizedStore) Size(kind Stored, hash Hash) (uint64, bool, error) {
+	return s.inner.Size(kind, hash)
+}
+
+func TestAStoreThatSaysHowLongAThingIsIsNotReadToSeeWhatItHolds(t *testing.T) {
+	store := sizedStore{plainStore{NewMemoryStore()}, new(atomic.Int64)}
+	content := corpusBytes("sized", 5000)
+	builder := NewBuilder(store, smallPieces(t))
+	first := must[Target](t)(builder.FileFromBytes(content))
+	// Built again, every piece and the list are there already. Seeing that
+	// takes no read: for a store on disk, a read is the whole of a piece.
+	again := must[Target](t)(builder.FileFromBytes(content))
+	if again != first || store.inner.Count(StoredPiece) == 0 {
+		t.Fatal(again, first)
+	}
+	if read := store.read.Load(); read != 0 {
+		t.Fatalf("the store was read %d times to see what it holds", read)
+	}
+	// And it is still asked rightly.
+	hash := HashOf([]byte("not there"))
+	if held, err := storeHas(store, StoredPiece, hash); held || err != nil {
+		t.Fatal(held, err)
+	}
+	if held, err := storeHas(store, StoredFileList, first.Hash); !held || err != nil {
+		t.Fatal(held, err)
 	}
 }
 

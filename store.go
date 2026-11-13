@@ -50,6 +50,8 @@ func (s Stored) String() string {
 //
 // A store that can answer without reading the bytes may also have the
 // methods of [StoreHas] and [StoreSize]. They are used when they are there.
+// A store on disk should have Size at the least: without it, seeing whether
+// a piece is there takes a read of the whole piece.
 type Store interface {
 	// Put keeps bytes under hash. Keeping what is kept already changes
 	// nothing. The bytes are lent for the call only: a store that keeps
@@ -64,7 +66,7 @@ type Store interface {
 }
 
 // StoreHas is a store that says whether it keeps a thing without reading
-// it.
+// it. A store that has Size and not Has is asked for the size instead.
 type StoreHas interface {
 	// Has reports whether anything is kept under hash.
 	Has(kind Stored, hash Hash) (bool, error)
@@ -77,10 +79,15 @@ type StoreSize interface {
 	Size(kind Stored, hash Hash) (uint64, bool, error)
 }
 
-// storeHas reports whether anything is kept under hash.
+// storeHas reports whether anything is kept under hash, without reading it
+// where the store can say so.
 func storeHas(store Store, kind Stored, hash Hash) (bool, error) {
 	if direct, ok := store.(StoreHas); ok {
 		return direct.Has(kind, hash)
+	}
+	if direct, ok := store.(StoreSize); ok {
+		_, found, err := direct.Size(kind, hash)
+		return found, err
 	}
 	_, found, err := store.Get(kind, hash)
 	return found, err
