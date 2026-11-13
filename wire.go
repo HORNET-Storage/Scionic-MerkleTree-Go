@@ -2,7 +2,6 @@ package scionic
 
 import (
 	"encoding/binary"
-	"errors"
 	"io"
 	"math/bits"
 	"unicode/utf8"
@@ -433,10 +432,10 @@ func WriteFrame(out io.Writer, frame []byte) error {
 	}
 	var header [4]byte
 	binary.BigEndian.PutUint32(header[:], uint32(len(frame)))
-	if _, err := out.Write(header[:]); err != nil {
+	if err := writeAll(out, header[:]); err != nil {
 		return streamError("write a frame", err)
 	}
-	if _, err := out.Write(frame); err != nil {
+	if err := writeAll(out, frame); err != nil {
 		return streamError("write a frame", err)
 	}
 	return nil
@@ -444,7 +443,7 @@ func WriteFrame(out io.Writer, frame []byte) error {
 
 // writeEnd writes a length of zero to a stream: the end of an answer.
 func writeEnd(out io.Writer) error {
-	if _, err := out.Write([]byte{0, 0, 0, 0}); err != nil {
+	if err := writeAll(out, []byte{0, 0, 0, 0}); err != nil {
 		return streamError("write a frame", err)
 	}
 	return nil
@@ -467,13 +466,19 @@ const (
 // refused before any of it is read, and a stream that ends inside a frame is
 // an error. A frame's bytes are set aside as they come, a megabyte at a
 // time.
-func readNext(input io.Reader, limit int) (nextOnStream, []byte, error) {
+//
+// The stream is read as a steady reader gives it. A stream that fails while
+// it gives a frame's last bytes has failed: the frame is not handed on as if
+// nothing had happened.
+func readNext(input *steady, limit int) (nextOnStream, []byte, error) {
 	var header [4]byte
 	if _, err := io.ReadFull(input, header[:]); err != nil {
-		switch {
-		case errors.Is(err, io.EOF):
+		switch err {
+		// io.EOF itself, and not an error that wraps it: a reader says that
+		// it has ended with io.EOF, and anything else is a failure.
+		case io.EOF:
 			return nextClosed, nil, nil
-		case errors.Is(err, io.ErrUnexpectedEOF):
+		case io.ErrUnexpectedEOF:
 			return 0, nil, invalid("a stream ends inside a frame")
 		}
 		return 0, nil, streamError("read a frame", err)
@@ -491,11 +496,14 @@ func readNext(input io.Reader, limit int) (nextOnStream, []byte, error) {
 		more := int(min(length-uint64(held), readStepBytes))
 		frame = append(frame, make([]byte, more)...)
 		if _, err := io.ReadFull(input, frame[held:]); err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				return 0, nil, invalid("a stream ends inside a frame")
 			}
 			return 0, nil, streamError("read a frame", err)
 		}
+	}
+	if err := input.failed(); err != nil {
+		return 0, nil, streamError("read a frame", err)
 	}
 	return nextFrame, frame, nil
 }
@@ -505,7 +513,7 @@ func readNext(input io.Reader, limit int) (nextOnStream, []byte, error) {
 // before any of it is read, and a stream that ends inside a frame is an
 // error.
 func ReadFrame(input io.Reader, limit int) ([]byte, error) {
-	next, frame, err := readNext(input, limit)
+	next, frame, err := readNext(steadied(input), limit)
 	if err != nil {
 		return nil, err
 	}

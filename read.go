@@ -244,7 +244,7 @@ func writeStretch(store Store, wanted []wantedPiece, offset, end uint64, out io.
 			from = offset - piece.start
 		}
 		to := min(end, piece.start+uint64(piece.item.Length)) - piece.start
-		if _, err := out.Write(kept[from:to]); err != nil {
+		if err := writeAll(out, kept[from:to]); err != nil {
 			return streamError("write a file's bytes", err)
 		}
 	}

@@ -190,24 +190,3 @@ func pathWithin(folder, name string) string {
 	}
 	return folder + string(os.PathSeparator) + name
 }
-
-// readOf turns a reader of the usual kind into one that gives no bytes, and
-// no error, when it has ended.
-func readOf(reader io.Reader) func(buffer []byte) (int, error) {
-	return func(buffer []byte) (int, error) {
-		for {
-			count, err := reader.Read(buffer)
-			if count > 0 {
-				return count, nil
-			}
-			if errors.Is(err, io.EOF) {
-				return 0, nil
-			}
-			if err != nil {
-				return 0, err
-			}
-			// No bytes and no error: the reader has nothing yet, and is
-			// asked again.
-		}
-	}
-}

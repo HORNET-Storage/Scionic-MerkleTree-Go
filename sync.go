@@ -780,7 +780,7 @@ func (r *Remote) Read(file Target, offset, length uint64, out io.Writer) error {
 				pieceEnd := pieceStart + uint64(item.Length)
 				from := at - pieceStart
 				to := min(end, pieceEnd) - pieceStart
-				if _, err := out.Write(sent.Bytes[from:to]); err != nil {
+				if err := writeAll(out, sent.Bytes[from:to]); err != nil {
 					return streamError("write a file's bytes", err)
 				}
 				at = min(end, pieceEnd)
@@ -841,7 +841,7 @@ func Export(store Store, root Root, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.WriteString(out, BundleMagic); err != nil {
+	if err := writeAll(out, []byte(BundleMagic)); err != nil {
 		return streamError("write a bundle", err)
 	}
 	if err := WriteFrame(out, record.Encode()); err != nil {
@@ -900,7 +900,8 @@ func Export(store Store, root Root, out io.Writer) error {
 // frame from a peer, and the tree must be whole when the stream ends. A
 // frame for something the store holds already is passed over. A frame that
 // nothing in the tree names is an error.
-func Import(store Store, root Root, input io.Reader) (*Summary, error) {
+func Import(store Store, root Root, from io.Reader) (*Summary, error) {
+	input := steadied(from)
 	var magic [len(BundleMagic)]byte
 	if _, err := io.ReadFull(input, magic[:]); err != nil {
 		return nil, streamError("read a bundle", err)
@@ -950,7 +951,8 @@ func flush(output io.Writer, operation string) error {
 //
 // A request that is malformed or too long ends the serving with an error.
 // What is not held is answered with a refusal, and the serving goes on.
-func Serve(store Store, input io.Reader, output io.Writer) error {
+func Serve(store Store, from io.Reader, output io.Writer) error {
+	input := steadied(from)
 	responder := NewResponder(store)
 	for {
 		next, request, err := readNext(input, MaxRequestBytes)
@@ -985,7 +987,7 @@ func Serve(store Store, input io.Reader, output io.Writer) error {
 // leaves the connection where nobody knows what comes next. Nothing more is
 // asked on it then: open a new one.
 type StreamPeer struct {
-	input  io.Reader
+	input  *steady
 	output io.Writer
 	broken bool
 }
@@ -994,7 +996,7 @@ type StreamPeer struct {
 // sends, and output is what it reads. If output has a Flush method, as a
 // buffered writer has, it is called once requests are written.
 func NewStreamPeer(input io.Reader, output io.Writer) *StreamPeer {
-	return &StreamPeer{input: input, output: output}
+	return &StreamPeer{input: steadied(input), output: output}
 }
 
 // Ask sends one request, and reads its answer.
