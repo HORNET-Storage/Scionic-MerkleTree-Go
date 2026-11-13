@@ -261,6 +261,56 @@ func (i heldInner) openFolder(above *held, name, _ string) (heldInner, error) {
 	return heldInner{exact: exact, pin: pin, above: above.retain()}, nil
 }
 
+// fileIdentity tells one file from every other on this machine: the volume
+// it is on, and its number there.
+type fileIdentity struct {
+	volume uint64
+	file   [16]byte
+}
+
+// longIdentity gives a file's identity in the long form, which every volume
+// of the newer kinds has.
+func longIdentity(handle windows.Handle) (fileIdentity, error) {
+	var info [24]byte
+	if err := windows.GetFileInformationByHandleEx(handle, windows.FileIdInfo, &info[0], uint32(len(info))); err != nil {
+		return fileIdentity{}, err
+	}
+	identity := fileIdentity{volume: binary.LittleEndian.Uint64(info[0:8])}
+	copy(identity.file[:], info[8:24])
+	return identity, nil
+}
+
+// shortIdentity gives a file's identity in the short form, which every
+// volume has.
+func shortIdentity(handle windows.Handle) (fileIdentity, error) {
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		return fileIdentity{}, err
+	}
+	identity := fileIdentity{volume: uint64(info.VolumeSerialNumber)}
+	binary.LittleEndian.PutUint32(identity.file[0:4], info.FileIndexLow)
+	binary.LittleEndian.PutUint32(identity.file[4:8], info.FileIndexHigh)
+	return identity, nil
+}
+
+// sameFile reports whether two handles are open on one file. Both are
+// asked in the same form: the long one where both volumes have it, and the
+// short one otherwise. Where a file's identity is not to be had, nothing
+// says that the two are one, and that is an error.
+func sameFile(left, right windows.Handle) (bool, error) {
+	leftIs, leftErr := longIdentity(left)
+	rightIs, rightErr := longIdentity(right)
+	if leftErr != nil || rightErr != nil {
+		if leftIs, leftErr = shortIdentity(left); leftErr != nil {
+			return false, leftErr
+		}
+		if rightIs, rightErr = shortIdentity(right); rightErr != nil {
+			return false, rightErr
+		}
+	}
+	return leftIs == rightIs, nil
+}
+
 // openAsItself opens path as itself, and says whether it is a plain file
 // with nothing standing in for it. A link is refused, and so is a folder.
 func openAsItself(path string, share uint32) (windows.Handle, bool, error) {
@@ -295,14 +345,30 @@ func (i heldInner) openFile(name, _ string) (io.ReadCloser, error) {
 	// Something stands in for this file, as for one that is fetched when
 	// it is read, and opened as itself it may not read as the file does.
 	// So it is held where it is, looked at again, and opened in the usual
-	// way while it cannot be swapped.
+	// way while it cannot be renamed or replaced.
 	_ = windows.CloseHandle(handle)
 	kept, _, err := openAsItself(exact, shareNoDelete)
 	if err != nil {
 		return nil, err
 	}
 	defer windows.CloseHandle(kept)
-	return os.Open(exact)
+	file, err := os.Open(exact)
+	if err != nil {
+		return nil, err
+	}
+	// Holding the file keeps its name on it. It does not keep what stands
+	// in for it from being changed into a link, which the usual way of
+	// opening then follows. So what was opened has to be the file that is
+	// held, and not another one.
+	same, err := sameFile(kept, windows.Handle(file.Fd()))
+	if err == nil && !same {
+		err = errRefusedLink
+	}
+	if err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	return file, nil
 }
 
 func (i heldInner) makeFolder(name, _ string) error {
