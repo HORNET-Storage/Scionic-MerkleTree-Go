@@ -306,11 +306,19 @@ func keepPieces(store Store, shared *helpers, pieces [][]byte, items *[]PieceRef
 	}
 	func() {
 		// The helpers read the caller's pieces, so they are waited for
-		// whatever happens here.
+		// whatever happens here, and are free again after that. If this
+		// goroutine falls over, they take no more pieces.
+		finished := false
+		defer shared.give(helping)
 		defer wait.Wait()
+		defer func() {
+			if !finished {
+				next.Store(int64(len(pieces)))
+			}
+		}()
 		work()
+		finished = true
 	}()
-	shared.give(helping)
 	panics.raise()
 	for index := range kept {
 		if kept[index].err != nil {
@@ -628,17 +636,26 @@ func walk(top *held, links Links, onFiles func(batch *fileBatch) error) ([]built
 		inside []folderBelow
 	}
 	var way []onTheWay
+	// next is the folder that is read next, held for the reading.
+	var next *held
+	// However the walk ends, by its end, by an error or by a goroutine that
+	// falls over, every folder it holds is let go of. Nothing does that for
+	// a folder that is forgotten: it would stay held for as long as the
+	// program runs.
 	defer func() {
+		if next != nil {
+			next.release()
+		}
 		for _, step := range way {
 			step.folder.release()
 		}
 	}()
-	next, nextIndex := top.retain(), 0
+	next = top.retain()
+	nextIndex := 0
 	for {
 		if next != nil {
 			inside, err := w.read(next, nextIndex, len(way)+1)
 			if err != nil {
-				next.release()
 				return nil, 0, err
 			}
 			way = append(way, onTheWay{folder: next, inside: inside})
@@ -815,6 +832,9 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 	done := make([][]cutFile, threads)
 	failures := make([]error, threads)
 	work := func(worker int) error {
+		// With no file left, or gone, it is one more that may help with the
+		// long files that are still being cut.
+		defer shared.give(1)
 		builder := sharingBuilder(store, cutting, shared)
 		var firstError error
 		for {
@@ -843,7 +863,6 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 				}
 			}()
 		}
-		shared.give(1)
 		return firstError
 	}
 	var panics caught
@@ -865,6 +884,9 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 		// The walk is on this goroutine. Whatever happens to it, the others
 		// are told that no more folders will come, and are waited for.
 		walked := false
+		// Last of all, with every goroutine gone: the folders whose files
+		// nobody took are let go of.
+		defer queue.drop()
 		defer wait.Wait()
 		defer func() {
 			if !walked {
@@ -878,7 +900,6 @@ func walkAndCut(store Store, cutting Cutting, top *held, links Links, threads in
 		// the file it is on, however long that file is.
 		walked = walkErr == nil
 	}()
-	queue.drop()
 	panics.raise()
 	// The failure that came first on its goroutine is the one to tell. A
 	// goroutine that only stopped for another's failure has nothing to

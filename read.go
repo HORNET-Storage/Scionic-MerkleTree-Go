@@ -422,17 +422,24 @@ func WriteToDiskWith(store Store, root Root, dest string, options WriteOptions) 
 		inside []folderToFill
 	}
 	var way []onTheWay
+	// next is the folder that is filled next, held for the filling.
+	next, nextFolder := made, top
+	// However the writing ends, by its end, by an error or by a store that
+	// falls over, every folder it holds is let go of. Nothing does that for
+	// a folder that is forgotten: it would stay held for as long as the
+	// program runs.
 	defer func() {
+		if next != nil {
+			next.release()
+		}
 		for _, step := range way {
 			step.folder.release()
 		}
 	}()
-	next, nextFolder := made, top
 	for {
 		if next != nil {
 			inside, err := fillFolder(store, next, nextFolder)
 			if err != nil {
-				next.release()
 				return err
 			}
 			way = append(way, onTheWay{folder: next, inside: inside})
@@ -667,7 +674,16 @@ func reopened(path string, err error) error {
 // fillFile writes a file's bytes into a file that was just made, and closes
 // it. The path is for messages.
 func fillFile(store Store, file Target, out io.WriteCloser, path string) error {
+	// The file is closed however this ends, also when the store falls
+	// over: nothing else would close it.
+	closed := false
+	defer func() {
+		if !closed {
+			_ = out.Close()
+		}
+	}()
 	err := ReadFile(store, file, out)
+	closed = true
 	closeErr := out.Close()
 	if err != nil {
 		if told := (*Error)(nil); errors.As(err, &told) && told.kind == kindStream {
