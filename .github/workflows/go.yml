@@ -1,14 +1,28 @@
 name: Test & Coverage
 
+# Built and tested on Linux, macOS and Windows, with the race detector on.
+# The tests hold the library to the vectors under spec/ on each of them.
+
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
     steps:
     - uses: actions/checkout@v7
 
@@ -20,6 +34,9 @@ jobs:
     - name: Build
       run: go build -v ./...
 
+    - name: Vet
+      run: go vet ./...
+
     - name: Test (with cross-package coverage)
       run: |
         go test ./... \
@@ -30,6 +47,7 @@ jobs:
           -coverprofile=coverage.txt
 
     - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest'
       uses: codecov/codecov-action@v3
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
