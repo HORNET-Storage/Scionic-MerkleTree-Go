@@ -10,38 +10,6 @@ We've designed a [new type of Merkle DAG/Merkle Tree hybrid](https://www.hornet.
 
 This repository is the **Go implementation**, at **version 2.5.6**. The Scionic tree format is specified in [`spec/FORMAT.md`](spec/FORMAT.md). The Rust library is the reference for it, and this library is held to the same test vectors, under [`spec/`](spec), byte for byte.
 
-```mermaid
-flowchart TD
-    root(["Root<br/>hash of the tree's record"])
-    top["Folder<br/>Merkle tree over its entries"]
-    readme["File"]
-    v1["Folder"]
-    v2["Folder"]
-    m1["File<br/>Merkle tree over its chunks"]
-    m2["File<br/>Merkle tree over its chunks"]
-    r0["Chunk"]
-    a["Chunk A"]
-    b["Chunk B"]
-    b2["Chunk B, edited"]
-    c["Chunk C"]
-
-    root --> top
-    top -- "README.md" --> readme
-    top -- "v1" --> v1
-    top -- "v2" --> v2
-    v1 -- "model.bin" --> m1
-    v2 -- "model.bin" --> m2
-    readme -- "0" --> r0
-    m1 -- "0" --> a
-    m1 -- "1" --> b
-    m1 -- "2" --> c
-    m2 -- "0" --> a
-    m2 -- "1" --> b2
-    m2 -- "2" --> c
-```
-
-*Two versions of a model in one tree. The second version changed one chunk, so that chunk is the only new data: chunks A and C are stored once and shared. A name belongs to its folder and a chunk number belongs to its file, so a file is the same file wherever it sits and whatever it is called.*
-
 Scionic Merkle Trees maintain the advantages of IPFS Merkle DAGs with the slim Merkle Branches of Classic Merkle Trees, while providing LeafSync as a new feature that complements any set reconciliation system (IBLTs, negentropy, et al.). In plant grafting, the "Scion" is the upper part of the plant, chosen for its desirable fruits or flowers; it's grafted onto another plant's base to grow together. In a similar vein, the Scionic Merkle Tree was born from grafting together Merkle Trees and Merkle DAGs. This process emphasizes why we use the term "Scion" for the Scionic Merkle Trees: it symbolizes the digital grafting of these two similar data structures, combining their strengths into one piece of software.
 
 ## Contents
@@ -68,6 +36,14 @@ Scionic Merkle Trees maintain the advantages of IPFS Merkle DAGs with the slim M
   - [License](#license)
 
 ## Scionic Merkle Trees: The Best of Both Worlds
+
+### Scionic Merkle Tree
+
+![Scionic Merkle Tree: the root is the hash of the record, which names the folder on top. Each folder lists its entries by name and each file lists its chunks by number, and a Classic Merkle tree inside each one covers its list. Every link ends at a box that holds what the hash covers: the count, the size and the Classic Merkle root.](docs/pictures/scionic-merkle-tree.png)
+
+### Scionic Merkle Branch
+
+![Scionic Merkle Branch: one chunk of a file, proven against the root. Each folder and file on the way shows one item of its list with a few hashes beside it. At each step the count, the size and the Classic Merkle root are hashed, and must give the hash held just above. The rest of the tree is never sent.](docs/pictures/scionic-merkle-branch.png)
 
 ### Classic Merkle Trees
 
@@ -108,7 +84,7 @@ Within each parent leaf, the list of children is organized as a Classic Merkle T
 - **A folder's Classic Merkle Tree** covers its entries, in the order of their names.
 - **A file's Classic Merkle Tree** covers its chunks, in the order they have in the file. A chunk's number is its place in that tree, so a chunk cannot be shown under a number it does not have.
 
-The top of each tree is its Classic Merkle root. The hash of a folder or of a file covers three things: how many items its list has, its size in bytes, and its Classic Merkle root. That hash is what a parent holds for its child, and what the tree's record holds for the folder or file on top. In the pictures below, every folder and file shows those three in a box, and every link by hash ends at that box.
+The top of each tree is its Classic Merkle root. The hash of a folder or of a file covers three things: how many items its list has, its size in bytes, and its Classic Merkle root. That hash is what a parent holds for its child, and what the tree's record holds for the folder or file on top. In the pictures above, every folder and file shows those three in a box, and every link by hash ends at that box.
 
 A large file has far more chunks than most folders have entries: about 500,000 for a file of a terabyte. A file of 512 KiB or less is a single chunk, and its tree is that one leaf.
 
@@ -119,14 +95,6 @@ If a user wants to download a specific file chunk within a Scionic Merkle Tree, 
 ### One Place for Every Name
 
 A folder's entries are sorted by name, and every fork of the folder's Merkle tree records the name at which its right half begins. A name can therefore sit in exactly one place. One branch proves that a name is in a folder and what it holds, and the same kind of branch proves that a name is *not* in the folder. A publisher cannot show one file under a name to a reviewer and a different file under the same name to everyone else.
-
-### Scionic Merkle Tree
-
-![Scionic Merkle Tree: the root is the hash of the record, which names the folder on top. Each folder lists its entries by name and each file lists its chunks by number, and a Classic Merkle tree inside each one covers its list. Every link ends at a box that holds what the hash covers: the count, the size and the Classic Merkle root.](docs/pictures/scionic-merkle-tree.png)
-
-### Scionic Merkle Branch
-
-![Scionic Merkle Branch: one chunk of a file, proven against the root. Each folder and file on the way shows one item of its list with a few hashes beside it. At each step the count, the size and the Classic Merkle root are hashed, and must give the hash held just above. The rest of the tree is never sent.](docs/pictures/scionic-merkle-branch.png)
 
 ## Scionic Merkle Branch Statistics
 
