@@ -125,6 +125,16 @@ class Picture {
     );
   }
 
+  // shape draws a box whose outline is not a plain rectangle, as a folder's and
+  // a file's are. The layout check holds it as it holds a rect with an id, by
+  // the rectangle that all of it fits in. `inside` is a point that the box
+  // covers, for whoever holds the rendered picture to the drawing.
+  shape(d, o = {}) {
+    this.parts.push(
+      `<path${attrs({ d, fill: o.fill ?? 'none', stroke: o.stroke, 'stroke-width': o.stroke ? (o.sw ?? 1.5) : undefined, 'stroke-linejoin': 'round', 'data-box': o.id, 'data-parent': o.parent, 'data-inside': o.inside })}/>`,
+    );
+  }
+
   circle(cx, cy, r, o = {}) {
     this.parts.push(`<circle${attrs({ cx, cy, r, fill: o.fill ?? 'none', stroke: o.stroke, 'stroke-width': o.stroke ? (o.sw ?? 1.5) : undefined })}/>`);
   }
@@ -242,10 +252,10 @@ function tree(mode) {
     })[state(id)];
   const linkLook = (id) => (!branch ? { stroke: C.sky, sw: 1.5 } : taken.has(id) ? { stroke: C.green, sw: 2.5 } : { stroke: fade(C.sky, C.canvas), sw: 1.5 });
 
-  // Where everything stands. A folder and a file are drawn the same way: a box
-  // with the Classic Merkle tree over its list, and one chip for each item of
-  // the list under the tree's leaves. A folder's chips are names, and a file's
-  // are the numbers of its chunks.
+  // Where everything stands. A folder and a file hold the same things: the
+  // Classic Merkle tree over its list, and one chip for each item of the list
+  // under the tree's leaves. A folder's chips are names, and a file's are the
+  // numbers of its chunks. Their outlines tell them apart ("The boxes").
   const pad = 16, gap = 12, chipH = 26, step = 30, least = 160;
   const nameChip = { w: 2 * Math.ceil((Math.max(...[...TOP, ...LEFT, ...RIGHT].map((s) => s.length)) * 8.25 + 22) / 2), gap: 12 };
   const numberChip = { w: 42, gap: 12 };
@@ -298,7 +308,7 @@ function tree(mode) {
   const cx = W / 2;
   const root = { id: 'root', x: cx - 220, y: 138, w: 440, h: 38 };
   const record = { id: 'record', x: cx - 235, y: 194, w: 470, h: 66 };
-  const bottom1 = 286 + boxH, bottom2 = bottom1 + 88 + boxH, bottom3 = bottom2 + 172 + boxH;
+  const bottom1 = 296 + boxH, bottom2 = bottom1 + 88 + boxH, bottom3 = bottom2 + 172 + boxH;
   const top = folder('top', TOP, cx - folderW(TOP, record.w) / 2, bottom1, record.w);
   const second = folderW(LEFT) + gap + rowW(BETWEEN) + gap + folderW(RIGHT);
   if (second > W - 2 * edge) throw new Error(`the second row takes ${second} units, and the picture has ${W - 2 * edge}`);
@@ -343,10 +353,39 @@ function tree(mode) {
     p.text(cx, record.y + 27, [{ s: 'Record', weight: 600, size: 18 }, { s: 'what is on top, and how much the tree holds', fill: look.ink2, dx: 10 }], { size: 14.5, fill: look.ink, anchor: 'middle', in: 'record' });
     p.text(cx, record.y + 50, 'kind · size · hash · chunks · chunk bytes · list bytes · extra data', { size: 14.5, fill: look.ink, anchor: 'middle', in: 'record' });
   }
+  // A folder and a file are told apart by their outlines. A folder's box has a
+  // tab over its top left corner, as a folder has, and a file's box has its top
+  // right corner folded down, as a sheet has. Each also has a small picture of
+  // itself beside its word. A box's place and size are those of its body: a
+  // folder's tab stands over them.
+  const radius = 12, tab = { h: 20, share: 0.32, slope: 24 }, ear = 22;
+  const corner = (dx, dy) => `a${radius} ${radius} 0 0 1 ${dx * radius} ${dy * radius}`;
+  const tabEnd = (b) => b.x + Math.round(b.w * tab.share);
+  const tabTop = (b) => `V${n(b.y - tab.h + 10)} a10 10 0 0 1 10 -10 H${n(tabEnd(b) - tab.slope)} C${n(tabEnd(b) - tab.slope + 10)} ${n(b.y - tab.h)} ${n(tabEnd(b) - 10)} ${n(b.y)} ${n(tabEnd(b))} ${n(b.y)}`;
+  const folderOutline = (b) => `M${n(b.x)} ${n(b.y + b.h - radius)} ${tabTop(b)} H${n(b.x + b.w - radius)} ${corner(1, 1)} V${n(b.y + b.h - radius)} ${corner(-1, 1)} H${n(b.x + radius)} ${corner(-1, -1)} Z`;
+  const tabOutline = (b) => `M${n(b.x)} ${n(b.y)} ${tabTop(b)} Z`;
+  const fileOutline = (b) => `M${n(b.x)} ${n(b.y + radius)} ${corner(1, -1)} H${n(b.x + b.w - ear)} L${n(b.x + b.w)} ${n(b.y + ear)} V${n(b.y + b.h - radius)} ${corner(-1, 1)} H${n(b.x + radius)} ${corner(-1, -1)} Z`;
+  const folderIcon = (x, y, stroke, fill) => p.path(`M${n(x)} ${n(y + 3.5)} a2 2 0 0 1 2 -2 h5 l2.5 2.5 h8.5 a2 2 0 0 1 2 2 v8.5 a2 2 0 0 1 -2 2 h-16 a2 2 0 0 1 -2 -2 Z`, { stroke, fill, sw: 1.5 });
+  const fileIcon = (x, y, stroke, fill) => {
+    p.path(`M${n(x + 2)} ${n(y)} h6.5 l5.5 5.5 v10.5 a2 2 0 0 1 -2 2 h-10 a2 2 0 0 1 -2 -2 v-14 a2 2 0 0 1 2 -2 Z`, { stroke, fill, sw: 1.5 });
+    p.path(`M${n(x + 8.5)} ${n(y)} v5.5 h5.5`, { stroke, sw: 1.5 });
+  };
   for (const b of [...folders, ...files]) {
-    const look = boxLook(b.id);
-    p.rect(b.x, b.y, b.w, b.h, { id: b.id, rx: 12, fill: look.fill, stroke: look.stroke, sw: look.sw });
-    p.text(b.x + pad, b.y + 30, [{ s: b.kind, weight: 600, size: 18 }, { s: b.about, fill: look.ink2, dx: 10 }], { size: 14.5, fill: look.ink, in: b.id });
+    const look = boxLook(b.id), isFolder = b.kind === 'Folder';
+    // The tab, the folded corner and the small pictures are tinted in the tree
+    // picture only. In the branch picture a fill says what is shown or sent,
+    // so there they are outlines.
+    const plain = state(b.id) === 'plain';
+    const tint = plain ? mix(C.sky, C.box, 0.2) : look.fill;
+    p.shape(isFolder ? folderOutline(b) : fileOutline(b), { id: b.id, fill: look.fill, stroke: look.stroke, sw: look.sw, inside: `${n(b.x + 4)} ${n(b.y + b.h / 2)}` });
+    if (isFolder) {
+      p.path(tabOutline(b), { fill: plain ? mix(C.sky, C.box, 0.38) : look.fill, stroke: look.stroke, sw: look.sw });
+      folderIcon(b.x + pad, b.y + 15, look.stroke, tint);
+    } else {
+      p.path(`M${n(b.x + b.w - ear)} ${n(b.y)} V${n(b.y + ear)} H${n(b.x + b.w)} Z`, { fill: tint, stroke: look.stroke, sw: look.sw });
+      fileIcon(b.x + pad, b.y + 14, look.stroke, tint);
+    }
+    p.text(b.x + pad + (isFolder ? 28 : 22), b.y + 30, [{ s: b.kind, weight: 600, size: 18 }, { s: b.about, fill: look.ink2, dx: 10 }], { size: 14.5, fill: look.ink, in: b.id });
   }
   for (const b of chunks) {
     const s = state(b.id);
@@ -448,7 +487,11 @@ function tree(mode) {
   const tileKey = (fill, stroke, sw) => (x, y) => p.rect(x - 13, y - 10, 26, 20, { rx: 8, fill, stroke, sw });
   const linkKey = (stroke, sw) => (x, y) => p.path(`M${n(x - 13)} ${n(y - 11)} C${n(x - 13)} ${n(y + 4)} ${n(x + 13)} ${n(y - 4)} ${n(x + 13)} ${n(y + 11)}`, { stroke, sw });
   if (!branch) {
-    key(0, 0, boxKey(C.box, C.sky, 1.5), 'Folder and file', ['Each is named by its hash. The same', 'content has the same hash anywhere.']);
+    const both = (x, y) => {
+      folderIcon(x - 20, y - 9, C.sky, mix(C.sky, C.box, 0.2));
+      fileIcon(x + 6, y - 9.5, C.sky, mix(C.sky, C.box, 0.2));
+    };
+    key(0, 0, both, 'Folder and file', ['Each is named by its hash. The same', 'content has the same hash anywhere.']);
     key(0, 1, (x, y) => p.hex(x, y, 9, { fill: C.amber }), 'Classic Merkle tree', ['Inside every folder and file, over its', 'list. Its top is the Classic Merkle root.']);
     key(0, 2, tileKey(mix(C.sky, C.box, 0.16), C.sky, 1.5), 'Chunk', ['Its bytes and nothing else, so the same', 'chunk in two files is stored once.']);
     key(1, 0, chipKey('name', 40, C.raised, C.hair, 1), "A folder's entry", ['kind · size · hash · name · extra data.', "Sorted by name. A file's hash holds no name."]);
