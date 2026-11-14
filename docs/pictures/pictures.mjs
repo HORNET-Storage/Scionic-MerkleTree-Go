@@ -206,7 +206,7 @@ function tree(mode) {
   const branch = mode === 'branch';
   // The tree pictures are a little wider than the table, so that the bottom
   // row holds every file with its chunks at a size that can be read.
-  const W = 1400, edge = 48;
+  const W = 1424, edge = 48;
   const proven = LEFT[0];
 
   // What the branch shows, what the receiver works out, and what is sent
@@ -248,7 +248,9 @@ function tree(mode) {
   // are the numbers of its chunks.
   const pad = 16, gap = 12, chipH = 26, step = 30, least = 160;
   const nameChip = { w: 2 * Math.ceil((Math.max(...[...TOP, ...LEFT, ...RIGHT].map((s) => s.length)) * 8.25 + 22) / 2), gap: 12 };
-  const numberChip = { w: 42, gap: 10 };
+  const numberChip = { w: 42, gap: 12 };
+  // A chunk is narrower than the step from one number to the next, by the room
+  // that is left between two chunks.
   const tile = { w: 48, h: 38, drop: 30 };
   const levels = (count) => Math.max(1, Math.ceil(Math.log2(count)));
   // Every box has one height, that of the deepest tree, so that the boxes of a
@@ -364,7 +366,7 @@ function tree(mode) {
   const link = (parent, i, child, fall = 0.55, land = 0.55) => {
     const c = parent.chips[i], id = `${c.id}>${child.id}`;
     const from = parent.y + parent.h, to = child.y;
-    const tx = Math.abs(c.cx - child.cx) <= 6 ? c.cx : child.cx;
+    const tx = Math.abs(c.cx - child.cx) <= 8 ? c.cx : child.cx;
     p.path(`M${n(c.cx)} ${n(c.y + c.h)} V${n(from)} C${n(c.cx)} ${n(from + (to - from) * fall)} ${n(tx)} ${n(to - (to - from) * land)} ${n(tx)} ${n(to)}`, { ...linkLook(id), from: c.id, to: child.id });
   };
   [left, ...middle, right].forEach((child, i) => link(top, i, child));
