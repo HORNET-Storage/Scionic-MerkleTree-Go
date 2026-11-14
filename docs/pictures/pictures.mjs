@@ -173,42 +173,91 @@ function table() {
     { name: 'Folder Storage Support', lines: ['Convert folders containing many files', 'into a chunked, Merklized tree.'], marks: [true, true, false] },
     { name: 'Chunked Parent Leaves', lines: ['Avoid bloated parent leaves that grow', 'when the number of chunks rises.'], marks: [false, true, true] },
   ];
-  const forms = ['IPFS Merkle DAGs', 'Scionic Merkle Trees', 'Classic Merkle Trees'];
+  // The three forms. The word that tells a form from the other two is written
+  // large, over the rest of its name. Each has a small picture of itself, in
+  // the colours of the two tree pictures: sky for the things that link by
+  // hash, and amber for a Classic Merkle tree.
+  const forms = [
+    { word: 'IPFS', rest: 'Merkle DAGs', sign: 'links' },
+    { word: 'Scionic', rest: 'Merkle Trees', sign: 'both' },
+    { word: 'Classic', rest: 'Merkle Trees', sign: 'tree' },
+  ];
+  const said = (form) => `${form.word} ${form.rest}`;
   const ours = 1;
-  const W = 1344, left = 56, featureW = 508, formW = 240, headY = 124, headH = 76, rowH = 122;
-  const bottom = headY + headH + rows.length * rowH;
+  // The table fills the picture. Its title stands in the corner that a table
+  // leaves empty: left of the names of the forms, and over the names of the
+  // rows.
+  const left = 48, featureW = 428, formW = 196, headY = 56, headH = 136, rowH = 100;
+  const rowsY = headY + headH + 20, bottom = rowsY + rows.length * rowH;
+  const right = left + featureW + forms.length * formW, inset = 6;
   const p = new Picture(
     'merklized-forms',
-    W,
-    bottom + 56,
+    right - inset + left,
+    bottom + 58,
     'Comparison of Many Merklized Forms',
-    rows.map((r) => `${r.name}: ${r.lines.join(' ')} ${forms.map((f, j) => `${f}: ${r.marks[j] ? 'yes' : 'no'}`).join(', ')}.`).join(' '),
+    rows.map((r) => `${r.name}: ${r.lines.join(' ')} ${forms.map((f, j) => `${said(f)}: ${r.marks[j] ? 'yes' : 'no'}`).join(', ')}.`).join(' '),
   );
   const formX = (j) => left + featureW + j * formW;
 
-  p.text(left, 82, 'Comparison of Many Merklized Forms', { size: 32, weight: 700 });
+  p.text(left, headY + 40, 'Comparison of Many', { size: 32, weight: 700 });
+  p.text(left, headY + 84, 'Merklized Forms', { size: 32, weight: 700 });
+  p.text(left, headY + 113, 'Scionic Merkle Trees: The Best of Both Worlds', { size: 17, fill: C.ink2 });
 
-  // The column of the Scionic Merkle Tree stands out from the other two.
-  p.rect(formX(ours) + 8, headY - 6, formW - 16, bottom - headY + 18, { rx: 16, fill: C.raised, stroke: C.sky, sw: 1.5 });
+  // The small pictures. (cx, y) is the middle of a picture's top edge, and
+  // each is 50 high.
+  const amberTree = (nodes, links) => {
+    for (const [a, b] of links) p.line(nodes[a][0], nodes[a][1], nodes[b][0], nodes[b][1], { stroke: C.amber, sw: 2 });
+    for (const [x, y] of nodes) p.hex(x, y, 6.3, { fill: C.amber });
+  };
+  const signs = {
+    // Boxes that link to boxes, one of them from two sides: a Merkle DAG.
+    links: (cx, y) => {
+      const at = [[cx, y + 5.5], [cx - 13.5, y + 25], [cx + 13.5, y + 25], [cx - 27, y + 44.5], [cx, y + 44.5], [cx + 27, y + 44.5]];
+      for (const [a, b] of [[0, 1], [0, 2], [1, 3], [1, 4], [2, 4], [2, 5]]) p.line(at[a][0], at[a][1], at[b][0], at[b][1], { stroke: C.sky, sw: 2 });
+      for (const [x, top] of at) p.rect(x - 7.5, top - 5.5, 15, 11, { rx: 3.5, fill: C.sky });
+    },
+    // A Classic Merkle tree.
+    tree: (cx, y) =>
+      amberTree(
+        [[cx, y + 6.5], [cx - 15, y + 25], [cx + 15, y + 25], [cx - 22.5, y + 43.5], [cx - 7.5, y + 43.5], [cx + 7.5, y + 43.5], [cx + 22.5, y + 43.5]],
+        [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [2, 6]],
+      ),
+    // A box that links by hash, with a Classic Merkle tree inside it.
+    both: (cx, y) => {
+      p.rect(cx - 31, y, 62, 50, { rx: 10, fill: C.box, stroke: C.sky, sw: 2.25 });
+      amberTree([[cx, y + 15], [cx - 15, y + 35], [cx + 15, y + 35]], [[0, 1], [0, 2]]);
+    },
+  };
+
+  // The column of the Scionic Merkle Tree stands out from the other two: one
+  // frame holds its name and its four marks.
+  p.rect(formX(ours) + 2, headY - 8, formW - 4, bottom - headY + 18, { rx: 18, fill: C.raised, stroke: C.sky, sw: 1.75 });
+  // A line under the names of the forms, half way to the first row, and one
+  // between two rows.
+  rows.forEach((_, i) => p.line(left, rowsY + i * rowH - (i ? 0 : 10), right - inset, rowsY + i * rowH - (i ? 0 : 10), { stroke: C.hair, sw: 1 }));
 
   forms.forEach((form, j) => {
-    p.rect(formX(j) + 12, headY, formW - 24, headH, { id: `head${j}` });
-    p.text(formX(j) + formW / 2, headY + 46, form, { size: 19, weight: 600, anchor: 'middle', in: `head${j}` });
+    const mine = j === ours, cx = formX(j) + formW / 2, pad = mine ? 10 : inset;
+    p.rect(formX(j) + pad, headY, formW - 2 * pad, headH, { id: `head${j}`, rx: mine ? 12 : 14, fill: mine ? mix(C.sky, C.raised, 0.22) : C.box, stroke: mine ? undefined : C.hair, sw: 1 });
+    signs[form.sign](cx, headY + 12);
+    p.text(cx, headY + 94, form.word, { size: 28, weight: 700, anchor: 'middle', in: `head${j}` });
+    p.text(cx, headY + 123, form.rest, { size: 17, weight: 600, anchor: 'middle', in: `head${j}` });
   });
 
   rows.forEach((row, i) => {
-    const top = headY + headH + i * rowH;
-    p.line(left, top, left + featureW + forms.length * formW, top, { stroke: C.hair, sw: 1 });
+    const top = rowsY + i * rowH, mid = top + rowH / 2;
     p.rect(left - 6, top + 6, featureW - 12, rowH - 12, { id: `feature${i}` });
-    p.text(left, top + 44, row.name, { size: 22, weight: 600, in: `feature${i}` });
-    row.lines.forEach((line, k) => p.text(left, top + 72 + k * 23, line, { size: 16.5, fill: C.ink2, in: `feature${i}` }));
+    p.text(left, top + 40, row.name, { size: 21.5, weight: 600, in: `feature${i}` });
+    row.lines.forEach((line, k) => p.text(left, top + 64 + k * 22, line, { size: 16, fill: C.ink2, in: `feature${i}` }));
+    // A mark is a badge: a tick or a cross, and the word beside it, so that
+    // neither the colour nor the shape says it alone.
     row.marks.forEach((yes, j) => {
-      const cx = formX(j) + formW / 2 - 19, cy = top + rowH / 2;
-      p.rect(formX(j) + 22, top + 16, formW - 44, rowH - 32, { rx: 12, fill: mix(yes ? C.green : C.red, j === ours ? C.raised : C.canvas, 0.12) });
-      p.rect(formX(j) + 12, top + 6, formW - 24, rowH - 12, { id: `mark${i}.${j}` });
-      p.circle(cx, cy, 16, { fill: yes ? C.green : C.red });
-      p.path(yes ? `M${n(cx - 7)} ${n(cy + 0.5)} l4.8 4.7 l9.4 -10` : `M${n(cx - 5.5)} ${n(cy - 5.5)} l11 11 M${n(cx + 5.5)} ${n(cy - 5.5)} l-11 11`, { stroke: C.dark, sw: 3 });
-      p.text(cx + 26, cy + 6, yes ? 'Yes' : 'No', { size: 17, weight: 600, in: `mark${i}.${j}` });
+      const cx = formX(j) + formW / 2, colour = yes ? C.green : C.red, under = j === ours ? C.raised : C.canvas;
+      p.rect(cx - 56, mid - 23, 112, 46, { rx: 23, fill: mix(colour, under, 0.16), stroke: mix(colour, under, 0.5), sw: 1.25 });
+      p.rect(formX(j) + 8, top + 8, formW - 16, rowH - 16, { id: `mark${i}.${j}` });
+      p.circle(cx - 19, mid, 13, { fill: colour });
+      p.path(yes ? `M${n(cx - 24.7)} ${n(mid + 0.4)} l3.9 3.8 l7.6 -8.1` : `M${n(cx - 23.5)} ${n(mid - 4.5)} l9 9 M${n(cx - 14.5)} ${n(mid - 4.5)} l-9 9`, { stroke: C.dark, sw: 2.6 });
+      p.text(cx + 3, mid + 6.5, yes ? 'Yes' : 'No', { size: 18, weight: 600, in: `mark${i}.${j}` });
     });
   });
   return p;

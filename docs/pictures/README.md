@@ -38,9 +38,11 @@ Everything a picture says is at the top of `pictures.mjs` or in the function tha
 - **No list in these pictures has fewer than three items.** The tree over two items is a single fork, which does not look like a tree. So the program refuses a folder with fewer than three entries, and a file with fewer than three chunks. The format itself has smaller ones: a file of 512 KiB or less is a single chunk, and its tree is that one leaf.
 - **Every folder and file box has one height,** that of the deepest tree, so that the boxes of a row line up at the top and at the bottom. A folder's tab stands over that height. A tree of fewer levels is drawn as tall as the deepest: every Classic Merkle root stands at one height in its box, and so does every leaf.
 - **Each row stands in the middle of the picture.** Two boxes that belong together are 12 units apart, and two sets of them are 26 apart: the folders and the files of the second row, and the two folders' files in the bottom row.
-- **The two tree pictures are 1,424 units wide,** a little wider than the table, so that the bottom row holds six files with their chunks at a size that can be read, and with room between one chunk and the next. If the files are given more chunks than fit, the program refuses them, and says how much room they take and how much there is.
+- **The two tree pictures are 1,424 units wide,** wider than the table, so that the bottom row holds six files with their chunks at a size that can be read, and with room between one chunk and the next. If the files are given more chunks than fit, the program refuses them, and says how much room they take and how much there is.
 - **`PROVEN`** is the chunk that the branch picture proves, in the first file of the first folder. What is shown, what is sent beside it and what the receiver works out follow from it by the rule in [`spec/FORMAT.md`](../../spec/FORMAT.md), under "Showing a part".
-- **The rows of the table** are in `table()`.
+- **The rows of the table and its three forms** are in `table()`.
+- **The name of a form is the largest thing in its column.** The word that tells it from the other two is written large, over the rest of its name: `IPFS` over `Merkle DAGs`. Each form has a small picture of itself in the colours of the two tree pictures: boxes that link to boxes for a Merkle DAG, a Classic Merkle tree, and for a Scionic Merkle Tree a box with a Classic Merkle tree inside it.
+- **The table fills its picture.** Its title stands in the corner that a table leaves empty, beside the names of the forms. A mark is a badge that is no larger than what it says, and the picture is as wide as its columns and no wider, so that its text is large at the width of a page.
 
 ## The Colours
 
