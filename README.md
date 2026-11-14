@@ -161,7 +161,7 @@ A chunk's number is its position in its file's list, and the file's hash covers 
 
 ### Negentropy Symbiosis
 
-Scionic Sync complements any set reconciliation system, such as Negentropy. Each one does the part it suits:
+Scionic Sync complements any set reconciliation system, such as Negentropy. Each does the part it is suited to:
 
 - **Set reconciliation syncs the Merkle roots, and the file hashes that link to each root.** Two sides work out which roots, and which files under a root, one of them holds and the other is missing. These are small sets: one hash for a tree and one for a file.
 - **Scionic Sync then syncs the chunks of each file.** A file's chunks are numbered, so a receiver asks for the ranges of numbers it is missing. Chunk hashes are never reconciled as a set. They are by far the largest set, about 500,000 for a terabyte of files, and set reconciliation costs memory and work for every hash in the set.
