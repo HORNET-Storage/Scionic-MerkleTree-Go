@@ -6,7 +6,7 @@
 
 We've designed a [new type of Merkle DAG/Merkle Tree hybrid](https://www.hornet.storage/) known as the Scionic Merkle Tree. Scionic Merkle Trees contain small branches like Classic Merkle Trees, the folder storage support of Merkle DAGs, and numbered file chunks, so anyone can sync a file by its hash and request the range of chunk numbers they are missing. Scionic Sync is the name of the simple protocol used to request a range of a file's chunk numbers in order to retrieve a batch of missing file chunks. Identical chunks, files and folders have identical hashes wherever they appear, so each one is stored once and sent once.
 
-![Tree Comparison Diagram](https://static.wixstatic.com/media/e9326a_ee5ee567806d439b93eaf3ce49afe072~mv2.png)
+![Comparison of Many Merklized Forms. Numbered chunks and Negentropy symbiosis: Scionic Merkle Trees only. Folder storage support: IPFS Merkle DAGs and Scionic Merkle Trees. Chunked parent leaves: Scionic Merkle Trees and Classic Merkle Trees.](docs/pictures/merklized-forms.png)
 
 This repository is the **Go implementation**, at **version 2.5.6**. The Scionic tree format is specified in [`spec/FORMAT.md`](spec/FORMAT.md). The Rust library is the reference for it, and this library is held to the same test vectors, under [`spec/`](spec), byte for byte.
 
@@ -115,11 +115,11 @@ A folder's entries are sorted by name, and every fork of the folder's Merkle tre
 
 ### Scionic Merkle Tree
 
-![Scionic Merkle Tree Diagram](https://i.ibb.co/XJjbwmP/Scionic-Merkle-Tree.jpg)
+![Scionic Merkle Tree: the root is the hash of the record, which names the folder on top. Each folder lists its entries by name and each file lists its chunks by number, and a Classic Merkle tree inside each one covers its list.](docs/pictures/scionic-merkle-tree.png)
 
 ### Scionic Merkle Branch
 
-![Scionic Merkle Branch Diagram](https://i.ibb.co/nLcNLw1/Merkle-Branch.png)
+![Scionic Merkle Branch: one chunk of a file, proven against the root. Each folder and file on the way shows one item of its list with a few hashes beside it, and the rest of the tree is never sent.](docs/pictures/scionic-merkle-branch.png)
 
 ## Scionic Merkle Branch Statistics
 
@@ -643,6 +643,8 @@ go test -race ./...
 ```
 
 CI runs these on Linux, macOS and Windows on every push, runs the tests once more on Go 1.26, the oldest version the module supports, and once as a 32-bit program. The tests also hold this file to the module: its Go code is taken from files that are compiled and run, and its tables of branch sizes from the program that measures them.
+
+The three pictures of this file are drawn by [`docs/pictures/pictures.mjs`](docs/pictures/pictures.mjs). [`docs/pictures/README.md`](docs/pictures/README.md) says how to draw them again, and what their colours are.
 
 ## License
 

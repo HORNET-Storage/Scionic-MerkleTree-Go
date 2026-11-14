@@ -1,6 +1,7 @@
 package scionic_test
 
 import (
+	"image/png"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -94,6 +95,30 @@ func TestTheReadmeKeepsItsPictures(t *testing.T) {
 		_, after, found := strings.Cut(text, "\n"+heading+"\n")
 		if !found || !strings.HasPrefix(strings.TrimLeft(after, "\n"), "![") {
 			t.Fatalf("the README has no picture under %q", heading)
+		}
+	}
+}
+
+// A picture that the README takes from the repository is a picture: a PNG
+// that opens, and wide enough to be read at the width of a page.
+func TestThePicturesTheReadmeShowsOpen(t *testing.T) {
+	for _, after := range strings.Split(readme(t), "\n![")[1:] {
+		_, rest, found := strings.Cut(after, "](")
+		target, _, closed := strings.Cut(rest, ")")
+		if !found || !closed || strings.HasPrefix(target, "http") {
+			continue
+		}
+		file, err := os.Open(filepath.FromSlash(target))
+		if err != nil {
+			t.Fatal(err)
+		}
+		picture, err := png.DecodeConfig(file)
+		file.Close()
+		if err != nil {
+			t.Fatalf("%s is not a picture: %v", target, err)
+		}
+		if picture.Width < 1600 {
+			t.Fatalf("%s is %d pixels wide, too few to read", target, picture.Width)
 		}
 	}
 }
