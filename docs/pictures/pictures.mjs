@@ -38,18 +38,22 @@ const C = {
 const SANS = "'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif";
 const MONO = "Consolas, 'Cascadia Mono', 'SF Mono', Menlo, monospace";
 
-// The tree that the two tree pictures draw. The folder on top holds a folder,
-// two files and a folder, and each of those two folders holds three files. The
-// names are in the order of their bytes, as a folder's entries are, so the two
-// folders are the first and the last entry of the folder on top.
-const TOP = ['model', 'notes.pdf', 'paper.pdf', 'samples'];
+// The tree that the two tree pictures draw. The folder on top holds two
+// folders and two files, and each of those folders holds three files. The
+// names are in the order of their bytes, as a folder's entries are, and the
+// pictures draw a folder's entries in that order. The first two names of TOP
+// are the two folders. So that the two folders stand side by side, with the
+// files to the right of them, the files of the folder on top have names that
+// sort after both folders.
+const TOP = ['model', 'samples', 'test.csv', 'train.csv'];
 const LEFT = ['model.bin', 'tags.json', 'vocab.txt'];
 const RIGHT = ['bird.wav', 'cat.wav', 'dog.wav'];
 // How many chunks each file has.
-const CHUNKS = { 'notes.pdf': 3, 'paper.pdf': 3, 'model.bin': 6, 'tags.json': 3, 'vocab.txt': 3, 'bird.wav': 3, 'cat.wav': 3, 'dog.wav': 3 };
-// The files of the folder on top, and every file.
-const BETWEEN = TOP.slice(1, -1);
-const FILES = [...BETWEEN, ...LEFT, ...RIGHT];
+const CHUNKS = { 'test.csv': 3, 'train.csv': 3, 'model.bin': 6, 'tags.json': 3, 'vocab.txt': 3, 'bird.wav': 3, 'cat.wav': 3, 'dog.wav': 3 };
+// The files of the folder on top, which stand beside its two folders, and
+// every file.
+const BESIDE = TOP.slice(2);
+const FILES = [...BESIDE, ...LEFT, ...RIGHT];
 // The tree over a list of two items is one fork, which does not look like a
 // tree. So every folder here has three entries or more, and every file three
 // chunks or more.
@@ -256,7 +260,12 @@ function tree(mode) {
   // Classic Merkle tree over its list, and one chip for each item of the list
   // under the tree's leaves. A folder's chips are names, and a file's are the
   // numbers of its chunks. Their outlines tell them apart ("The boxes").
-  const pad = 16, gap = 12, chipH = 26, step = 30, least = 160;
+  const pad = 16, chipH = 26, step = 30, least = 160;
+  // Two boxes that belong together stand `gap` apart, and two sets of them
+  // stand `group` apart: the folders and the files of the second row, and the
+  // two folders' files in the bottom row. The picture is as wide as the bottom
+  // row is with these.
+  const gap = 12, group = 26;
   const nameChip = { w: 2 * Math.ceil((Math.max(...[...TOP, ...LEFT, ...RIGHT].map((s) => s.length)) * 8.25 + 22) / 2), gap: 12 };
   const numberChip = { w: 42, gap: 12 };
   // A chunk is narrower than the step from one number to the next, by the room
@@ -297,32 +306,34 @@ function tree(mode) {
     });
   };
 
-  // Three rows of boxes. The root, the record and the folder on top stand in
-  // the middle of the picture, with the key on both sides of them, and the
-  // folder on top is as wide as the record. The second row is the entries of
-  // the folder on top, side by side in the order of their names, in the middle
-  // of the picture. The bottom row is the files of the two folders, from edge
-  // to edge. The second and the third row are far enough apart for the chunks
-  // of the second row's files to hang between them, and for the links from
-  // the two folders to pass under those chunks.
+  // Three rows of boxes, each in the middle of the picture.
+  // - The root, the record and the folder on top stand with the key on both
+  //   sides of them, and the folder on top is as wide as the record.
+  // - The second row is the entries of the folder on top, in the order of
+  //   their names: its two folders side by side, and then its files.
+  // - The bottom row is the files of the first folder, and then those of the
+  //   second.
+  // The second and the third row are far enough apart for the links from the
+  // second folder to pass under the chunks that hang from the second row's
+  // files.
   const cx = W / 2;
   const root = { id: 'root', x: cx - 220, y: 138, w: 440, h: 38 };
   const record = { id: 'record', x: cx - 235, y: 194, w: 470, h: 66 };
-  const bottom1 = 296 + boxH, bottom2 = bottom1 + 88 + boxH, bottom3 = bottom2 + 172 + boxH;
+  const bottom1 = 296 + boxH, bottom2 = bottom1 + 88 + boxH, bottom3 = bottom2 + 184 + boxH;
   const top = folder('top', TOP, cx - folderW(TOP, record.w) / 2, bottom1, record.w);
-  const second = folderW(LEFT) + gap + rowW(BETWEEN) + gap + folderW(RIGHT);
+  const second = folderW(LEFT) + gap + folderW(RIGHT) + group + rowW(BESIDE);
   if (second > W - 2 * edge) throw new Error(`the second row takes ${second} units, and the picture has ${W - 2 * edge}`);
   const left = folder('left', LEFT, cx - second / 2, bottom2);
-  const middle = row('top', BETWEEN, left.x + left.w + gap, bottom2);
-  const right = folder('right', RIGHT, middle.at(-1).x + middle.at(-1).w + gap, bottom2);
-  const third = rowW(LEFT) + gap + rowW(RIGHT);
+  const right = folder('right', RIGHT, left.x + left.w + gap, bottom2);
+  const beside = row('top', BESIDE, right.x + right.w + group, bottom2);
+  const third = rowW(LEFT) + group + rowW(RIGHT);
   if (third > W - 2 * edge) throw new Error(`the files of the bottom row take ${third} units, and the picture has ${W - 2 * edge}`);
-  const leftFiles = row('left', LEFT, edge, bottom3);
-  const rightFiles = row('right', RIGHT, W - edge - rowW(RIGHT), bottom3);
-  const folders = [top, left, right], files = [...middle, ...leftFiles, ...rightFiles];
+  const leftFiles = row('left', LEFT, cx - third / 2, bottom3);
+  const rightFiles = row('right', RIGHT, leftFiles.at(-1).x + leftFiles.at(-1).w + group, bottom3);
+  const folders = [top, left, right], files = [...beside, ...leftFiles, ...rightFiles];
   const chunks = files.flatMap((f) => f.chunks);
   const others = files.length - 1;
-  const said = (names) => `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  const said = (names) => (names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
 
   const p = new Picture(
     branch ? 'scionic-merkle-branch' : 'scionic-merkle-tree',
@@ -331,7 +342,7 @@ function tree(mode) {
     branch ? 'Scionic Merkle Branch' : 'Scionic Merkle Tree',
     branch
       ? `The same tree, with the branch that proves chunk ${PROVEN} of ${proven} against the root. The record is sent. The folder on top, the folder ${TOP[0]} and the file ${proven} each show one item of their list, with a hash and a size for every part of the list that is not shown: ${sent.size} in all. The receiver works out every hash on the way up, until the top matches the root it trusts. The other ${CHUNKS[proven] - 1} chunks of ${proven}, the ${others} other files and the rest of every list are never sent.`
-      : `The root is the hash of the record. The record names the folder on top, which lists ${TOP.length} entries by name: the folder ${TOP[0]}, the files ${said(BETWEEN)}, and the folder ${TOP.at(-1)}. The folder ${TOP[0]} lists the files ${said(LEFT)}, and the folder ${TOP.at(-1)} lists the files ${said(RIGHT)}. Every file lists its chunks by number: ${FILES.map((f) => `${f} has ${CHUNKS[f]}`).join(', ')}. Inside every folder and every file, a Classic Merkle tree covers its list. A chunk is its bytes and nothing else.`,
+      : `The root is the hash of the record. The record names the folder on top, which lists ${TOP.length} entries by name: the folders ${TOP[0]} and ${TOP[1]}, and the ${BESIDE.length === 1 ? 'file' : 'files'} ${said(BESIDE)}. The folder ${TOP[0]} lists the files ${said(LEFT)}, and the folder ${TOP[1]} lists the files ${said(RIGHT)}. Every file lists its chunks by number: ${FILES.map((f) => `${f} has ${CHUNKS[f]}`).join(', ')}. Inside every folder and every file, a Classic Merkle tree covers its list. A chunk is its bytes and nothing else.`,
   );
 
   p.text(edge, 82, branch ? 'Scionic Merkle Branch' : 'Scionic Merkle Tree', { size: 32, weight: 700 });
@@ -408,11 +419,11 @@ function tree(mode) {
     const tx = Math.abs(c.cx - child.cx) <= 8 ? c.cx : child.cx;
     p.path(`M${n(c.cx)} ${n(c.y + c.h)} V${n(from)} C${n(c.cx)} ${n(from + (to - from) * fall)} ${n(tx)} ${n(to - (to - from) * land)} ${n(tx)} ${n(to)}`, { ...linkLook(id), from: c.id, to: child.id });
   };
-  [left, ...middle, right].forEach((child, i) => link(top, i, child));
-  // The links to the bottom row go sideways under the chunks that hang from
-  // the second row's files.
-  leftFiles.forEach((child, i) => link(left, i, child, 0.75, 0.45));
-  rightFiles.forEach((child, i) => link(right, i, child, 0.75, 0.45));
+  [left, right, ...beside].forEach((child, i) => link(top, i, child));
+  // The links to the bottom row fall a long way before they go sideways, so
+  // that they pass under the chunks that hang from the second row's files.
+  leftFiles.forEach((child, i) => link(left, i, child, 0.85, 0.4));
+  rightFiles.forEach((child, i) => link(right, i, child, 0.85, 0.4));
   for (const f of files) f.chunks.forEach((child, i) => link(f, i, child));
 
   // Inside each box: the Classic Merkle tree over its list, and the list.
