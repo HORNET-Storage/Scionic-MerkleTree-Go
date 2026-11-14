@@ -8,6 +8,8 @@ The README has three pictures. One program draws all of them, so they share one 
 | Scionic Merkle Tree | [`scionic-merkle-tree.png`](scionic-merkle-tree.png) |
 | Scionic Merkle Branch | [`scionic-merkle-branch.png`](scionic-merkle-branch.png) |
 
+The Rust library's README shows the same three pictures, from copies of these files in its own repository, under `docs/pictures`. When a picture is drawn again, the three `.png` files are copied there.
+
 ## Drawing Them Again
 
 ```sh
