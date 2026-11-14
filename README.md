@@ -105,6 +105,11 @@ So the same chunk, the same file and the same folder have the same hash in every
 
 Within each parent leaf, the list of children is organized as a Classic Merkle Tree rather than one potentially large list of hashes. This holds for a folder with its entries and for a file with its chunks. Large files and large folders lead to very long lists, and chunking the parent leaf with a Classic Merkle Tree avoids that scaling problem.
 
+- **A folder's Classic Merkle Tree** covers its entries, in the order of their names.
+- **A file's Classic Merkle Tree** covers its chunks, in the order they have in the file. A chunk's number is its place in that tree, so a chunk cannot be shown under a number it does not have.
+
+A large file has far more chunks than most folders have entries: about 500,000 for a file of a terabyte. A file of 512 KiB or less is a single chunk, and its tree is that one leaf.
+
 ### File Chunk Downloading with Chunked Parent Leaves
 
 If a user wants to download a specific file chunk within a Scionic Merkle Tree, they no longer need to download the hash of every other chunk of its file, or the listing of every other file in its folder. Instead, they download a Classic Merkle branch for each parent on the way down from the root. This allows the user to verify that the chunk is part of the tree without the rest of it.
