@@ -38,18 +38,26 @@ const C = {
 const SANS = "'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif";
 const MONO = "Consolas, 'Cascadia Mono', 'SF Mono', Menlo, monospace";
 
-// The tree that the two tree pictures draw: a folder on top with two folders
-// and two files, and one file of eight chunks. The names are in the order of
-// their bytes, as a folder's entries are.
-const TOP = ['data', 'meta.json', 'readme.md', 'src'];
-const LEFT = ['model.bin', 'notes.md', 'tags.json', 'vocab.txt'];
-const RIGHT = ['build.sh', 'eval.py', 'lint.py', 'train.py'];
+// The tree that the two tree pictures draw. The folder on top holds a folder,
+// a file and a folder, and each of those two folders holds two files. Every
+// file has several chunks, and is drawn with its own Classic Merkle tree. The
+// names are in the order of their bytes, as a folder's entries are.
+const TOP = ['model', 'notes.pdf', 'samples'];
+const LEFT = ['model.bin', 'vocab.json'];
+const RIGHT = ['cat.wav', 'dog.wav'];
+// How many chunks each file has. Every file has two or more, so that its tree
+// can be seen.
+const CHUNKS = { 'model.bin': 8, 'vocab.json': 3, 'notes.pdf': 2, 'cat.wav': 4, 'dog.wav': 3 };
 for (const names of [TOP, LEFT, RIGHT]) {
   if (names.some((name, i) => i > 0 && Buffer.compare(Buffer.from(names[i - 1]), Buffer.from(name)) >= 0)) throw new Error(`a folder's names are out of order: ${names}`);
 }
-const NUMBERS = ['0', '1', '2', '3', '4', '5', '6', '7'];
-// The chunk that the branch picture proves: this place in model.bin's list.
+for (const name of [TOP[1], ...LEFT, ...RIGHT]) {
+  if (!(CHUNKS[name] >= 2)) throw new Error(`${name} needs two chunks or more, so that its tree can be seen`);
+}
+// The chunk that the branch picture proves: this place in the list of the
+// first file of the first folder.
 const PROVEN = 2;
+if (!(PROVEN >= 0 && PROVEN < CHUNKS[LEFT[0]])) throw new Error(`${LEFT[0]} has no chunk ${PROVEN} to prove`);
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const n = (v) => String(Math.round(v * 100) / 100);
@@ -187,10 +195,11 @@ function table() {
 }
 
 // tree draws the Scionic Merkle Tree, and with mode 'branch' the same tree with
-// the branch that proves one chunk of model.bin.
+// the branch that proves one chunk of the first folder's first file.
 function tree(mode) {
   const branch = mode === 'branch';
   const W = 1344, edge = 48;
+  const proven = LEFT[0];
 
   // What the branch shows, what the receiver works out, and what is sent
   // beside it. shape gives the last two as spec/FORMAT.md has them under
@@ -207,10 +216,10 @@ function tree(mode) {
     };
     shape('top', 0, TOP.length, 0);
     shape('left', 0, LEFT.length, 0);
-    shape('big', 0, NUMBERS.length, PROVEN);
-    for (const id of ['record', 'top.c0', 'left.c0', `big.c${PROVEN}`, `chunk${PROVEN}`]) shown.add(id);
-    for (const id of ['root', 'top', 'left', 'big']) worked.add(id);
-    for (const id of ['root>record', 'record>top', 'top.c0>left', 'left.c0>big', `big.c${PROVEN}>chunk${PROVEN}`]) taken.add(id);
+    shape('left.f0', 0, CHUNKS[proven], PROVEN);
+    for (const id of ['record', 'top.c0', 'left.c0', `left.f0.c${PROVEN}`, `left.f0.k${PROVEN}`]) shown.add(id);
+    for (const id of ['root', 'top', 'left', 'left.f0']) worked.add(id);
+    for (const id of ['root>record', 'record>top', 'top.c0>left', 'left.c0>left.f0', `left.f0.c${PROVEN}>left.f0.k${PROVEN}`]) taken.add(id);
   }
   const state = (id) => (!branch ? 'plain' : shown.has(id) ? 'shown' : worked.has(id) ? 'worked' : sent.has(id) ? 'sent' : 'rest');
   const fade = (colour, over) => mix(colour, over, 0.38);
@@ -225,52 +234,69 @@ function tree(mode) {
     })[state(id)];
   const linkLook = (id) => (!branch ? { stroke: C.sky, sw: 1.5 } : taken.has(id) ? { stroke: C.green, sw: 2.5 } : { stroke: fade(C.sky, C.canvas), sw: 1.5 });
 
-  // Where everything stands. An open box shows the Classic Merkle tree over
-  // its list, with one chip for each item of the list under the tree's leaves.
-  const pad = 16, gap = 12, chipH = 26, step = 30;
-  const openW = (count, chipW) => count * (chipW + gap) - gap + 2 * pad;
+  // Where everything stands. A folder and a file are drawn the same way: a box
+  // with the Classic Merkle tree over its list, and one chip for each item of
+  // the list under the tree's leaves. A folder's chips are names, and a file's
+  // are the numbers of its chunks.
+  const pad = 16, gap = 12, chipH = 26, step = 30, numberW = 44, least = 176;
+  const tile = { w: 50, h: 40, drop: 34 };
+  const levels = (count) => Math.max(1, Math.ceil(Math.log2(count)));
+  const openH = (count) => 68 + levels(count) * step + 14 + chipH + 14;
+  const openW = (count, chipW) => Math.max(least, count * (chipW + gap) - gap + 2 * pad);
   const open = (id, kind, about, x, y, labels, chipW) => {
-    const levels = Math.ceil(Math.log2(labels.length));
-    const topY = y + 64, leafY = topY + levels * step, chipY = leafY + 14;
     const w = openW(labels.length, chipW);
-    const chips = labels.map((s, i) => ({ id: `${id}.c${i}`, s, x: x + pad + i * (chipW + gap), y: chipY, w: chipW, h: chipH, cx: x + pad + i * (chipW + gap) + chipW / 2 }));
-    return { id, kind, about, x, y, w, h: chipY + chipH + 14 - y, cx: x + w / 2, leafY, chips };
+    const first = x + (w - labels.length * (chipW + gap) + gap) / 2;
+    const leafY = y + 68 + levels(labels.length) * step, chipY = leafY + 14;
+    const chips = labels.map((s, i) => ({ id: `${id}.c${i}`, s, x: first + i * (chipW + gap), y: chipY, w: chipW, h: chipH, cx: first + i * (chipW + gap) + chipW / 2 }));
+    return { id, kind, about, x, y, w, h: openH(labels.length), cx: x + w / 2, leafY, chips };
   };
-  const small = { w: 88, h: 64 };
-  const closed = (id, x, y) => ({ id, x, y, ...small, cx: x + small.w / 2 });
+  const nameW = (names) => 2 * Math.ceil((Math.max(...names.map((s) => s.length)) * 8.25 + 22) / 2);
+  const folder = (id, names, cx, bottom) => open(id, 'Folder', `${names.length} entries`, cx - openW(names.length, nameW(names)) / 2, bottom - openH(names.length), names, nameW(names));
+  const fileW = (name) => openW(CHUNKS[name], numberW);
+  // The boxes of a row end at one height, so that the chunks under its files
+  // make one row.
+  const file = (id, name, x, bottom) => {
+    const count = CHUNKS[name];
+    const box = open(id, 'File', `${count} chunks`, x, bottom - openH(count), Array.from({ length: count }, (_, i) => String(i)), numberW);
+    box.chunks = box.chips.map((c, i) => ({ id: `${id}.k${i}`, x: c.cx - tile.w / 2, y: bottom + tile.drop, w: tile.w, h: tile.h, cx: c.cx }));
+    return box;
+  };
 
-  // The bottom row is the widest, and fills the picture from edge to edge:
-  // the file of eight chunks, the three small files beside it, and the four
-  // files of the other folder. The folder on the right stands over its files.
-  // The folder on the left stands as far to the left as leaves room for the
-  // two files between the folders.
-  const y1 = 286, y2 = 552, y3 = 826;
-  const nameW = 96, numberW = 50;
-  const bigW = openW(NUMBERS.length, numberW), leftW = openW(LEFT.length, nameW), rightW = openW(RIGHT.length, nameW - 8), topW = openW(TOP.length, nameW);
-  const between = 44, room = 22;
-  const x0 = (W - (bigW + 7 * small.w + 6 * gap + between)) / 2;
-  const big = open('big', 'File', "8 chunks, in the file's order", x0, y3, NUMBERS, numberW);
-  const leftFiles = [0, 1, 2].map((i) => closed(`left.f${i + 1}`, x0 + bigW + gap + i * (small.w + gap), y3));
-  const rightX = x0 + bigW + 3 * (small.w + gap) + between;
-  const rightFiles = [0, 1, 2, 3].map((i) => closed(`right.f${i}`, rightX + i * (small.w + gap), y3));
-  const right = open('right', 'Folder', '4 entries, sorted by name', W - x0 - rightW, y2, RIGHT, nameW - 8);
-  const left = open('left', 'Folder', '4 entries, sorted by name', right.x - 3 * room - 2 * small.w - leftW, y2, LEFT, nameW);
-  const file1 = closed('top.f1', left.x + left.w + room, y2);
-  const file2 = closed('top.f2', file1.x + small.w + room, y2);
-  const cx = (left.cx + right.cx) / 2;
-  const top = open('top', 'Folder', '4 entries, sorted by name', cx - topW / 2, y1, TOP, nameW);
+  // The bottom row fills the picture from edge to edge: the two files of the
+  // first folder, the room that is left, and the two files of the second
+  // folder. Each folder stands over its own files. The file between the
+  // folders stands over that room, and its chunks hang in it.
+  const leftW = fileW(LEFT[0]) + gap + fileW(LEFT[1]), rightW = fileW(RIGHT[0]) + gap + fileW(RIGHT[1]);
+  const room = W - 2 * edge - leftW - rightW;
+  const hanging = CHUNKS[TOP[1]] * (numberW + gap) - (numberW + gap - tile.w);
+  if (room < hanging + 2 * gap) throw new Error(`the files of the bottom row leave ${room} units for the chunks of ${TOP[1]}, which take ${hanging + 2 * gap}`);
+  const x0 = edge, rightX = x0 + leftW + room;
+  const y1 = 286;
+  const bottom2 = y1 + openH(TOP.length) + 88 + Math.max(openH(LEFT.length), openH(RIGHT.length), openH(CHUNKS[TOP[1]]));
+  const bottom3 = bottom2 + 96 + Math.max(...[...LEFT, ...RIGHT].map((name) => openH(CHUNKS[name])));
+  const leftFiles = [file('left.f0', LEFT[0], x0, bottom3), file('left.f1', LEFT[1], x0 + fileW(LEFT[0]) + gap, bottom3)];
+  const rightFiles = [file('right.f0', RIGHT[0], rightX, bottom3), file('right.f1', RIGHT[1], rightX + fileW(RIGHT[0]) + gap, bottom3)];
+  const left = folder('left', LEFT, x0 + leftW / 2, bottom2);
+  const right = folder('right', RIGHT, rightX + rightW / 2, bottom2);
+  const middle = file('top.f1', TOP[1], x0 + leftW + room / 2 - fileW(TOP[1]) / 2, bottom2);
+  // The root, the record and the folder on top stand in the middle of the
+  // picture, with the key on both sides of them.
+  const cx = W / 2;
+  const top = folder('top', TOP, cx, y1 + openH(TOP.length));
   const root = { id: 'root', x: cx - 220, y: 138, w: 440, h: 38 };
   const record = { id: 'record', x: cx - 235, y: 194, w: 470, h: 66 };
-  const chunks = big.chips.map((c, i) => ({ id: `chunk${i}`, x: c.cx - 27, y: big.y + big.h + 34, w: 54, h: 40, cx: c.cx }));
+  const folders = [top, left, right], files = [middle, ...leftFiles, ...rightFiles];
+  const chunks = files.flatMap((f) => f.chunks);
+  const others = files.length - 1;
 
   const p = new Picture(
     branch ? 'scionic-merkle-branch' : 'scionic-merkle-tree',
     W,
-    chunks[0].y + chunks[0].h + 52,
+    bottom3 + tile.drop + tile.h + 52,
     branch ? 'Scionic Merkle Branch' : 'Scionic Merkle Tree',
     branch
-      ? `The same tree, with the branch that proves chunk ${PROVEN} of ${LEFT[0]} against the root. The record is sent. The folder on top, the folder ${TOP[0]} and the file ${LEFT[0]} each show one item of their list, with a hash and a size for every part of the list that is not shown: two for each folder, and three for the file of eight chunks. The receiver works out every hash on the way up, until the top matches the root it trusts. The rest of the tree is never sent.`
-      : `The root is the hash of the record. The record names the folder on top, which lists four entries by name: the folder ${TOP[0]}, the files ${TOP[1]} and ${TOP[2]}, and the folder ${TOP[3]}. The folder ${TOP[0]} lists ${LEFT[0]}, a file of eight chunks, and three files of one chunk. The folder ${TOP[3]} lists four files of one chunk. Inside every folder and every file, a Classic Merkle tree covers its list. A chunk is its bytes and nothing else.`,
+      ? `The same tree, with the branch that proves chunk ${PROVEN} of ${proven} against the root. The record is sent. The folder on top, the folder ${TOP[0]} and the file ${proven} each show one item of their list, with a hash and a size for every part of the list that is not shown: ${sent.size} in all. The receiver works out every hash on the way up, until the top matches the root it trusts. The other ${CHUNKS[proven] - 1} chunks of ${proven}, the ${others} other files and the rest of every list are never sent.`
+      : `The root is the hash of the record. The record names the folder on top, which lists three entries by name: the folder ${TOP[0]}, the file ${TOP[1]} and the folder ${TOP[2]}. The folder ${TOP[0]} lists the files ${LEFT[0]} and ${LEFT[1]}, and the folder ${TOP[2]} lists the files ${RIGHT[0]} and ${RIGHT[1]}. Every file lists its chunks by number: ${files.map((f, i) => `${[TOP[1], ...LEFT, ...RIGHT][i]} has ${f.chips.length}`).join(', ')}. Inside every folder and every file, a Classic Merkle tree covers its list. A chunk is its bytes and nothing else.`,
   );
 
   p.text(edge, 82, branch ? 'Scionic Merkle Branch' : 'Scionic Merkle Tree', { size: 32, weight: 700 });
@@ -278,7 +304,7 @@ function tree(mode) {
     edge,
     112,
     branch
-      ? `One chunk of ${LEFT[0]}, proven against the root: one item of each list on the way, and a few hashes beside it.`
+      ? `One chunk of ${proven}, proven against the root: one item of each list on the way, and a few hashes beside it.`
       : 'Folders and files link by hash, like a Merkle DAG. Inside each, a Classic Merkle tree covers its list.',
     { size: 17, fill: C.ink2 },
   );
@@ -292,22 +318,16 @@ function tree(mode) {
     p.text(cx, record.y + 27, [{ s: 'Record', weight: 600, size: 18 }, { s: 'what is on top, and how much the tree holds', fill: look.ink2, dx: 10 }], { size: 14.5, fill: look.ink, anchor: 'middle', in: 'record' });
     p.text(cx, record.y + 50, 'kind · size · hash · chunks · chunk bytes · list bytes · extra data', { size: 14.5, fill: look.ink, anchor: 'middle', in: 'record' });
   }
-  for (const b of [top, left, right, big]) {
+  for (const b of [...folders, ...files]) {
     const look = boxLook(b.id);
     p.rect(b.x, b.y, b.w, b.h, { id: b.id, rx: 12, fill: look.fill, stroke: look.stroke, sw: look.sw });
     p.text(b.x + pad, b.y + 30, [{ s: b.kind, weight: 600, size: 18 }, { s: b.about, fill: look.ink2, dx: 10 }], { size: 14.5, fill: look.ink, in: b.id });
-  }
-  for (const b of [file1, file2, ...leftFiles, ...rightFiles]) {
-    const look = boxLook(b.id);
-    p.rect(b.x, b.y, b.w, b.h, { id: b.id, rx: 12, fill: look.fill, stroke: look.stroke, sw: look.sw });
-    p.text(b.cx, b.y + 28, 'File', { size: 17, weight: 600, fill: look.ink, anchor: 'middle', in: b.id });
-    p.text(b.cx, b.y + 49, '1 chunk', { size: 14.5, fill: look.ink2, anchor: 'middle', in: b.id });
   }
   for (const b of chunks) {
     const s = state(b.id);
     const look = s === 'plain' ? { fill: mix(C.sky, C.box, 0.16), stroke: C.sky, sw: 1.5, ink: C.ink } : s === 'shown' ? { fill: mix(C.green, C.box, 0.3), stroke: C.green, sw: 2, ink: C.ink } : { fill: faintBox, stroke: fade(C.sky, C.canvas), sw: 1.5, ink: faintInk };
     p.rect(b.x, b.y, b.w, b.h, { id: b.id, rx: 8, fill: look.fill, stroke: look.stroke, sw: look.sw });
-    p.text(b.cx, b.y + 25, 'Chunk', { size: 14, weight: 600, fill: look.ink, anchor: 'middle', in: b.id });
+    p.text(b.cx, b.y + 24.5, 'Chunk', { size: 13, weight: 600, fill: look.ink, anchor: 'middle', in: b.id });
   }
 
   // The links: an item of a list holds the hash of the thing under it.
@@ -319,13 +339,13 @@ function tree(mode) {
     const tx = child.x + child.w / 2;
     p.path(`M${n(c.cx)} ${n(c.y + c.h)} V${n(from)} C${n(c.cx)} ${n(from + bend)} ${n(tx)} ${n(to - bend)} ${n(tx)} ${n(to)}`, { ...linkLook(id), from: c.id, to: child.id });
   };
-  [left, file1, file2, right].forEach((child, i) => link(top, i, child));
-  [big, ...leftFiles].forEach((child, i) => link(left, i, child));
+  [left, middle, right].forEach((child, i) => link(top, i, child));
+  leftFiles.forEach((child, i) => link(left, i, child));
   rightFiles.forEach((child, i) => link(right, i, child));
-  chunks.forEach((child, i) => link(big, i, child));
+  for (const f of files) f.chunks.forEach((child, i) => link(f, i, child));
 
-  // Inside each open box: the Classic Merkle tree over its list, and the list.
-  for (const b of [top, left, right, big]) {
+  // Inside each box: the Classic Merkle tree over its list, and the list.
+  for (const b of [...folders, ...files]) {
     const look = boxLook(b.id);
     const at = new Map();
     const place = (o, m) => {
@@ -359,7 +379,7 @@ function tree(mode) {
       else if (s === 'sent') p.hex(node.x, node.y, 8.5, { fill: C.green, in: b.id });
       else p.hex(node.x, node.y, 7, { fill: fade(C.amber, look.fill), in: b.id });
     }
-    p.text(crown.x + 15, crown.y - 9, 'Classic Merkle root', { size: 14, fill: look.ink2, in: b.id });
+    p.text(crown.x, b.y + 52, 'Classic Merkle root', { size: 13.5, fill: look.ink2, anchor: 'middle', in: b.id });
     for (const c of b.chips) {
       const s = state(c.id);
       const chip = s === 'plain' ? { fill: C.raised, stroke: C.hair, sw: 1, ink: C.ink } : s === 'shown' ? { fill: mix(C.green, C.box, 0.25), stroke: C.green, sw: 1.75, ink: C.ink } : { fill: mix(C.raised, look.fill, 0.45), stroke: undefined, ink: faintInk };
@@ -368,18 +388,12 @@ function tree(mode) {
     }
   }
 
-  // The note beside the chunks.
-  const others = 2 + (LEFT.length - 1) + RIGHT.length;
-  const notes = branch
-    ? [`Sent for this chunk: the record, 3 items, ${sent.size} hashes with their sizes, and the chunk.`, `Never sent: the ${NUMBERS.length - 1} other chunks, the ${others} other files, and the rest of every list.`]
-    : ['A chunk is its bytes and nothing else: no name and no number of its own.', 'The same chunk in two files, or in two trees, is stored once and sent once.'];
-  notes.forEach((line, k) => p.text(big.x + big.w + 28, chunks[0].y + 17 + k * 21, line, { size: 14.5, fill: C.ink2 }));
-
-  // The key stands in the room under the small files, over the note.
-  const keyX = big.x + big.w + 28, keyW = (W - x0 - keyX) / 2;
-  const key = (column, row, swatch, title, lines) => {
-    const x = keyX + column * keyW, y = y3 + small.h + 46 + row * 76, id = `key${column}${row}`;
-    p.rect(x - 8, y - 22, keyW - 8, 70, { id });
+  // The key stands on both sides of the root.
+  const flank = [edge, record.x + record.w + 28];
+  const flankW = [record.x - 28 - edge, W - edge - flank[1]];
+  const key = (side, row, swatch, title, lines) => {
+    const x = flank[side], y = 204 + row * 86, id = `key${side}${row}`;
+    p.rect(x - 8, y - 22, flankW[side] + 8, 74, { id });
     swatch(x + 20, y - 5, id);
     p.text(x + 50, y, title, { size: 15.5, weight: 600, in: id });
     lines.forEach((line, k) => p.text(x + 50, y + 22 + k * 21, line, { size: 14.5, fill: C.ink2, in: id }));
@@ -388,16 +402,23 @@ function tree(mode) {
     p.rect(x - w / 2, y - 12, w, 24, { rx: 6, fill, stroke, sw });
     p.text(x, y + 4.5, label, { size: 13, mono: true, anchor: 'middle', in: id });
   };
+  const boxKey = (fill, stroke, sw) => (x, y) => p.rect(x - 15, y - 11, 30, 22, { rx: 6, fill, stroke, sw });
+  const tileKey = (fill, stroke, sw) => (x, y) => p.rect(x - 13, y - 10, 26, 20, { rx: 8, fill, stroke, sw });
+  const linkKey = (stroke, sw) => (x, y) => p.path(`M${n(x - 13)} ${n(y - 11)} C${n(x - 13)} ${n(y + 4)} ${n(x + 13)} ${n(y - 4)} ${n(x + 13)} ${n(y + 11)}`, { stroke, sw });
   if (!branch) {
-    key(0, 0, (x, y) => p.rect(x - 15, y - 11, 30, 22, { rx: 6, fill: C.box, stroke: C.sky, sw: 1.5 }), 'Folder, file, chunk', ['Each is named by its hash. The same', 'content has the same hash anywhere.']);
-    key(1, 0, (x, y) => p.hex(x, y, 9, { fill: C.amber }), 'Classic Merkle tree', ['Inside every folder and file, over its', 'list. Its top is the Classic Merkle root.']);
-    key(0, 1, chipKey('name', 40, C.raised, C.hair, 1), "A folder's entry", ['name · kind · size · hash · extra data.', 'A name belongs to its folder.']);
+    key(0, 0, boxKey(C.box, C.sky, 1.5), 'Folder and file', ['Each is named by its hash. The same', 'content has the same hash anywhere.']);
+    key(0, 1, (x, y) => p.hex(x, y, 9, { fill: C.amber }), 'Classic Merkle tree', ['Inside every folder and file, over its', 'list. Its top is the Classic Merkle root.']);
+    key(0, 2, tileKey(mix(C.sky, C.box, 0.16), C.sky, 1.5), 'Chunk', ['Its bytes and nothing else, so the same', 'chunk in two files is stored once.']);
+    key(1, 0, chipKey('name', 40, C.raised, C.hair, 1), "A folder's entry", ['kind · size · hash · name · extra data.', "Sorted by name. A file's hash holds no name."]);
     key(1, 1, chipKey(String(PROVEN), 28, C.raised, C.hair, 1), "A file's chunk number", ["A chunk's place in the file's list,", 'which holds its hash and its length.']);
+    key(1, 2, linkKey(C.sky, 1.5), 'Link by hash', ['An item of a list holds the hash of', 'the folder, file or chunk under it.']);
   } else {
     key(0, 0, chipKey(String(PROVEN), 28, mix(C.green, C.box, 0.25), C.green, 1.75), 'Shown', ['The record, one item of each list', 'on the way, and the chunk itself.']);
-    key(1, 0, (x, y) => p.hex(x, y, 9.5, { fill: C.green }), 'Sent beside it', ['A hash and a size, and in a folder a', 'name, for each part that is not shown.']);
-    key(0, 1, (x, y) => p.hex(x, y, 8, { fill: C.box, stroke: C.green, sw: 2.25 }), 'Worked out by the receiver', ['Every hash on the way up, until', 'the top matches the root it trusts.']);
-    key(1, 1, (x, y) => p.rect(x - 15, y - 11, 30, 22, { rx: 6, fill: faintBox, stroke: fade(C.sky, C.canvas), sw: 1.5 }), 'Never sent', ['The rest of the tree is not', 'needed to check this chunk.']);
+    key(0, 1, (x, y) => p.hex(x, y, 9.5, { fill: C.green }), 'Sent beside it', ['A hash and a size, and in a folder a', 'name, for each part that is not shown.']);
+    key(0, 2, (x, y) => p.hex(x, y, 8, { fill: C.box, stroke: C.green, sw: 2.25 }), 'Worked out by the receiver', ['Every hash on the way up, until', 'the top matches the root it trusts.']);
+    key(1, 0, linkKey(C.green, 2.5), 'The way to the chunk', ['The hash worked out at each step must', 'match the one held just above it.']);
+    key(1, 1, boxKey(mix(C.green, C.box, 0.22), C.green, 2), 'Sent, in all', [`The record, 3 items, ${sent.size} hashes with`, 'their sizes, and the chunk.']);
+    key(1, 2, boxKey(faintBox, fade(C.sky, C.canvas), 1.5), 'Never sent', [`The ${CHUNKS[proven] - 1} other chunks of ${proven},`, `the ${others} other files, the rest of each list.`]);
   }
   return p;
 }

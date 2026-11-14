@@ -29,8 +29,10 @@ python docs/pictures/shrink.py <folder>/scionic-merkle-branch.png docs/pictures/
 Everything a picture says is at the top of `pictures.mjs` or in the function that draws it:
 
 - **`SYNC`** is the name of the protocol that asks for a file's chunks by their numbers.
-- **`TOP`, `LEFT` and `RIGHT`** are the names in the example tree. They must be in the order of their bytes, as a folder's entries are, and the program refuses them otherwise.
-- **`PROVEN`** is the chunk that the branch picture proves. What is shown, what is sent beside it and what the receiver works out follow from it by the rule in [`spec/FORMAT.md`](../../spec/FORMAT.md), under "Showing a part".
+- **`TOP`, `LEFT` and `RIGHT`** are the names in the example tree: the folder on top holds a folder, a file and a folder, and each of those two folders holds two files. The names must be in the order of their bytes, as a folder's entries are, and the program refuses them otherwise.
+- **`CHUNKS`** is how many chunks each file has. Every file is drawn the way a folder is: a box with the Classic Merkle tree over its list, its chunks' numbers under the tree's leaves, and its chunks under those. A file in these pictures has two chunks or more, so that its tree can be seen, and the program refuses a file with fewer. The format itself has smaller files: one of 512 KiB or less is a single chunk, and its tree is that one leaf.
+- **The bottom row fills the picture from edge to edge.** If the files are given more chunks than fit, the program refuses them, and says how much room is left and how much is needed.
+- **`PROVEN`** is the chunk that the branch picture proves, in the first file of the first folder. What is shown, what is sent beside it and what the receiver works out follow from it by the rule in [`spec/FORMAT.md`](../../spec/FORMAT.md), under "Showing a part".
 - **The rows of the table** are in `table()`.
 
 ## The Colours
