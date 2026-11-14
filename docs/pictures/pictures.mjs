@@ -15,8 +15,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-// The name of the protocol that asks for a file's chunks by their numbers.
-const SYNC = 'Scionic Sync';
+// The name of the protocol that asks for a file's chunks by their numbers. A
+// file's chunks are the leaves of its Classic Merkle tree.
+const SYNC = 'LeafSync';
 
 // The theme. The navy surfaces are those of the HORNET Storage relay panel.
 // Sky and amber are the two colours of the HORNET Storage mark, each at the
@@ -171,7 +172,7 @@ function table() {
     { name: 'Numbered Chunks', lines: ["A file's chunks are numbered in order,", `facilitating ${SYNC}.`], marks: [false, true, false] },
     { name: 'Negentropy Symbiosis', lines: ['Sync Merkle roots and file hashes via Set Reconciliation,', `then each file's chunks via ${SYNC}.`], marks: [false, true, false] },
     { name: 'Folder Storage Support', lines: ['Convert folders containing many files', 'into a chunked, Merklized tree.'], marks: [true, true, false] },
-    { name: 'Chunked Parent Leaves', lines: ['Avoid bloated parent leaves that grow', 'when the number of chunks rises.'], marks: [false, true, true] },
+    { name: 'Chunked Parent Leaves', lines: ['Avoid bloated parent leaves that grow', 'when chunk counts rise.'], marks: [false, true, true] },
   ];
   // The three forms. The word that tells a form from the other two is written
   // large, over the rest of its name. Each has a small picture of itself, in
@@ -222,10 +223,16 @@ function table() {
         [[cx, y + 6.5], [cx - 15, y + 25], [cx + 15, y + 25], [cx - 22.5, y + 43.5], [cx - 7.5, y + 43.5], [cx + 7.5, y + 43.5], [cx + 22.5, y + 43.5]],
         [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [2, 6]],
       ),
-    // A box that links by hash, with a Classic Merkle tree inside it.
+    // Both in one: boxes that link by hash, and between a box and the boxes
+    // under it the nodes of a Classic Merkle tree.
     both: (cx, y) => {
-      p.rect(cx - 31, y, 62, 50, { rx: 10, fill: C.box, stroke: C.sky, sw: 2.25 });
-      amberTree([[cx, y + 15], [cx - 15, y + 35], [cx + 15, y + 35]], [[0, 1], [0, 2]]);
+      const top = [cx, y + 5.5], forks = [[cx - 15, y + 25], [cx + 15, y + 25]];
+      const under = [[cx - 23.25, y + 44.5], [cx - 7.75, y + 44.5], [cx + 7.75, y + 44.5], [cx + 23.25, y + 44.5]];
+      for (const [x, at] of forks) p.line(top[0], top[1], x, at, { stroke: C.amber, sw: 2 });
+      under.forEach(([x, at], i) => p.line(forks[i >> 1][0], forks[i >> 1][1], x, at, { stroke: C.sky, sw: 2 }));
+      p.rect(top[0] - 7.5, top[1] - 5.5, 15, 11, { rx: 3.5, fill: C.sky });
+      for (const [x, at] of under) p.rect(x - 6, at - 5, 12, 10, { rx: 3, fill: C.sky });
+      for (const [x, at] of forks) p.hex(x, at, 6.3, { fill: C.amber });
     },
   };
 
@@ -309,7 +316,13 @@ function tree(mode) {
   // Classic Merkle tree over its list, and one chip for each item of the list
   // under the tree's leaves. A folder's chips are names, and a file's are the
   // numbers of its chunks. Their outlines tell them apart ("The boxes").
-  const pad = 16, chipH = 26, step = 30, least = 160;
+  const pad = 16, chipH = 26, step = 30;
+  // What the hash of a folder or of a file covers stands in a box of its own,
+  // close under the box's name: the count and the size of its list, and its
+  // Classic Merkle root. The link from above ends at that box, and the tree
+  // hangs from it. So a line always ends at what its hash is the hash of.
+  const cover = { top: 30, w: 158, h: 48 };
+  const least = cover.w + 24;
   // Two boxes that belong together stand `gap` apart, and two sets of them
   // stand `group` apart: the folders and the files of the second row, and the
   // two folders' files in the bottom row. The picture is as wide as the bottom
@@ -326,12 +339,12 @@ function tree(mode) {
   // as tall as the deepest: its top stands where every top stands, and its
   // leaves where every leaf stands.
   const deepest = Math.max(...[TOP.length, LEFT.length, RIGHT.length, ...FILES.map((f) => CHUNKS[f])].map(levels));
-  const boxH = 68 + deepest * step + 14 + chipH + 14;
+  const boxH = cover.top + cover.h + deepest * step + 14 + chipH + 14;
   const boxW = (count, chip, min = least) => Math.max(min, count * (chip.w + chip.gap) - chip.gap + 2 * pad);
   const open = (id, kind, about, x, bottom, labels, chip, min) => {
     const w = boxW(labels.length, chip, min), y = bottom - boxH;
     const first = x + (w - labels.length * (chip.w + chip.gap) + chip.gap) / 2;
-    const leafY = y + 68 + deepest * step, chipY = leafY + 14;
+    const leafY = y + cover.top + cover.h + deepest * step, chipY = leafY + 14;
     const chips = labels.map((s, i) => ({ id: `${id}.c${i}`, s, x: first + i * (chip.w + chip.gap), y: chipY, w: chip.w, h: chipH, cx: first + i * (chip.w + chip.gap) + chip.w / 2 }));
     return { id, kind, about, x, y, w, h: boxH, cx: x + w / 2, leafY, rise: (deepest * step) / levels(labels.length), chips };
   };
@@ -362,13 +375,14 @@ function tree(mode) {
   //   their names: its two folders side by side, and then its files.
   // - The bottom row is the files of the first folder, and then those of the
   //   second.
-  // The second and the third row are far enough apart for the links from the
-  // second folder to pass under the chunks that hang from the second row's
-  // files.
+  // The second and the bottom row are as far apart as the links from the
+  // second folder need to pass under the chunks that hang from the second
+  // row's files, and no further ("The links").
   const cx = W / 2;
   const root = { id: 'root', x: cx - 220, y: 138, w: 440, h: 38 };
   const record = { id: 'record', x: cx - 235, y: 194, w: 470, h: 66 };
-  const bottom1 = 296 + boxH, bottom2 = bottom1 + 88 + boxH, bottom3 = bottom2 + 184 + boxH;
+  const apart = { second: 88, bottom: 123 };
+  const bottom1 = 296 + boxH, bottom2 = bottom1 + apart.second + boxH, bottom3 = bottom2 + apart.bottom + boxH;
   const top = folder('top', TOP, cx - folderW(TOP, record.w) / 2, bottom1, record.w);
   const second = folderW(LEFT) + gap + folderW(RIGHT) + group + rowW(BESIDE);
   if (second > W - 2 * edge) throw new Error(`the second row takes ${second} units, and the picture has ${W - 2 * edge}`);
@@ -391,7 +405,7 @@ function tree(mode) {
     branch ? 'Scionic Merkle Branch' : 'Scionic Merkle Tree',
     branch
       ? `The same tree, with the branch that proves chunk ${PROVEN} of ${proven} against the root. The record is sent. The folder on top, the folder ${TOP[0]} and the file ${proven} each show one item of their list, with a hash and a size for every part of the list that is not shown: ${sent.size} in all. The receiver works out every hash on the way up, until the top matches the root it trusts. The other ${CHUNKS[proven] - 1} chunks of ${proven}, the ${others} other files and the rest of every list are never sent.`
-      : `The root is the hash of the record. The record names the folder on top, which lists ${TOP.length} entries by name: the folders ${TOP[0]} and ${TOP[1]}, and the ${BESIDE.length === 1 ? 'file' : 'files'} ${said(BESIDE)}. The folder ${TOP[0]} lists the files ${said(LEFT)}, and the folder ${TOP[1]} lists the files ${said(RIGHT)}. Every file lists its chunks by number: ${FILES.map((f) => `${f} has ${CHUNKS[f]}`).join(', ')}. Inside every folder and every file, a Classic Merkle tree covers its list. A chunk is its bytes and nothing else.`,
+      : `The root is the hash of the record. The record names the folder on top, which lists ${TOP.length} entries by name: the folders ${TOP[0]} and ${TOP[1]}, and the ${BESIDE.length === 1 ? 'file' : 'files'} ${said(BESIDE)}. The folder ${TOP[0]} lists the files ${said(LEFT)}, and the folder ${TOP[1]} lists the files ${said(RIGHT)}. Every file lists its chunks by number: ${FILES.map((f) => `${f} has ${CHUNKS[f]}`).join(', ')}. Inside every folder and every file, a Classic Merkle tree covers its list. The hash of a folder or of a file covers the count and the size of its list, and its Classic Merkle root, and every link ends at the box that holds those three. A chunk is its bytes and nothing else.`,
   );
 
   p.text(edge, 82, branch ? 'Scionic Merkle Branch' : 'Scionic Merkle Tree', { size: 32, weight: 700 });
@@ -415,37 +429,42 @@ function tree(mode) {
   }
   // A folder and a file are told apart by their outlines. A folder's box has a
   // tab over its top left corner, as a folder has, and a file's box has its top
-  // right corner folded down, as a sheet has. Each also has a small picture of
-  // itself beside its word. A box's place and size are those of its body: a
-  // folder's tab stands over them.
-  const radius = 12, tab = { h: 20, share: 0.32, slope: 24 }, ear = 22;
+  // right corner folded down, as a sheet has. The box is itself the picture of
+  // a folder or of a file, so its word is small and has no picture beside it.
+  // A box's place and size are those of its body: a folder's tab stands over
+  // them.
+  const radius = 12, tab = { h: 20, share: 0.32, slope: 24 }, ear = 15;
   const corner = (dx, dy) => `a${radius} ${radius} 0 0 1 ${dx * radius} ${dy * radius}`;
   const tabEnd = (b) => b.x + Math.round(b.w * tab.share);
   const tabTop = (b) => `V${n(b.y - tab.h + 10)} a10 10 0 0 1 10 -10 H${n(tabEnd(b) - tab.slope)} C${n(tabEnd(b) - tab.slope + 10)} ${n(b.y - tab.h)} ${n(tabEnd(b) - 10)} ${n(b.y)} ${n(tabEnd(b))} ${n(b.y)}`;
   const folderOutline = (b) => `M${n(b.x)} ${n(b.y + b.h - radius)} ${tabTop(b)} H${n(b.x + b.w - radius)} ${corner(1, 1)} V${n(b.y + b.h - radius)} ${corner(-1, 1)} H${n(b.x + radius)} ${corner(-1, -1)} Z`;
   const tabOutline = (b) => `M${n(b.x)} ${n(b.y)} ${tabTop(b)} Z`;
   const fileOutline = (b) => `M${n(b.x)} ${n(b.y + radius)} ${corner(1, -1)} H${n(b.x + b.w - ear)} L${n(b.x + b.w)} ${n(b.y + ear)} V${n(b.y + b.h - radius)} ${corner(-1, 1)} H${n(b.x + radius)} ${corner(-1, -1)} Z`;
-  const folderIcon = (x, y, stroke, fill) => p.path(`M${n(x)} ${n(y + 3.5)} a2 2 0 0 1 2 -2 h5 l2.5 2.5 h8.5 a2 2 0 0 1 2 2 v8.5 a2 2 0 0 1 -2 2 h-16 a2 2 0 0 1 -2 -2 Z`, { stroke, fill, sw: 1.5 });
-  const fileIcon = (x, y, stroke, fill) => {
-    p.path(`M${n(x + 2)} ${n(y)} h6.5 l5.5 5.5 v10.5 a2 2 0 0 1 -2 2 h-10 a2 2 0 0 1 -2 -2 v-14 a2 2 0 0 1 2 -2 Z`, { stroke, fill, sw: 1.5 });
-    p.path(`M${n(x + 8.5)} ${n(y)} v5.5 h5.5`, { stroke, sw: 1.5 });
+  // The small pictures of a folder and of a file, which the key of the tree
+  // picture shows. s is their size: at 1 a folder is 20 wide and a file 14.
+  const folderIcon = (x, y, stroke, fill, s = 1) => {
+    const k = (v) => n(v * s), r = `a${k(2)} ${k(2)} 0 0 1`;
+    p.path(`M${n(x)} ${n(y + 3.5 * s)} ${r} ${k(2)} ${k(-2)} h${k(5)} l${k(2.5)} ${k(2.5)} h${k(8.5)} ${r} ${k(2)} ${k(2)} v${k(8.5)} ${r} ${k(-2)} ${k(2)} h${k(-16)} ${r} ${k(-2)} ${k(-2)} Z`, { stroke, fill, sw: 1.5 });
+  };
+  const fileIcon = (x, y, stroke, fill, s = 1) => {
+    const k = (v) => n(v * s), r = `a${k(2)} ${k(2)} 0 0 1`;
+    p.path(`M${n(x + 2 * s)} ${n(y)} h${k(6.5)} l${k(5.5)} ${k(5.5)} v${k(10.5)} ${r} ${k(-2)} ${k(2)} h${k(-10)} ${r} ${k(-2)} ${k(-2)} v${k(-14)} ${r} ${k(2)} ${k(-2)} Z`, { stroke, fill, sw: 1.5 });
+    p.path(`M${n(x + 8.5 * s)} ${n(y)} v${k(5.5)} h${k(5.5)}`, { stroke, sw: 1.5 });
   };
   for (const b of [...folders, ...files]) {
     const look = boxLook(b.id), isFolder = b.kind === 'Folder';
-    // The tab, the folded corner and the small pictures are tinted in the tree
-    // picture only. In the branch picture a fill says what is shown or sent,
-    // so there they are outlines.
+    // The tab and the folded corner are tinted in the tree picture only. In
+    // the branch picture a fill says what is shown or sent, so there they are
+    // outlines.
     const plain = state(b.id) === 'plain';
-    const tint = plain ? mix(C.sky, C.box, 0.2) : look.fill;
     p.shape(isFolder ? folderOutline(b) : fileOutline(b), { id: b.id, fill: look.fill, stroke: look.stroke, sw: look.sw, inside: `${n(b.x + 4)} ${n(b.y + b.h / 2)}` });
-    if (isFolder) {
-      p.path(tabOutline(b), { fill: plain ? mix(C.sky, C.box, 0.38) : look.fill, stroke: look.stroke, sw: look.sw });
-      folderIcon(b.x + pad, b.y + 15, look.stroke, tint);
-    } else {
-      p.path(`M${n(b.x + b.w - ear)} ${n(b.y)} V${n(b.y + ear)} H${n(b.x + b.w)} Z`, { fill: tint, stroke: look.stroke, sw: look.sw });
-      fileIcon(b.x + pad, b.y + 14, look.stroke, tint);
-    }
-    p.text(b.x + pad + (isFolder ? 28 : 22), b.y + 30, [{ s: b.kind, weight: 600, size: 18 }, { s: b.about, fill: look.ink2, dx: 10 }], { size: 14.5, fill: look.ink, in: b.id });
+    if (isFolder) p.path(tabOutline(b), { fill: plain ? mix(C.sky, C.box, 0.38) : look.fill, stroke: look.stroke, sw: look.sw });
+    else p.path(`M${n(b.x + b.w - ear)} ${n(b.y)} V${n(b.y + ear)} H${n(b.x + b.w)} Z`, { fill: plain ? mix(C.sky, C.box, 0.2) : look.fill, stroke: look.stroke, sw: look.sw });
+    // What it is stands on the left, and how many items its list has on the
+    // right, clear of a file's folded corner. The link from above comes down
+    // between the two, to what the hash covers, which stands close under them.
+    p.text(b.x + pad, b.y + 21.5, b.kind, { size: 16, weight: 600, fill: look.ink, in: b.id });
+    p.text(b.x + b.w - (isFolder ? pad : ear + 7), b.y + 21.5, b.about, { size: 13.5, fill: look.ink2, anchor: 'end', in: b.id });
   }
   for (const b of chunks) {
     const s = state(b.id);
@@ -456,23 +475,32 @@ function tree(mode) {
 
   // The links: an item of a list holds the hash of the thing under it.
   p.line(cx, root.y + root.h, cx, record.y, linkLook('root>record'));
-  p.line(cx, record.y + record.h, cx, top.y, linkLook('record>top'));
+  // The record holds the hash of the folder on top, so its link ends as every
+  // link to a folder does: at what that hash covers.
+  p.path(`M${n(cx)} ${n(record.y + record.h)} V${n(top.y + cover.top)}`, { ...linkLook('record>top'), from: 'record', to: 'top.sum' });
   // A link leaves its chip straight down and reaches its box straight down, in
   // the middle of the box. fall and land say how far it keeps each of those two
   // directions, as a share of the way: a link with a long fall goes sideways
   // late, and so lower. A chip that stands almost over the middle of its box
-  // has a straight link.
-  const link = (parent, i, child, fall = 0.55, land = 0.55) => {
+  // has a straight link. A link to a folder or to a file goes on into the box,
+  // down to what its hash covers. straight is how far a link falls under its
+  // box before it starts to go sideways.
+  const link = (parent, i, child, fall = 0.55, land = 0.55, straight = 0) => {
     const c = parent.chips[i], id = `${c.id}>${child.id}`;
-    const from = parent.y + parent.h, to = child.y;
+    const from = parent.y + parent.h + straight, to = child.y;
     const tx = Math.abs(c.cx - child.cx) <= 8 ? c.cx : child.cx;
-    p.path(`M${n(c.cx)} ${n(c.y + c.h)} V${n(from)} C${n(c.cx)} ${n(from + (to - from) * fall)} ${n(tx)} ${n(to - (to - from) * land)} ${n(tx)} ${n(to)}`, { ...linkLook(id), from: c.id, to: child.id });
+    const into = child.chips ? ` V${n(to + cover.top)}` : '';
+    p.path(`M${n(c.cx)} ${n(c.y + c.h)} V${n(from)} C${n(c.cx)} ${n(from + (to - from) * fall)} ${n(tx)} ${n(to - (to - from) * land)} ${n(tx)} ${n(to)}${into}`, { ...linkLook(id), from: c.id, to: child.chips ? `${child.id}.sum` : child.id });
   };
   [left, right, ...beside].forEach((child, i) => link(top, i, child));
-  // The links to the bottom row fall a long way before they go sideways, so
-  // that they pass under the chunks that hang from the second row's files.
-  leftFiles.forEach((child, i) => link(left, i, child, 0.85, 0.4));
-  rightFiles.forEach((child, i) => link(right, i, child, 0.85, 0.4));
+  // The links to the bottom row fall straight for a while before they go
+  // sideways. So the links from the second folder pass under the chunks that
+  // hang from the second row's files, and each link keeps its distance from
+  // the next. With these three numbers and the rows 123 apart, a link has 14
+  // units to the chunks over it, 16 to the boxes under it, and 13 to the next
+  // link. Rows that are closer bunch the links: at 110 they are 8 apart.
+  leftFiles.forEach((child, i) => link(left, i, child, 0.6, 0.3, 52));
+  rightFiles.forEach((child, i) => link(right, i, child, 0.6, 0.3, 52));
   for (const f of files) f.chunks.forEach((child, i) => link(f, i, child));
 
   // Inside each box: the Classic Merkle tree over its list, and the list.
@@ -490,7 +518,10 @@ function tree(mode) {
       at.set(`${b.id}.n${o}.${m}`, node);
       return node;
     };
+    // The top of the tree stands in the middle of its box, at the foot of what
+    // the hash covers, and is drawn as its last line and not as a node.
     const crown = place(0, b.chips.length);
+    crown.x = b.cx;
     for (const [id, node] of at) {
       for (const kid of node.under) {
         const kidState = state(`${b.id}.n${kid.o}.${kid.m}`);
@@ -503,6 +534,7 @@ function tree(mode) {
       p.line(c.cx, b.leafY, c.cx, c.y, !branch ? { stroke: C.amber, sw: 1.75 } : s === 'shown' ? { stroke: C.green, sw: 2.25 } : { stroke: fade(C.amber, look.fill), sw: 1.5 });
     }
     for (const [id, node] of at) {
+      if (node === crown) continue;
       const s = state(id);
       p.hex(node.x, node.y, 9.5, { fill: look.fill });
       if (s === 'plain') p.hex(node.x, node.y, 7, { fill: C.amber, in: b.id });
@@ -510,7 +542,22 @@ function tree(mode) {
       else if (s === 'sent') p.hex(node.x, node.y, 8.5, { fill: C.green, in: b.id });
       else p.hex(node.x, node.y, 7, { fill: fade(C.amber, look.fill), in: b.id });
     }
-    p.text(crown.x, b.y + 52, 'Classic Merkle root', { size: 13.5, fill: look.ink2, anchor: 'middle', in: b.id });
+    // What the hash of this folder or file covers: the count and the size of
+    // its list, and the top of its tree. The link from above ends at it.
+    // - In the tree picture it looks as a chunk does: both are what a link by
+    //   hash ends at.
+    // - In the branch picture it is a ring on the way to the chunk, because the
+    //   receiver works the three out, and faded everywhere else.
+    const crownState = state(`${b.id}.n0.${b.chips.length}`);
+    const sum =
+      crownState === 'plain'
+        ? { fill: mix(C.sky, C.box, 0.16), stroke: C.sky, sw: 1.5, ink: C.ink, ink2: C.ink2 }
+        : crownState === 'worked'
+          ? { fill: look.fill, stroke: C.green, sw: 2, ink: C.ink, ink2: C.ink2 }
+          : { fill: look.fill, stroke: fade(C.sky, C.canvas), sw: 1.5, ink: faintInk, ink2: faintInk };
+    p.rect(b.cx - cover.w / 2, b.y + cover.top, cover.w, cover.h, { id: `${b.id}.sum`, parent: b.id, rx: 10, fill: sum.fill, stroke: sum.stroke, sw: sum.sw });
+    p.text(b.cx, b.y + cover.top + 18, 'count · size', { size: 14, fill: sum.ink2, anchor: 'middle', in: `${b.id}.sum` });
+    p.text(b.cx, b.y + cover.top + 39.5, 'Classic Merkle root', { size: 15.5, weight: 600, fill: sum.ink, anchor: 'middle', in: `${b.id}.sum` });
     for (const c of b.chips) {
       const s = state(c.id);
       const chip = s === 'plain' ? { fill: C.raised, stroke: C.hair, sw: 1, ink: C.ink } : s === 'shown' ? { fill: mix(C.green, C.box, 0.25), stroke: C.green, sw: 1.75, ink: C.ink } : { fill: mix(C.raised, look.fill, 0.45), stroke: undefined, ink: faintInk };
@@ -520,48 +567,59 @@ function tree(mode) {
   }
 
   // The key stands on both sides of the root.
-  const flank = [edge, record.x + record.w + 28];
-  const flankW = [record.x - 28 - edge, W - edge - flank[1]];
+  // It fills the room beside the record and the folder on top. An entry is a
+  // title with two lines under it, and at their left a small picture of what
+  // they are about. The entries of a side stand `pitch` apart, which leaves
+  // clear room under the tallest of the small pictures: the chunk with its
+  // number. The left side starts `indent` inside the picture's margin, where
+  // the title starts, and may come as near as `left` to the record. The right
+  // side starts `right` from the record. Its words may run to the picture's
+  // margin itself, which is 5 units further than the check lets a text come
+  // to the side of its box.
+  // The words stand clear of the widest of the small pictures.
+  const keys = { top: 206, pitch: 110, indent: 10, left: 20, right: edge, picture: 24, words: 60 };
+  const flank = [edge + keys.indent, record.x + record.w + keys.right];
+  const flankW = [record.x - keys.left - flank[0], W - edge - flank[1] + 5];
   const key = (side, row, swatch, title, lines) => {
-    const x = flank[side], y = 204 + row * 86, id = `key${side}${row}`;
-    p.rect(x - 8, y - 22, flankW[side] + 8, 74, { id });
-    swatch(x + 20, y - 5, id);
-    p.text(x + 50, y, title, { size: 15.5, weight: 600, in: id });
-    lines.forEach((line, k) => p.text(x + 50, y + 22 + k * 21, line, { size: 14.5, fill: C.ink2, in: id }));
+    const x = flank[side], y = keys.top + row * keys.pitch, id = `key${side}${row}`;
+    p.rect(x - 8, y - 26, flankW[side] + 8, 84, { id });
+    swatch(x + keys.picture, y - 6, id);
+    p.text(x + keys.words, y, title, { size: 19, weight: 600, in: id });
+    lines.forEach((line, k) => p.text(x + keys.words, y + 26 + k * 23, line, { size: 16, fill: C.ink2, in: id }));
   };
   const chipKey = (label, w, fill, stroke, sw) => (x, y, id) => {
-    p.rect(x - w / 2, y - 12, w, 24, { rx: 6, fill, stroke, sw });
-    p.text(x, y + 4.5, label, { size: 13, mono: true, anchor: 'middle', in: id });
+    p.rect(x - w / 2, y - 14, w, 28, { rx: 7, fill, stroke, sw });
+    p.text(x, y + 5.5, label, { size: 15, mono: true, anchor: 'middle', in: id });
   };
   // What is shown, as it stands at the foot of the picture: the number of the
   // chunk in its file's list, the link, and the chunk itself. A number alone
   // would not say what it is the number of.
   const shownKey = (x, y, id) => {
-    p.line(x, y + 12, x, y + 26, { stroke: C.green, sw: 2.5 });
-    p.rect(x - 17, y - 12, 34, 24, { rx: 6, fill: mix(C.green, C.box, 0.25), stroke: C.green, sw: 1.75 });
-    p.text(x, y + 4.5, String(PROVEN), { size: 13, mono: true, anchor: 'middle', in: id });
-    p.rect(x - 21, y + 26, 42, 26, { rx: 7, fill: mix(C.green, C.box, 0.3), stroke: C.green, sw: 2 });
-    p.text(x, y + 43, 'Chunk', { size: 11, weight: 600, anchor: 'middle', in: id });
+    p.line(x, y + 14, x, y + 32, { stroke: C.green, sw: 2.5 });
+    p.rect(x - 20, y - 14, 40, 28, { rx: 7, fill: mix(C.green, C.box, 0.25), stroke: C.green, sw: 1.75 });
+    p.text(x, y + 5.5, String(PROVEN), { size: 15, mono: true, anchor: 'middle', in: id });
+    p.rect(x - 23, y + 32, 46, 31, { rx: 8, fill: mix(C.green, C.box, 0.3), stroke: C.green, sw: 2 });
+    p.text(x, y + 52, 'Chunk', { size: 13, weight: 600, anchor: 'middle', in: id });
   };
-  const boxKey = (fill, stroke, sw) => (x, y) => p.rect(x - 15, y - 11, 30, 22, { rx: 6, fill, stroke, sw });
-  const tileKey = (fill, stroke, sw) => (x, y) => p.rect(x - 13, y - 10, 26, 20, { rx: 8, fill, stroke, sw });
-  const linkKey = (stroke, sw) => (x, y) => p.path(`M${n(x - 13)} ${n(y - 11)} C${n(x - 13)} ${n(y + 4)} ${n(x + 13)} ${n(y - 4)} ${n(x + 13)} ${n(y + 11)}`, { stroke, sw });
+  const boxKey = (fill, stroke, sw) => (x, y) => p.rect(x - 18, y - 13, 36, 26, { rx: 7, fill, stroke, sw });
+  const tileKey = (fill, stroke, sw) => (x, y) => p.rect(x - 16, y - 12, 32, 24, { rx: 9, fill, stroke, sw });
+  const linkKey = (stroke, sw) => (x, y) => p.path(`M${n(x - 15)} ${n(y - 13)} C${n(x - 15)} ${n(y + 5)} ${n(x + 15)} ${n(y - 5)} ${n(x + 15)} ${n(y + 13)}`, { stroke, sw });
   if (!branch) {
     const both = (x, y) => {
-      folderIcon(x - 20, y - 9, C.sky, mix(C.sky, C.box, 0.2));
-      fileIcon(x + 6, y - 9.5, C.sky, mix(C.sky, C.box, 0.2));
+      folderIcon(x - 25, y - 11.5, C.sky, mix(C.sky, C.box, 0.2), 1.25);
+      fileIcon(x + 6.5, y - 11.25, C.sky, mix(C.sky, C.box, 0.2), 1.25);
     };
-    key(0, 0, both, 'Folder and file', ['Each is named by its hash. The same', 'content has the same hash anywhere.']);
-    key(0, 1, (x, y) => p.hex(x, y, 9, { fill: C.amber }), 'Classic Merkle tree', ['Inside every folder and file, over its', 'list. Its top is the Classic Merkle root.']);
+    key(0, 0, both, 'Folder and file', ['Same content, same hash. The hash covers', 'its count, size and Classic Merkle root.']);
+    key(0, 1, (x, y) => p.hex(x, y, 11, { fill: C.amber }), 'Classic Merkle tree', ['Inside every folder and file, over its', 'list. Its top is the Classic Merkle root.']);
     key(0, 2, tileKey(mix(C.sky, C.box, 0.16), C.sky, 1.5), 'Chunk', ['Its bytes and nothing else, so the same', 'chunk in two files is stored once.']);
-    key(1, 0, chipKey('name', 40, C.raised, C.hair, 1), "A folder's entry", ['kind · size · hash · name · extra data.', "Sorted by name. A file's hash holds no name."]);
-    key(1, 1, chipKey(String(PROVEN), 28, C.raised, C.hair, 1), "A file's chunk number", ["A chunk's place in the file's list,", 'which holds its hash and its length.']);
+    key(1, 0, chipKey('name', 44, C.raised, C.hair, 1), "A folder's entry", ['kind · size · hash · name · extra data.', "Sorted by name. A file's hash holds no name."]);
+    key(1, 1, chipKey(String(PROVEN), 34, C.raised, C.hair, 1), "A file's chunk number", ["A chunk's place in the file's list,", 'which holds its hash and its length.']);
     key(1, 2, linkKey(C.sky, 1.5), 'Link by hash', ['An item of a list holds the hash of', 'the folder, file or chunk under it.']);
   } else {
     key(0, 0, shownKey, 'Shown', ['The record, one item of each list', 'on the way, and the chunk itself.']);
-    key(0, 1, (x, y) => p.hex(x, y, 9.5, { fill: C.green }), 'Sent beside it', ['A hash and a size, and in a folder a', 'name, for each part that is not shown.']);
-    key(0, 2, (x, y) => p.hex(x, y, 8, { fill: C.box, stroke: C.green, sw: 2.25 }), 'Worked out by the receiver', ['Every hash on the way up, until', 'the top matches the root it trusts.']);
-    key(1, 0, linkKey(C.green, 2.5), 'The way to the chunk', ['The hash worked out at each step must', 'match the one held just above it.']);
+    key(0, 1, (x, y) => p.hex(x, y, 11.5, { fill: C.green }), 'Sent beside it', ['A hash and a size, and in a folder a', 'name, for each part that is not shown.']);
+    key(0, 2, (x, y) => p.hex(x, y, 9.5, { fill: C.box, stroke: C.green, sw: 2.5 }), 'Worked out by the receiver', ['Every hash on the way up, until', 'the top matches the root it trusts.']);
+    key(1, 0, linkKey(C.green, 2.5), 'The way to the chunk', ['Each count, size and Classic Merkle root is', 'hashed, and must give the hash held above.']);
     key(1, 1, boxKey(mix(C.green, C.box, 0.22), C.green, 2), 'Sent, in all', [`The record, 3 items, ${sent.size} hashes with`, 'their sizes, and the chunk.']);
     key(1, 2, boxKey(faintBox, fade(C.sky, C.canvas), 1.5), 'Never sent', [`The ${CHUNKS[proven] - 1} other chunks of ${proven},`, `the ${others} other files, the rest of each list.`]);
   }
@@ -633,13 +691,34 @@ function check() {
     for (const s of hit) wrong.push(`a line of a Classic Merkle tree crosses the text "${s}"`);
   }
   for (const el of svg.querySelectorAll('[data-from]')) {
+    // A link may pass through the boxes that its two ends stand in, and it
+    // runs into the box of a folder or a file, down to what the hash covers.
+    // It keeps clear of every text on its way: only the texts of the two boxes
+    // it joins are its own.
     const own = new Set([el.dataset.from, el.dataset.to, ...above(el.dataset.from), ...above(el.dataset.to)]);
+    const ends = new Set([el.dataset.from, el.dataset.to]);
     const hit = new Set();
     along(el, (q) => {
       for (const id of ids) if (!own.has(id) && holds(boxes.get(id), q, 5)) hit.add(`box ${id}`);
-      for (const t of texts) if (!own.has(t.in) && holds(t.b, q, 2)) hit.add(`the text "${t.s}"`);
+      for (const t of texts) if (!ends.has(t.in) && holds(t.b, q, 2)) hit.add(`the text "${t.s}"`);
     });
     for (const s of hit) wrong.push(`the link ${el.dataset.from} > ${el.dataset.to} crosses ${s}`);
+  }
+  // No two links cross, nor run within 8 units of each other.
+  const routes = [...svg.querySelectorAll('[data-from]')].map((el) => {
+    const points = [];
+    along(el, (q) => points.push([q.x, q.y]));
+    const xs = points.map((q) => q[0]), ys = points.map((q) => q[1]);
+    return { name: `${el.dataset.from} > ${el.dataset.to}`, points, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  });
+  for (let i = 0; i < routes.length; i++) {
+    for (let j = i + 1; j < routes.length; j++) {
+      const a = routes[i], b = routes[j];
+      if (a.x0 > b.x1 + 8 || b.x0 > a.x1 + 8 || a.y0 > b.y1 + 8 || b.y0 > a.y1 + 8) continue;
+      let near = Infinity;
+      for (const [x, y] of a.points) for (const [u, v] of b.points) near = Math.min(near, Math.hypot(x - u, y - v));
+      if (near < 8) wrong.push(`the links ${a.name} and ${b.name} are ${Math.round(near)} apart`);
+    }
   }
 
   // The fonts the picture is drawn with must be the ones it names first.

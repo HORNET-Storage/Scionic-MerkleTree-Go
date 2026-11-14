@@ -4,7 +4,7 @@
 
 ## Combining Merkle Trees and Merkle DAGs
 
-We've designed a [new type of Merkle DAG/Merkle Tree hybrid](https://www.hornet.storage/) known as the Scionic Merkle Tree. Scionic Merkle Trees contain small branches like Classic Merkle Trees, the folder storage support of Merkle DAGs, and numbered file chunks, so anyone can sync a file by its hash and request the range of chunk numbers they are missing. Scionic Sync is the name of the simple protocol used to request a range of a file's chunk numbers in order to retrieve a batch of missing file chunks. Identical chunks, files and folders have identical hashes wherever they appear, so each one is stored once and sent once.
+We've designed a [new type of Merkle DAG/Merkle Tree hybrid](https://www.hornet.storage/) known as the Scionic Merkle Tree. Scionic Merkle Trees contain small branches like Classic Merkle Trees, the folder storage support of Merkle DAGs, and numbered file chunks, so anyone can sync a file by its hash and request the range of chunk numbers they are missing. LeafSync is the name of the simple protocol used to request a range of a file's chunk numbers in order to retrieve a batch of missing file chunks. Identical chunks, files and folders have identical hashes wherever they appear, so each one is stored once and sent once.
 
 ![Comparison of Many Merklized Forms. Numbered chunks and Negentropy symbiosis: Scionic Merkle Trees only. Folder storage support: IPFS Merkle DAGs and Scionic Merkle Trees. Chunked parent leaves: Scionic Merkle Trees and Classic Merkle Trees.](docs/pictures/merklized-forms.png)
 
@@ -42,7 +42,7 @@ flowchart TD
 
 *Two versions of a model in one tree. The second version changed one chunk, so that chunk is the only new data: chunks A and C are stored once and shared. A name belongs to its folder and a chunk number belongs to its file, so a file is the same file wherever it sits and whatever it is called.*
 
-Scionic Merkle Trees maintain the advantages of IPFS Merkle DAGs with the slim Merkle Branches of Classic Merkle Trees, while providing Scionic Sync as a new feature that complements any set reconciliation system (IBLTs, negentropy, et al.). In plant grafting, the "Scion" is the upper part of the plant, chosen for its desirable fruits or flowers; it's grafted onto another plant's base to grow together. In a similar vein, the Scionic Merkle Tree was born from grafting together Merkle Trees and Merkle DAGs. This process emphasizes why we use the term "Scion" for the Scionic Merkle Trees: it symbolizes the digital grafting of these two similar data structures, combining their strengths into one piece of software.
+Scionic Merkle Trees maintain the advantages of IPFS Merkle DAGs with the slim Merkle Branches of Classic Merkle Trees, while providing LeafSync as a new feature that complements any set reconciliation system (IBLTs, negentropy, et al.). In plant grafting, the "Scion" is the upper part of the plant, chosen for its desirable fruits or flowers; it's grafted onto another plant's base to grow together. In a similar vein, the Scionic Merkle Tree was born from grafting together Merkle Trees and Merkle DAGs. This process emphasizes why we use the term "Scion" for the Scionic Merkle Trees: it symbolizes the digital grafting of these two similar data structures, combining their strengths into one piece of software.
 
 ## Contents
 
@@ -108,6 +108,8 @@ Within each parent leaf, the list of children is organized as a Classic Merkle T
 - **A folder's Classic Merkle Tree** covers its entries, in the order of their names.
 - **A file's Classic Merkle Tree** covers its chunks, in the order they have in the file. A chunk's number is its place in that tree, so a chunk cannot be shown under a number it does not have.
 
+The top of each tree is its Classic Merkle root. The hash of a folder or of a file covers three things: how many items its list has, its size in bytes, and its Classic Merkle root. That hash is what a parent holds for its child, and what the tree's record holds for the folder or file on top. In the pictures below, every folder and file shows those three in a box, and every link by hash ends at that box.
+
 A large file has far more chunks than most folders have entries: about 500,000 for a file of a terabyte. A file of 512 KiB or less is a single chunk, and its tree is that one leaf.
 
 ### File Chunk Downloading with Chunked Parent Leaves
@@ -120,11 +122,11 @@ A folder's entries are sorted by name, and every fork of the folder's Merkle tre
 
 ### Scionic Merkle Tree
 
-![Scionic Merkle Tree: the root is the hash of the record, which names the folder on top. Each folder lists its entries by name and each file lists its chunks by number, and a Classic Merkle tree inside each one covers its list.](docs/pictures/scionic-merkle-tree.png)
+![Scionic Merkle Tree: the root is the hash of the record, which names the folder on top. Each folder lists its entries by name and each file lists its chunks by number, and a Classic Merkle tree inside each one covers its list. Every link ends at a box that holds what the hash covers: the count, the size and the Classic Merkle root.](docs/pictures/scionic-merkle-tree.png)
 
 ### Scionic Merkle Branch
 
-![Scionic Merkle Branch: one chunk of a file, proven against the root. Each folder and file on the way shows one item of its list with a few hashes beside it, and the rest of the tree is never sent.](docs/pictures/scionic-merkle-branch.png)
+![Scionic Merkle Branch: one chunk of a file, proven against the root. Each folder and file on the way shows one item of its list with a few hashes beside it. At each step the count, the size and the Classic Merkle root are hashed, and must give the hash held just above. The rest of the tree is never sent.](docs/pictures/scionic-merkle-branch.png)
 
 ## Scionic Merkle Branch Statistics
 
@@ -156,7 +158,7 @@ Scionic Merkle Trees incorporate Classic Merkle Trees within their structure, so
 
 ## Syncing by File Hash and Chunk Number
 
-A Scionic Merkle Tree says what is in it. The root names what is on top, a folder lists its entries, and a file lists its chunks. **Scionic Sync**, which earlier versions called LeafSync, is the protocol that fetches from it. A receiver asks for:
+A Scionic Merkle Tree says what is in it. The root names what is on top, a folder lists its entries, and a file lists its chunks. **LeafSync** is the protocol that fetches from it. A receiver asks for:
 
 - **a file by its hash, and its chunks by their numbers**: chunks 100 to 200 of this file;
 - **a range of a file's bytes**, for which only the chunks that hold those bytes are sent;
@@ -166,12 +168,12 @@ A chunk's number is its position in its file's list, and the file's hash covers 
 
 ### Negentropy Symbiosis
 
-Scionic Sync complements any set reconciliation system, such as Negentropy. Each does the part it is suited to:
+LeafSync complements any set reconciliation system, such as Negentropy. Each does the part it is suited to:
 
 - **Set reconciliation syncs the Merkle roots, and the file hashes that link to each root.** Two sides work out which roots, and which files under a root, one of them holds and the other is missing. These are small sets: one hash for a tree and one for a file.
-- **Scionic Sync then syncs the chunks of each file.** A file's chunks are numbered, so a receiver asks for the ranges of numbers it is missing. Chunk hashes are never reconciled as a set. They are by far the largest set, about 500,000 for a terabyte of files, and set reconciliation costs memory and work for every hash in the set.
+- **LeafSync then syncs the chunks of each file.** A file's chunks are numbered, so a receiver asks for the ranges of numbers it is missing. Chunk hashes are never reconciled as a set. They are by far the largest set, about 500,000 for a terabyte of files, and set reconciliation costs memory and work for every hash in the set.
 
-This library provides Scionic Sync. It holds no set reconciliation of its own, and works beside whichever one an application runs. A receiver that has nothing but a root needs none at all: it walks down from the root, skips everything it already holds by its hash, and asks for the rest.
+This library provides LeafSync. It holds no set reconciliation of its own, and works beside whichever one an application runs. A receiver that has nothing but a root needs none at all: it walks down from the root, skips everything it already holds by its hash, and asks for the rest.
 
 A phone can read one file out of a tree of terabytes and hold almost nothing. Which chunks of a file a peer holds is one bit per chunk: about 60 KB for a file of a terabyte. Different ranges of one file can be requested from different peers at the same time.
 
@@ -182,7 +184,7 @@ A phone can read one file out of a tree of terabytes and hold almost nothing. Wh
 Version 2.5.6 is a new tree format, built for deduplication and for trees of a terabyte and more. It does not read trees made by 2.4.x, and the same folder has a different root than it had there.
 
 - **Deduplication comes first.** A chunk's hash covers its bytes alone and a file's hash covers its chunks alone. Names and chunk numbers moved into the parent. Earlier versions hashed a chunk's number into the chunk and a file's name into the file, so the same bytes had different hashes in different places.
-- **Scionic Sync numbers a file's chunks, not a tree's leaves.** Earlier versions called it LeafSync and numbered every leaf of a tree. It now asks for a file by its hash and for its chunks by their numbers within that file, which the file's hash covers. Set reconciliation is left with the small sets: the Merkle roots, and the file hashes that link to them.
+- **LeafSync numbers a file's chunks, not a tree's leaves.** Earlier versions numbered every leaf of a tree. It now asks for a file by its hash and for its chunks by their numbers within that file, which the file's hash covers. Set reconciliation is left with the small sets: the Merkle roots, and the file hashes that link to them.
 - **A folder has one place for each name,** so one branch proves that a name is in a folder, or that it is not.
 - **Hardened against forged data.** A made-up leaf, a file that comes back short, a chunk that belongs to another file, and a store that is tricked into handing back other bytes are each refused, and each has a test.
 - **Bounded memory and work.** Every request says how long its answer may be, a tree's record says how much the tree holds, and writing a tree out counts what it would create before it creates anything.
