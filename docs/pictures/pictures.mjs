@@ -434,6 +434,16 @@ function tree(mode) {
     p.rect(x - w / 2, y - 12, w, 24, { rx: 6, fill, stroke, sw });
     p.text(x, y + 4.5, label, { size: 13, mono: true, anchor: 'middle', in: id });
   };
+  // What is shown, as it stands at the foot of the picture: the number of the
+  // chunk in its file's list, the link, and the chunk itself. A number alone
+  // would not say what it is the number of.
+  const shownKey = (x, y, id) => {
+    p.line(x, y + 12, x, y + 26, { stroke: C.green, sw: 2.5 });
+    p.rect(x - 17, y - 12, 34, 24, { rx: 6, fill: mix(C.green, C.box, 0.25), stroke: C.green, sw: 1.75 });
+    p.text(x, y + 4.5, String(PROVEN), { size: 13, mono: true, anchor: 'middle', in: id });
+    p.rect(x - 21, y + 26, 42, 26, { rx: 7, fill: mix(C.green, C.box, 0.3), stroke: C.green, sw: 2 });
+    p.text(x, y + 43, 'Chunk', { size: 11, weight: 600, anchor: 'middle', in: id });
+  };
   const boxKey = (fill, stroke, sw) => (x, y) => p.rect(x - 15, y - 11, 30, 22, { rx: 6, fill, stroke, sw });
   const tileKey = (fill, stroke, sw) => (x, y) => p.rect(x - 13, y - 10, 26, 20, { rx: 8, fill, stroke, sw });
   const linkKey = (stroke, sw) => (x, y) => p.path(`M${n(x - 13)} ${n(y - 11)} C${n(x - 13)} ${n(y + 4)} ${n(x + 13)} ${n(y - 4)} ${n(x + 13)} ${n(y + 11)}`, { stroke, sw });
@@ -445,7 +455,7 @@ function tree(mode) {
     key(1, 1, chipKey(String(PROVEN), 28, C.raised, C.hair, 1), "A file's chunk number", ["A chunk's place in the file's list,", 'which holds its hash and its length.']);
     key(1, 2, linkKey(C.sky, 1.5), 'Link by hash', ['An item of a list holds the hash of', 'the folder, file or chunk under it.']);
   } else {
-    key(0, 0, chipKey(String(PROVEN), 28, mix(C.green, C.box, 0.25), C.green, 1.75), 'Shown', ['The record, one item of each list', 'on the way, and the chunk itself.']);
+    key(0, 0, shownKey, 'Shown', ['The record, one item of each list', 'on the way, and the chunk itself.']);
     key(0, 1, (x, y) => p.hex(x, y, 9.5, { fill: C.green }), 'Sent beside it', ['A hash and a size, and in a folder a', 'name, for each part that is not shown.']);
     key(0, 2, (x, y) => p.hex(x, y, 8, { fill: C.box, stroke: C.green, sw: 2.25 }), 'Worked out by the receiver', ['Every hash on the way up, until', 'the top matches the root it trusts.']);
     key(1, 0, linkKey(C.green, 2.5), 'The way to the chunk', ['The hash worked out at each step must', 'match the one held just above it.']);
