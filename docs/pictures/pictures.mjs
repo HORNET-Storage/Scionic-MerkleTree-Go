@@ -241,23 +241,28 @@ function tree(mode) {
   const pad = 16, gap = 12, chipH = 26, step = 30, numberW = 44, least = 176;
   const tile = { w: 50, h: 40, drop: 34 };
   const levels = (count) => Math.max(1, Math.ceil(Math.log2(count)));
-  const openH = (count) => 68 + levels(count) * step + 14 + chipH + 14;
+  // Every box has one height, that of the deepest tree, so that the boxes of a
+  // row line up at the top and at the bottom. A tree of fewer levels is drawn
+  // as tall as the deepest: its top stands where every top stands, and its
+  // leaves where every leaf stands.
+  const deepest = Math.max(...[TOP.length, LEFT.length, RIGHT.length, ...[TOP[1], ...LEFT, ...RIGHT].map((name) => CHUNKS[name])].map(levels));
+  const boxH = 68 + deepest * step + 14 + chipH + 14;
   const openW = (count, chipW) => Math.max(least, count * (chipW + gap) - gap + 2 * pad);
   const open = (id, kind, about, x, y, labels, chipW) => {
     const w = openW(labels.length, chipW);
     const first = x + (w - labels.length * (chipW + gap) + gap) / 2;
-    const leafY = y + 68 + levels(labels.length) * step, chipY = leafY + 14;
+    const leafY = y + 68 + deepest * step, chipY = leafY + 14;
     const chips = labels.map((s, i) => ({ id: `${id}.c${i}`, s, x: first + i * (chipW + gap), y: chipY, w: chipW, h: chipH, cx: first + i * (chipW + gap) + chipW / 2 }));
-    return { id, kind, about, x, y, w, h: openH(labels.length), cx: x + w / 2, leafY, chips };
+    return { id, kind, about, x, y, w, h: boxH, cx: x + w / 2, leafY, rise: (deepest * step) / levels(labels.length), chips };
   };
   const nameW = (names) => 2 * Math.ceil((Math.max(...names.map((s) => s.length)) * 8.25 + 22) / 2);
-  const folder = (id, names, cx, bottom) => open(id, 'Folder', `${names.length} entries`, cx - openW(names.length, nameW(names)) / 2, bottom - openH(names.length), names, nameW(names));
+  const folder = (id, names, cx, bottom) => open(id, 'Folder', `${names.length} entries`, cx - openW(names.length, nameW(names)) / 2, bottom - boxH, names, nameW(names));
   const fileW = (name) => openW(CHUNKS[name], numberW);
-  // The boxes of a row end at one height, so that the chunks under its files
-  // make one row.
+  // The chunks of a file hang under it, and those of a row of files make one
+  // row.
   const file = (id, name, x, bottom) => {
     const count = CHUNKS[name];
-    const box = open(id, 'File', `${count} chunks`, x, bottom - openH(count), Array.from({ length: count }, (_, i) => String(i)), numberW);
+    const box = open(id, 'File', `${count} chunks`, x, bottom - boxH, Array.from({ length: count }, (_, i) => String(i)), numberW);
     box.chunks = box.chips.map((c, i) => ({ id: `${id}.k${i}`, x: c.cx - tile.w / 2, y: bottom + tile.drop, w: tile.w, h: tile.h, cx: c.cx }));
     return box;
   };
@@ -272,8 +277,8 @@ function tree(mode) {
   if (room < hanging + 2 * gap) throw new Error(`the files of the bottom row leave ${room} units for the chunks of ${TOP[1]}, which take ${hanging + 2 * gap}`);
   const x0 = edge, rightX = x0 + leftW + room;
   const y1 = 286;
-  const bottom2 = y1 + openH(TOP.length) + 88 + Math.max(openH(LEFT.length), openH(RIGHT.length), openH(CHUNKS[TOP[1]]));
-  const bottom3 = bottom2 + 96 + Math.max(...[...LEFT, ...RIGHT].map((name) => openH(CHUNKS[name])));
+  const bottom2 = y1 + boxH + 88 + boxH;
+  const bottom3 = bottom2 + 96 + boxH;
   const leftFiles = [file('left.f0', LEFT[0], x0, bottom3), file('left.f1', LEFT[1], x0 + fileW(LEFT[0]) + gap, bottom3)];
   const rightFiles = [file('right.f0', RIGHT[0], rightX, bottom3), file('right.f1', RIGHT[1], rightX + fileW(RIGHT[0]) + gap, bottom3)];
   const left = folder('left', LEFT, x0 + leftW / 2, bottom2);
@@ -282,7 +287,7 @@ function tree(mode) {
   // The root, the record and the folder on top stand in the middle of the
   // picture, with the key on both sides of them.
   const cx = W / 2;
-  const top = folder('top', TOP, cx, y1 + openH(TOP.length));
+  const top = folder('top', TOP, cx, y1 + boxH);
   const root = { id: 'root', x: cx - 220, y: 138, w: 440, h: 38 };
   const record = { id: 'record', x: cx - 235, y: 194, w: 470, h: 66 };
   const folders = [top, left, right], files = [middle, ...leftFiles, ...rightFiles];
@@ -354,7 +359,7 @@ function tree(mode) {
       else {
         const l = place(o, split(m)), r = place(o + split(m), m - split(m));
         const height = Math.max(l.height, r.height) + 1;
-        node = { o, m, x: (l.x + r.x) / 2, y: b.leafY - height * step, height, under: [l, r] };
+        node = { o, m, x: (l.x + r.x) / 2, y: b.leafY - height * b.rise, height, under: [l, r] };
       }
       at.set(`${b.id}.n${o}.${m}`, node);
       return node;
