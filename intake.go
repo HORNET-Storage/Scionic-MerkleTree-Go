@@ -657,7 +657,11 @@ func (i *Intake) rehashHeld(workers int) error {
 				return nil
 			}
 			item := held[index]
-			kept, found, err := store.Get(StoredChunk, item.Hash)
+			sound := false
+			found, err := lent(store, StoredChunk, item.Hash, func(kept []byte) error {
+				sound = item.Matches(kept)
+				return nil
+			})
 			if err == nil && !found {
 				err = missing("the chunk", item.Hash)
 			}
@@ -665,7 +669,7 @@ func (i *Intake) rehashHeld(workers int) error {
 				next.Store(int64(len(held)))
 				return err
 			}
-			if !item.Matches(kept) {
+			if !sound {
 				spoiledBy[worker] = append(spoiledBy[worker], int(index))
 			}
 		}

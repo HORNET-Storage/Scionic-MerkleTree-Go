@@ -347,7 +347,18 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 	case AskFile:
 		return whole(StoredFileList, FileListFrame)
 	case AskChunk:
-		return whole(StoredChunk, ChunkFrame)
+		var frame []byte
+		held, err := lent(r.store, StoredChunk, asked.Hash, func(kept []byte) error {
+			frame = ChunkFrame(kept)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if !held {
+			return notHeld()
+		}
+		return onFrame(frame)
 	case AskFolderBranch:
 		open, err := r.openFolder(asked.Hash)
 		if err != nil {
@@ -440,14 +451,16 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 		// for the call only.
 		var frame []byte
 		for _, item := range items {
-			kept, held, err := r.store.Get(StoredChunk, item.Hash)
+			held, err := lent(r.store, StoredChunk, item.Hash, func(kept []byte) error {
+				frame = append(append(frame[:0], byte(FrameChunk)), kept...)
+				return nil
+			})
 			if err != nil {
 				return err
 			}
 			if !held {
 				return notHeld()
 			}
-			frame = append(append(frame[:0], byte(FrameChunk)), kept...)
 			if err := onFrame(frame); err != nil {
 				return err
 			}
@@ -896,12 +909,14 @@ func Export(store Store, root Root, out io.Writer) error {
 				continue
 			}
 			chunks[item.Hash] = true
-			kept, err := heldChunk(store, item)
+			held, err := lendChunk(store, item, func(kept []byte) error {
+				return writeFramed(out, FrameChunk, kept)
+			})
 			if err != nil {
 				return err
 			}
-			if err := writeFramed(out, FrameChunk, kept); err != nil {
-				return err
+			if !held {
+				return missing("the chunk", item.Hash)
 			}
 		}
 	}

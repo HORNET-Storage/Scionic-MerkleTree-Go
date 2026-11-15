@@ -154,21 +154,35 @@ func TestWhatIsReadFromAStoreIsCheckedBeforeItIsUsed(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// How many times a chunk was handed on.
+	seen := 0
+	count := func([]byte) error {
+		seen++
+		return nil
+	}
 	// A store that holds other bytes under a chunk's hash.
 	put(StoredChunk, item.Hash, []byte("wrong"))
-	if _, _, err := loadChunk(store, item); !errors.Is(err, ErrCorrupt) {
+	if _, err := lendChunk(store, item, count); !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("other bytes of the same length: %v", err)
 	}
 	put(StoredChunk, item.Hash, []byte("longer"))
-	if _, _, err := loadChunk(store, item); !errors.Is(err, ErrCorrupt) {
+	if _, err := lendChunk(store, item, count); !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("other bytes of another length: %v", err)
 	}
 	// The chunk itself, named by an item that gives it another length.
 	put(StoredChunk, item.Hash, []byte("right"))
-	if _, _, err := loadChunk(store, ChunkRef{Hash: item.Hash, Length: 4}); !errors.Is(err, ErrSizeMismatch) {
+	if _, err := lendChunk(store, ChunkRef{Hash: item.Hash, Length: 4}, count); !errors.Is(err, ErrSizeMismatch) {
 		t.Fatalf("an item that gives another length: %v", err)
 	}
-	if kept, held, err := loadChunk(store, item); err != nil || !held || string(kept) != "right" {
+	// Nothing that failed a check was handed on.
+	if seen != 0 {
+		t.Fatal("a chunk that failed a check was handed on")
+	}
+	var kept []byte
+	if held, err := lendChunk(store, item, func(bytes []byte) error {
+		kept = bytes
+		return nil
+	}); err != nil || !held || string(kept) != "right" {
 		t.Fatal(kept, held, err)
 	}
 	// A list kept under another list's hash.
@@ -208,5 +222,74 @@ func TestWhatIsReadFromAStoreIsCheckedBeforeItIsUsed(t *testing.T) {
 	put(StoredRecord, root.Hash(), []byte("two"))
 	if _, err := loadRecord(store, root); !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("a record under another root: %v", err)
+	}
+}
+
+// lendingStore lends as it is set to, rightly or not.
+type lendingStore struct {
+	*MemoryStore
+	// calls is how many times it hands a thing to with.
+	calls int
+	// says is whether it says that it holds the thing.
+	says bool
+	// passesOver is whether it passes over an error that with returns.
+	passesOver bool
+}
+
+func (s *lendingStore) Lend(kind Stored, hash Hash, with func([]byte) error) (bool, error) {
+	kept, _, err := s.Get(kind, hash)
+	if err != nil {
+		return false, err
+	}
+	for range s.calls {
+		if err := with(kept); err != nil && !s.passesOver {
+			return false, err
+		}
+	}
+	return s.says, nil
+}
+
+func TestAStoreIsHeldToWhatLendingPromises(t *testing.T) {
+	item, err := ChunkRefOf([]byte("right"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// What lending a chunk gave, and what was handed on of it.
+	lend := func(calls int, says, passesOver bool, kept string) (bool, []string, error) {
+		store := &lendingStore{MemoryStore: NewMemoryStore(), calls: calls, says: says, passesOver: passesOver}
+		if err := store.Put(StoredChunk, item.Hash, []byte(kept)); err != nil {
+			t.Fatal(err)
+		}
+		var seen []string
+		held, err := lendChunk(store, item, func(bytes []byte) error {
+			seen = append(seen, string(bytes))
+			return nil
+		})
+		return held, seen, err
+	}
+	// As promised: one call for what is held, and none for what is not.
+	if held, seen, err := lend(1, true, false, "right"); err != nil || !held || !slices.Equal(seen, []string{"right"}) {
+		t.Fatal(held, seen, err)
+	}
+	if held, _, err := lend(0, false, false, "right"); err != nil || held {
+		t.Fatal(held, err)
+	}
+	// A second call is refused, and nothing of it is handed on.
+	if _, seen, err := lend(2, true, true, "right"); !errors.Is(err, ErrInvariant) || len(seen) != 1 {
+		t.Fatal(seen, err)
+	}
+	// Said to be held, and nothing lent; lent, and said not to be held.
+	if _, _, err := lend(0, true, false, "right"); !errors.Is(err, ErrInvariant) {
+		t.Fatal(err)
+	}
+	if _, _, err := lend(1, false, false, "right"); !errors.Is(err, ErrInvariant) {
+		t.Fatal(err)
+	}
+	// Damaged bytes stay an error when the store passes over it, and are
+	// never handed on.
+	for _, passesOver := range []bool{false, true} {
+		if _, seen, err := lend(1, true, passesOver, "wrong"); !errors.Is(err, ErrCorrupt) || len(seen) != 0 {
+			t.Fatal(passesOver, seen, err)
+		}
 	}
 }

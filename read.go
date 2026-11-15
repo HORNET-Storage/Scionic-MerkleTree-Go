@@ -109,11 +109,16 @@ func ReadFileBytes(store Store, file Target) ([]byte, error) {
 	}
 	content := make([]byte, 0, list.Size())
 	for _, chunk := range wanted {
-		kept, err := heldChunk(store, chunk.item)
+		held, err := lendChunk(store, chunk.item, func(kept []byte) error {
+			content = append(content, kept...)
+			return nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		content = append(content, kept...)
+		if !held {
+			return nil, missing("the chunk", chunk.item.Hash)
+		}
 	}
 	return content, nil
 }
@@ -216,18 +221,6 @@ func requireChunk(store Store, item ChunkRef) error {
 	return nil
 }
 
-// heldChunk gives the bytes of a chunk that has to be there, checked.
-func heldChunk(store Store, item ChunkRef) ([]byte, error) {
-	kept, held, err := loadChunk(store, item)
-	if err != nil {
-		return nil, err
-	}
-	if !held {
-		return nil, missing("the chunk", item.Hash)
-	}
-	return kept, nil
-}
-
 // writeStretch writes the bytes from offset up to end out of the chunks
 // that hold them.
 func writeStretch(store Store, wanted []wantedChunk, offset, end uint64, out io.Writer) error {
@@ -235,17 +228,22 @@ func writeStretch(store Store, wanted []wantedChunk, offset, end uint64, out io.
 		return err
 	}
 	for _, chunk := range wanted {
-		kept, err := heldChunk(store, chunk.item)
-		if err != nil {
-			return err
-		}
 		var from uint64
 		if offset > chunk.start {
 			from = offset - chunk.start
 		}
 		to := min(end, chunk.start+uint64(chunk.item.Length)) - chunk.start
-		if err := writeAll(out, kept[from:to]); err != nil {
-			return streamError("write a file's bytes", err)
+		held, err := lendChunk(store, chunk.item, func(kept []byte) error {
+			if err := writeAll(out, kept[from:to]); err != nil {
+				return streamError("write a file's bytes", err)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if !held {
+			return missing("the chunk", chunk.item.Hash)
 		}
 	}
 	return nil

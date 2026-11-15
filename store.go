@@ -49,9 +49,10 @@ func (s Stored) String() string {
 // from many goroutines at once.
 //
 // A store that can answer without reading the bytes may also have the
-// methods of [StoreHas] and [StoreSize]. They are used when they are there.
-// A store on disk should have Size at the least: without it, seeing whether
-// a chunk is there takes a read of the whole chunk.
+// methods of [StoreHas] and [StoreSize], and one that can lend what it
+// keeps the method of [StoreLend]. They are used when they are there. A
+// store on disk should have Size at the least: without it, seeing whether
+// a chunk is there takes a read of the whole chunk. It should have Lend too.
 type Store interface {
 	// Put keeps bytes under hash. Keeping what is kept already changes
 	// nothing. The bytes are lent for the call only: a store that keeps
@@ -77,6 +78,18 @@ type StoreSize interface {
 	// Size gives how many bytes are kept under hash, and false if nothing
 	// is.
 	Size(kind Stored, hash Hash) (uint64, bool, error)
+}
+
+// StoreLend is a store that lends what it keeps. The library reads a tree's
+// chunks this way when a store has it. A store on disk should: it can read
+// into memory that it uses again, where Get gives memory of its own for
+// every chunk, which costs some systems more than the reading does.
+type StoreLend interface {
+	// Lend hands what is kept under hash to with, and reports whether
+	// anything is kept: with is called once if it is, and not at all if it
+	// is not. The bytes are lent for that call only, and an error from with
+	// is what Lend returns.
+	Lend(kind Stored, hash Hash, with func(bytes []byte) error) (bool, error)
 }
 
 // storeHas reports whether anything is kept under hash, without reading it
@@ -299,20 +312,64 @@ func checkChunk(item ChunkRef, content []byte, what string) error {
 	return nil
 }
 
-// loadChunk gives the bytes of the chunk that item names, read from the
-// store and checked. Bytes that do not hash to the chunk's hash are damaged.
-// Bytes that do, and are not as many as the item says, show that the item is
-// wrong. It gives false when the store does not hold the chunk.
-func loadChunk(store Store, item ChunkRef) ([]byte, bool, error) {
-	kept, found, err := store.Get(StoredChunk, item.Hash)
-	if err != nil || !found {
-		return nil, false, err
+// lent has store lend the thing under hash to with, and holds the store to
+// what StoreLend promises: one call when it says it holds the thing, and
+// none when it says it does not. An error from with is returned whatever
+// the store does with it, so that no store can pass over a chunk that was
+// found damaged. A store that cannot lend is asked with Get.
+func lent(store Store, kind Stored, hash Hash, with func(bytes []byte) error) (bool, error) {
+	lender, ok := store.(StoreLend)
+	if !ok {
+		kept, found, err := store.Get(kind, hash)
+		if err != nil || !found {
+			return false, err
+		}
+		return true, with(kept)
 	}
-	if HashOf(kept) != item.Hash {
-		return nil, false, corrupt("a stored chunk", item.Hash)
+	calls := 0
+	var failed error
+	held, err := lender.Lend(kind, hash, func(bytes []byte) error {
+		calls++
+		var done error
+		if calls == 1 {
+			done = with(bytes)
+		} else {
+			done = invariant("a store lent one thing twice")
+		}
+		if done == nil {
+			return nil
+		}
+		if failed == nil {
+			failed = done
+		}
+		// What went wrong is kept here. The store is only told to stop.
+		return invariant("what a store lent was refused")
+	})
+	switch {
+	case failed != nil:
+		return false, failed
+	case err != nil:
+		return false, err
+	case held && calls == 0:
+		return false, invariant("a store said it held a thing, and lent nothing")
+	case !held && calls != 0:
+		return false, invariant("a store lent a thing, and said it did not hold it")
 	}
-	if uint64(len(kept)) != uint64(item.Length) {
-		return nil, false, sizeMismatch("a stored chunk", uint64(item.Length), uint64(len(kept)))
-	}
-	return kept, true, nil
+	return held, nil
+}
+
+// lendChunk lends the chunk that item names to with, read from the store
+// and checked first, and reports whether the store holds it. Bytes that do
+// not hash to the chunk's hash are damaged. Bytes that do, and are not as
+// many as the item says, show that the item is wrong.
+func lendChunk(store Store, item ChunkRef, with func(bytes []byte) error) (bool, error) {
+	return lent(store, StoredChunk, item.Hash, func(kept []byte) error {
+		if HashOf(kept) != item.Hash {
+			return corrupt("a stored chunk", item.Hash)
+		}
+		if uint64(len(kept)) != uint64(item.Length) {
+			return sizeMismatch("a stored chunk", uint64(item.Length), uint64(len(kept)))
+		}
+		return with(kept)
+	})
 }

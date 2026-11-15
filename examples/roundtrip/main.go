@@ -37,6 +37,10 @@ type dirStore struct {
 	// its place, and the second would put it in the place of a file that
 	// someone may be reading, which Windows does not allow.
 	writing [1024]sync.Mutex
+	// read keeps memory that things are read into for the next read: fresh
+	// memory for each chunk, as Get takes, costs some systems more than the
+	// reading does.
+	read sync.Pool
 }
 
 func (s *dirStore) path(kind scionic.Stored, hash scionic.Hash) string {
@@ -94,6 +98,36 @@ func (s *dirStore) Get(kind scionic.Stored, hash scionic.Hash) ([]byte, bool, er
 		return nil, false, err
 	}
 	return content, true, nil
+}
+
+// Lend hands what is kept under hash to with, read into memory that was
+// read into before. The library reads a tree's chunks this way.
+func (s *dirStore) Lend(kind scionic.Stored, hash scionic.Hash, with func(bytes []byte) error) (bool, error) {
+	file, err := os.Open(s.path(kind, hash))
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return false, err
+	}
+	buffer, _ := s.read.Get().(*[]byte)
+	if buffer == nil {
+		buffer = new([]byte)
+	}
+	defer s.read.Put(buffer)
+	if int64(cap(*buffer)) < info.Size() {
+		*buffer = make([]byte, info.Size())
+	}
+	content := (*buffer)[:info.Size()]
+	if _, err := io.ReadFull(file, content); err != nil {
+		return false, err
+	}
+	return true, with(content)
 }
 
 // Size gives how many bytes are kept under hash, without reading them. A
