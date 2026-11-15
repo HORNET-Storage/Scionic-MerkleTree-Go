@@ -605,9 +605,9 @@ The files under `spec/` are the Rust library's, copied byte for byte. The tests 
 | --- | --- | --- |
 | Go, this repository | 2.5.6 | |
 | [Rust](https://github.com/HORNET-Storage/Scionic-MerkleTree-Rust) | 2.5.6 | The reference for the format. |
-| [Swift](https://github.com/HORNET-Storage/Scionic-MerkleTree-Swift) | 2.4.3 | Being brought to 2.5.6. |
+| [Swift](https://github.com/HORNET-Storage/Scionic-MerkleTree-Swift) | 2.5.6 | |
 
-The three libraries are kept in step: one format, one set of vectors and one version number. A tree built by the Rust library and one built by this library from the same folder have the same root, and each reads what the other writes. Until Swift reaches 2.5.6 it writes the 2.4.x layout, which this version does not read.
+The three libraries are kept in step: one format, one set of vectors and one version number. A tree built by the Rust or the Swift library and one built by this library from the same folder have the same root, and each reads what the others write.
 
 ## Development
 
