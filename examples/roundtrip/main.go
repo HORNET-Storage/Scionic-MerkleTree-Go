@@ -1,9 +1,9 @@
 // Roundtrip takes a tree its whole way round, with a store on disk.
 //
 // It builds a tree from a folder, checks it, fetches it into a second store
-// as a receiver would, reads a stretch from the middle of its largest file
-// without the rest, writes the tree out again, and holds the copy to the
-// same root. It prints how long each step took.
+// as a receiver would, reads stretches of its largest file without the rest,
+// writes the tree out again, and holds the copy to the same root. It prints
+// how long each step took.
 //
 //	go run ./examples/roundtrip <folder> <work-dir>
 //
@@ -198,18 +198,25 @@ func roundtrip(folder, work string, out io.Writer) (scionic.Root, error) {
 		return none, err
 	}
 	if found {
+		// A stretch of 4 KiB is read from 64 places spread over the file, each
+		// asked for on its own, and the time one takes on average is printed:
+		// a single read is shorter than some systems' clocks can tell apart.
 		length := min(file.Size, 4096)
+		const places = 64
 		remote, err := scionic.OpenRemote(scionic.NewResponder(source), root)
 		if err != nil {
 			return none, err
 		}
 		var stretch bytes.Buffer
 		started = time.Now()
-		if err := remote.Read(file, (file.Size-length)/2, length, &stretch); err != nil {
-			return none, err
+		for place := range uint64(places) {
+			stretch.Reset()
+			if err := remote.Read(file, (file.Size-length)*place/(places-1), length, &stretch); err != nil {
+				return none, err
+			}
 		}
-		fmt.Fprintf(out, "a stretch    %8.4f s  %d bytes from the middle of a file of %d bytes\n",
-			time.Since(started).Seconds(), stretch.Len(), file.Size)
+		fmt.Fprintf(out, "a stretch    %8.4f s  %d bytes at a time, from %d places in a file of %d bytes\n",
+			time.Since(started).Seconds()/places, stretch.Len(), places, file.Size)
 	}
 
 	written := filepath.Join(work, "written")

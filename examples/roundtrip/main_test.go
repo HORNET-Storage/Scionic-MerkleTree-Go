@@ -43,7 +43,7 @@ func TestAFolderGoesItsWholeWayRound(t *testing.T) {
 		// The two files of 3 MiB are one file, kept once.
 		"the tree     6291479 bytes; kept once: 3 chunks of 3145751 bytes",
 		"4 different files in 4 different folders",
-		"4096 bytes from the middle of a file of 3145728 bytes",
+		"4096 bytes at a time, from 64 places in a file of 3145728 bytes",
 		"the copy has the same root",
 	} {
 		if !strings.Contains(printed, want) {

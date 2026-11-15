@@ -31,7 +31,7 @@ func TestTheExamplePrintsTheRootsThatTheRustLibrarysDoes(t *testing.T) {
 		}
 		printed := out.String()
 		wanted := append(sized.printed, "chunked ", "hashed ", "built ", "checked ", "root "+root.String(),
-			"built from disk ", " 1 different files, 8 bytes\n")
+			"fetched ", "bundled ", "built from disk ", " 1 different files, 8 bytes\n")
 		for _, want := range wanted {
 			if !strings.Contains(printed, want) {
 				t.Fatalf("%d MiB: the example did not print %q:\n%s", sized.megabytes, want, printed)

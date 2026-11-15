@@ -4,8 +4,10 @@
 //	go run ./examples/speed [MiB [folder]]
 //
 // It prints, for a file of that many MiB of bytes that look random: chunking
-// alone, hashing alone, building the file into a store in memory, and
-// checking every chunk of it again. Without a number, the file is 1 GiB.
+// alone, hashing alone, building the file into a store in memory, checking
+// every chunk of it again, fetching it into a second store as a receiver
+// would, and writing it as a bundle and reading that into a third. Without a
+// number, the file is 1 GiB.
 //
 // With a folder, it also builds that folder from disk into a store in
 // memory, and prints the best of five runs: by then the system holds the
@@ -13,6 +15,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -83,6 +86,28 @@ func speed(megabytes int, folder string, out io.Writer) (scionic.Root, error) {
 	}
 	report(out, "checked", started, len(data))
 	fmt.Fprintf(out, "root %s (%02x)\n", root, mixed)
+
+	// The tree is fetched from the first store into a second one, as a
+	// receiver would take it from a peer, and then written as a bundle and
+	// read back into a third. Each checks every byte as it comes.
+	fetched := scionic.NewMemoryStore()
+	started = time.Now()
+	if _, err := scionic.Fetch(fetched, root, scionic.NewResponder(store)); err != nil {
+		return none, err
+	}
+	report(out, "fetched", started, len(data))
+
+	imported := scionic.NewMemoryStore()
+	var bundle bytes.Buffer
+	bundle.Grow(len(data) + 1<<20)
+	started = time.Now()
+	if err := scionic.Export(store, root, &bundle); err != nil {
+		return none, err
+	}
+	if _, err := scionic.Import(imported, root, &bundle); err != nil {
+		return none, err
+	}
+	report(out, "bundled", started, len(data))
 
 	if folder != "" {
 		best := math.MaxFloat64
