@@ -528,20 +528,20 @@ Measured on a Windows 11 laptop with Go 1.27: each figure is the median of the f
 
 | Into a store in memory (`examples/speed`) | |
 | --- | ---: |
-| Content-defined chunking, one core | 5.4 GiB/s |
-| SHA-256 of the chunks, one core | 3.9 GiB/s |
-| Building a tree from one file of 1 GiB, every core | 3.9 GiB/s |
-| Building a tree from ten files of 256 MiB on disk, every core | 6.6 GiB/s |
-| Building a tree from 20,000 files of 4 KiB on disk, every core | 0.19 s |
-| Verifying every byte of a tree of 1 GiB, every core | 62 GiB/s |
+| Content-defined chunking, one core | 6.0 GiB/s |
+| SHA-256 of the chunks, one core | 4.1 GiB/s |
+| Building a tree from one file of 1 GiB, every core | 4.4 GiB/s |
+| Building a tree from ten files of 256 MiB on disk, every core | 7.6 GiB/s |
+| Building a tree from 20,000 files of 4 KiB on disk, every core | 0.16 s |
+| Verifying every byte of a tree of 1 GiB, every core | 67 GiB/s |
 
 | With a store on disk, a folder of 3.5 GiB (`examples/roundtrip`) | |
 | --- | ---: |
-| Building the tree into the store | 2.0 s |
+| Building the tree into the store | 1.2 s |
 | Verifying every byte from the store | 0.2 s |
-| Fetching the tree into a second store | 3.2 s |
-| Reading 4 KiB of a file of 1.5 GiB through a peer, on average over 64 places | 1.4 ms |
-| Writing the tree back out as files | 2.6 s |
+| Fetching the tree into a second store | 2.7 s |
+| Reading 4 KiB of a file of 1.5 GiB through a peer, on average over 64 places | 1.3 ms |
+| Writing the tree back out as files | 2.4 s |
 
 That folder holds one file of 1 GiB twice. The tree stores it once: 3.5 GiB of files are kept as 2.5 GiB of chunks and 40 KB of lists.
 
@@ -581,7 +581,7 @@ The exact rules are in [`spec/FORMAT.md`](spec/FORMAT.md), under "What a receive
 
 ## Known Limitations
 
-- **One file is chunked on one core,** because where a chunk ends decides where the next begins. That is about 5.4 GiB a second on the machine above. Hashing the chunks, which is the greater part of the work, uses every core.
+- **One file is chunked on one core,** because where a chunk ends decides where the next begins. That is about 6.0 GiB a second on the machine above. Hashing the chunks, which is the greater part of the work, uses every core.
 - **Fetching a tree and writing a tree out use one core each.** On the disks they were tried on, the disk was the slower part.
 - **Verifying or fetching a whole tree keeps a small record in memory for every different chunk,** so that each chunk is counted once: some tens of megabytes for a terabyte.
 - **A list is taken in whole.** A file's chunk list is 36 bytes a chunk, about 18 MB for each terabyte of the file, and a folder's listing has to fit in memory.
@@ -630,34 +630,32 @@ Released under the MIT License: see [`LICENSE`](LICENSE).
 
 The three libraries, measured one after another on the same machine and the same files. None of them is fastest at everything:
 
-- **Swift** is fastest at chunking a file, and at building its tree in memory.
-- **Rust** is fastest at fetching a tree from one store in memory into another, and at building a tree from 20,000 small files.
-- **Go** is fastest at writing a tree as a bundle and reading it back.
-- **Go and Rust tie** for fastest at fetching a tree into a store on disk, reading 4 KiB through a peer, writing a tree out as files, and building a tree from that copy. Swift is behind them at each.
-- **Rust and Swift tie** for fastest at verifying a tree from a store on disk.
-- **All three tie** at hashing, at verifying a tree in memory, at building a tree from ten large files, and at building a tree into a store on disk.
+- **Swift** is fastest at chunking a file, at building its tree in memory, at fetching a tree from one store in memory into another, at building a tree from ten large files, and at building a tree again from the copy written out to disk.
+- **Rust** is fastest at writing a tree as a bundle and reading it back, and at building a tree from 20,000 small files.
+- **Rust and Swift tie** for fastest at building a tree into a store on disk, verifying it from there, fetching it into a second store on disk, reading 4 KiB through a peer, and writing a tree out as files. Go is behind them at each.
+- **All three tie** at hashing, and at verifying a tree in memory.
 
 Each time is the median of five rounds. Lower is faster, and the times of those named fastest are in bold.
 
 | Step | Fastest | Go | Rust | Swift |
 | --- | --- | ---: | ---: | ---: |
 | **A file of 1 GiB, in memory** | | | | |
-| Content-defined chunking, one core | Swift | 0.186 s | 0.177 s | **0.154 s** |
-| SHA-256 of its chunks, one core | All three tied | 0.257 s | 0.254 s | 0.250 s |
-| Building its tree into a store in memory, every core | Swift | 0.258 s | 0.239 s | **0.216 s** |
-| Verifying every byte of the tree, every core | All three tied | 0.016 s | 0.017 s | 0.018 s |
-| Fetching the tree into a second store, as from a peer | Rust | 0.722 s | **0.619 s** | 0.653 s |
-| Writing the tree as a bundle, and reading that into a third store | Go | **0.987 s** | 1.187 s | 1.209 s |
+| Content-defined chunking, one core | Swift | 0.166 s | 0.142 s | **0.139 s** |
+| SHA-256 of its chunks, one core | All three tied | 0.242 s | 0.241 s | 0.242 s |
+| Building its tree into a store in memory, every core | Swift | 0.229 s | 0.060 s | **0.056 s** |
+| Verifying every byte of the tree, every core | All three tied | 0.015 s | 0.014 s | 0.014 s |
+| Fetching the tree into a second store, as from a peer | Swift | 0.661 s | 0.154 s | **0.151 s** |
+| Writing the tree as a bundle, and reading that into a third store | Rust | 0.950 s | **0.426 s** | 0.436 s |
 | **Folders on disk, built into a store in memory** | | | | |
-| Ten files of 256 MiB | All three tied | 0.376 s | 0.439 s | 0.413 s |
-| 20,000 files of 4 KiB | Rust | 0.186 s | **0.165 s** | 0.198 s |
+| Ten files of 256 MiB | Swift | 0.330 s | 0.269 s | **0.265 s** |
+| 20,000 files of 4 KiB | Rust | 0.158 s | **0.154 s** | 0.174 s |
 | **A folder of 3.5 GiB, with a store on disk** | | | | |
-| Building the tree into the store | All three tied | 1.99 s | 2.32 s | 1.99 s |
-| Verifying every byte from the store | Rust and Swift, tied | 0.18 s | **0.16 s** | **0.16 s** |
-| Fetching the tree into a second store | Go and Rust, tied | **3.22 s** | **3.12 s** | 3.90 s |
-| Reading 4 KiB of a file of 1.5 GiB through a peer, on average over 64 places | Go and Rust, tied | **1.4 ms** | **1.5 ms** | 2.1 ms |
-| Writing the tree back out as files | Go and Rust, tied | **2.63 s** | **2.67 s** | 4.05 s |
-| Building a tree from the copy, into a third store | Go and Rust, tied | **2.53 s** | **1.89 s** | 2.59 s |
+| Building the tree into the store | Rust and Swift, tied | 1.24 s | **0.73 s** | **0.72 s** |
+| Verifying every byte from the store | Rust and Swift, tied | 0.17 s | **0.13 s** | **0.14 s** |
+| Fetching the tree into a second store | Rust and Swift, tied | 2.70 s | **0.82 s** | **0.81 s** |
+| Reading 4 KiB of a file of 1.5 GiB through a peer, on average over 64 places | Rust and Swift, tied | 1.3 ms | **1.1 ms** | **1.2 ms** |
+| Writing the tree back out as files | Rust and Swift, tied | 2.35 s | **1.24 s** | **1.26 s** |
+| Building a tree from the copy, into a third store | Swift | 1.24 s | 0.87 s | **0.76 s** |
 
 **Fastest** names the library with the lowest time. Where another wasn't slower than it in at least four of the five rounds, the two are named as tied, since the difference between them could be chance.
 
@@ -667,29 +665,29 @@ Each time is the median of five rounds. Lower is faster, and the times of those 
 | Step | Go | Rust | Swift |
 | --- | ---: | ---: | ---: |
 | **A file of 1 GiB, in memory** | | | |
-| Content-defined chunking, one core | 0.175 s to 0.197 s | 0.173 s to 0.187 s | 0.152 s to 0.163 s |
-| SHA-256 of its chunks, one core | 0.248 s to 0.259 s | 0.245 s to 0.265 s | 0.246 s to 0.265 s |
-| Building its tree into a store in memory, every core | 0.245 s to 0.456 s | 0.223 s to 0.250 s | 0.198 s to 0.422 s |
-| Verifying every byte of the tree, every core | 0.016 s to 0.017 s | 0.015 s to 0.021 s | 0.016 s to 0.018 s |
-| Fetching the tree into a second store, as from a peer | 0.681 s to 0.766 s | 0.569 s to 0.648 s | 0.575 s to 0.681 s |
-| Writing the tree as a bundle, and reading that into a third store | 0.962 s to 1.032 s | 1.118 s to 1.237 s | 1.156 s to 1.313 s |
+| Content-defined chunking, one core | 0.165 s to 0.171 s | 0.139 s to 0.143 s | 0.139 s to 0.141 s |
+| SHA-256 of its chunks, one core | 0.238 s to 0.244 s | 0.240 s to 0.245 s | 0.239 s to 0.243 s |
+| Building its tree into a store in memory, every core | 0.228 s to 0.232 s | 0.059 s to 0.064 s | 0.055 s to 0.058 s |
+| Verifying every byte of the tree, every core | 0.013 s to 0.017 s | 0.013 s to 0.014 s | 0.014 s to 0.015 s |
+| Fetching the tree into a second store, as from a peer | 0.660 s to 0.664 s | 0.152 s to 0.157 s | 0.149 s to 0.155 s |
+| Writing the tree as a bundle, and reading that into a third store | 0.918 s to 1.113 s | 0.420 s to 0.427 s | 0.433 s to 0.437 s |
 | **Folders on disk, built into a store in memory** | | | |
-| Ten files of 256 MiB | 0.374 s to 0.414 s | 0.368 s to 0.976 s | 0.374 s to 1.003 s |
-| 20,000 files of 4 KiB | 0.174 s to 0.348 s | 0.164 s to 0.170 s | 0.186 s to 0.214 s |
+| Ten files of 256 MiB | 0.326 s to 0.337 s | 0.263 s to 0.292 s | 0.264 s to 0.269 s |
+| 20,000 files of 4 KiB | 0.150 s to 0.171 s | 0.143 s to 0.158 s | 0.171 s to 0.182 s |
 | **A folder of 3.5 GiB, with a store on disk** | | | |
-| Building the tree into the store | 1.69 s to 2.55 s | 1.95 s to 3.22 s | 1.79 s to 2.34 s |
-| Verifying every byte from the store | 0.17 s to 0.32 s | 0.14 s to 0.20 s | 0.16 s to 0.19 s |
-| Fetching the tree into a second store | 2.94 s to 3.83 s | 2.99 s to 3.99 s | 3.40 s to 6.83 s |
-| Reading 4 KiB of a file of 1.5 GiB through a peer, on average over 64 places | 1.4 ms to 1.6 ms | 1.4 ms to 1.5 ms | 1.4 ms to 2.3 ms |
-| Writing the tree back out as files | 2.53 s to 4.74 s | 2.61 s to 6.46 s | 3.00 s to 5.20 s |
-| Building a tree from the copy, into a third store | 1.30 s to 4.73 s | 1.67 s to 5.80 s | 1.70 s to 5.63 s |
+| Building the tree into the store | 1.13 s to 1.56 s | 0.72 s to 0.77 s | 0.67 s to 0.74 s |
+| Verifying every byte from the store | 0.14 s to 0.19 s | 0.12 s to 0.15 s | 0.13 s to 0.15 s |
+| Fetching the tree into a second store | 2.60 s to 2.80 s | 0.78 s to 0.86 s | 0.77 s to 0.87 s |
+| Reading 4 KiB of a file of 1.5 GiB through a peer, on average over 64 places | 1.2 ms to 1.3 ms | 1.1 ms to 1.2 ms | 1.1 ms to 1.2 ms |
+| Writing the tree back out as files | 2.31 s to 2.42 s | 1.23 s to 1.29 s | 1.23 s to 1.29 s |
+| Building a tree from the copy, into a third store | 1.12 s to 1.54 s | 0.77 s to 0.94 s | 0.70 s to 0.89 s |
 
 </details>
 
 **How it was measured.**
 
 - **The machine:** one Windows 11 laptop, the same for all three.
-- **The builds:** Go 1.27.3; Rust 1.100.0, with `--release`; Swift 6.3.1, with `-c release`. The libraries were at Go `8fc95ca`, Rust `1661f24` and Swift `088c9af`.
+- **The builds:** Go 1.27.3; Rust 1.100.0, with `--release`; Swift 6.3.1, with `-c release`. The libraries were at Go `13c91dc`, Rust `2ca0f1f` and Swift `72bdc41`.
 - **The programs:** each library's own `speed` and `roundtrip`, which take the same steps in the same order ([What Else It Does](#what-else-it-does) says how to run them). `speed` was given 1,024 MiB and the folder of ten files, and then 1 MiB and the folder of 20,000 files, of which only the time for the folder is taken. `roundtrip` was given the folder of 3.5 GiB.
 - **The files:** bytes that look random, so that nothing in them compresses, and nothing repeats unless it is there twice on purpose. The folder of 3.5 GiB holds one file of 1 GiB twice, one of 1.5 GiB and one of 2,000 bytes, and its tree keeps 2.5 GiB of chunks. The 20,000 files stand in 100 folders. `speed` makes its file of 1 GiB itself.
 - **The order:** in each round, each library ran its programs in turn, and the order of the three changed from round to round, so that none always went first. Before each program the machine rested for 20 seconds, so that one program's heat and writing to the disk would not carry into the next.
@@ -697,7 +695,7 @@ Each time is the median of five rounds. Lower is faster, and the times of those 
 
 **What it does not show.**
 
-- **The steps with a store on disk measure the disk as much as the library.** From one round to the next, the same library's time for such a step moved by as much as 3.6 times, which is more than the three differ by. Other programs wrote to the same disk at times. Even a step in memory had a slow round now and then, which the medians leave out.
-- **Each library's `roundtrip` brings its own store on disk.** All three keep each thing as a file named by its hash, write it under another name first, and lend what they read from memory that they use again, but they are not the same code.
+- **The steps with a store on disk measure the disk as much as the library.** From one round to the next, the same library's time for such a step moved by as much as 1.4 times, which is more than Rust and Swift differ by at any of them. The disk is the laptop's own, which other programs may write to at any time. Even a step in memory had a slow round now and then, which the medians leave out.
+- **Each library's `roundtrip` brings its own store on disk.** All three keep each thing as a file named by its hash, write it under another name first, and lend what they read from memory that they use again. Rust's and Swift's can also read a chunk straight into the library's memory, which Go's library doesn't ask for. They are not the same code.
 - **A store in memory keeps a copy of every chunk,** and on Windows the fresh memory for each costs more than the copy into it. Fetching and bundling into a store in memory measure that too.
 - **One machine, one system.** Nothing here was measured on Linux or macOS, or on another disk.
