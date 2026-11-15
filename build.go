@@ -424,25 +424,29 @@ func BuildWith(store Store, path string, options BuildOptions, entryExtra EntryE
 	for index := len(folders) - 1; index >= 0; index-- {
 		entries := make([]Entry, 0, len(folders[index].children))
 		for _, child := range folders[index].children {
-			// A file's path is put together here, for the caller to see. No
-			// file is opened by it.
 			var target Target
-			var childPath string
 			if child.kind == KindFile {
 				if child.index >= len(fileTargets) {
 					return Root{}, invariant("a file was left out of the build")
 				}
 				target = fileTargets[child.index]
-				childPath = pathWithin(folders[index].path, child.name)
 			} else {
 				if !made[child.index] {
 					return Root{}, invariant("a folder was made before a folder inside it")
 				}
 				target = folderTargets[child.index]
-				childPath = folders[child.index].path
 			}
 			var entryData ExtraData
 			if entryExtra != nil {
+				// A file's path is put together here, for the caller to see,
+				// and only when there is a caller to see it. No file is opened
+				// by it.
+				var childPath string
+				if child.kind == KindFile {
+					childPath = pathWithin(folders[index].path, child.name)
+				} else {
+					childPath = folders[child.index].path
+				}
 				if entryData, err = entryExtra(childPath, child.name, child.kind); err != nil {
 					return Root{}, err
 				}
