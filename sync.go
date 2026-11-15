@@ -318,8 +318,9 @@ func (r *Responder) openFolder(folder Hash) (*OpenFolder, error) {
 }
 
 // Answer answers one request. Each frame of the answer is handed to
-// onFrame. A request that is malformed is an error. A request for something
-// the store does not hold is answered with a refusal.
+// onFrame, and is lent for the call only. A request that is malformed is
+// an error. A request for something the store does not hold is answered
+// with a refusal.
 func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) error {
 	asked, err := DecodeRequest(request)
 	if err != nil {
@@ -433,6 +434,11 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 		}
 		items := list.Items()[asked.Start:]
 		items = items[:min(uint64(len(items)), uint64(asked.Count), maxChunksPerAnswer)]
+		// One frame is filled again for each chunk. Memory that is used
+		// again costs much less than fresh memory for every chunk, which a
+		// system has to find and clear first. A frame is lent to onFrame
+		// for the call only.
+		var frame []byte
 		for _, item := range items {
 			kept, held, err := r.store.Get(StoredChunk, item.Hash)
 			if err != nil {
@@ -441,7 +447,8 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 			if !held {
 				return notHeld()
 			}
-			if err := onFrame(ChunkFrame(kept)); err != nil {
+			frame = append(append(frame[:0], byte(FrameChunk)), kept...)
+			if err := onFrame(frame); err != nil {
 				return err
 			}
 		}
@@ -868,7 +875,7 @@ func Export(store Store, root Root, out io.Writer) error {
 			if err != nil {
 				return err
 			}
-			if err := WriteFrame(out, FolderListFrame(list.Encode())); err != nil {
+			if err := writeFramed(out, FrameFolderList, list.Encode()); err != nil {
 				return err
 			}
 			entries := list.Entries()
@@ -881,7 +888,7 @@ func Export(store Store, root Root, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if err := WriteFrame(out, FileListFrame(list.Encode())); err != nil {
+		if err := writeFramed(out, FrameFileList, list.Encode()); err != nil {
 			return err
 		}
 		for _, item := range list.Items() {
@@ -893,7 +900,7 @@ func Export(store Store, root Root, out io.Writer) error {
 			if err != nil {
 				return err
 			}
-			if err := WriteFrame(out, ChunkFrame(kept)); err != nil {
+			if err := writeFramed(out, FrameChunk, kept); err != nil {
 				return err
 			}
 		}

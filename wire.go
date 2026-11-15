@@ -441,6 +441,25 @@ func WriteFrame(out io.Writer, frame []byte) error {
 	return nil
 }
 
+// writeFramed writes the frame that tag and body make, without making it:
+// the body of a chunk's frame is megabytes long, and is written from where
+// it is.
+func writeFramed(out io.Writer, tag FrameKind, body []byte) error {
+	if uint64(len(body)) >= 0xFFFF_FFFF {
+		return limitExceeded("a frame", 0xFFFF_FFFF, uint64(len(body))+1)
+	}
+	var head [5]byte
+	binary.BigEndian.PutUint32(head[:4], uint32(len(body)+1))
+	head[4] = byte(tag)
+	if err := writeAll(out, head[:]); err != nil {
+		return streamError("write a frame", err)
+	}
+	if err := writeAll(out, body); err != nil {
+		return streamError("write a frame", err)
+	}
+	return nil
+}
+
 // writeEnd writes a length of zero to a stream: the end of an answer.
 func writeEnd(out io.Writer) error {
 	if err := writeAll(out, []byte{0, 0, 0, 0}); err != nil {
