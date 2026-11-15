@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 // The README is held to the module, so that it cannot fall behind it: the

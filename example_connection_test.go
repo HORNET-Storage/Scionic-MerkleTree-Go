@@ -7,7 +7,7 @@ import (
 	"log"
 	"net"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 // serveOnePeer is the side that holds the tree. It answers one peer's

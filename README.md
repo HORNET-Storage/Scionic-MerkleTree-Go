@@ -1,4 +1,4 @@
-![nostr Badge](https://img.shields.io/badge/nostr-8e30eb?style=flat) ![Go Badge](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white) <img src="https://static.wixstatic.com/media/e9326a_3823e7e6a7e14488954bb312d11636da~mv2.png" height="20"> [![CI](https://github.com/HORNET-Storage/Scionic-Merkle-Tree/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HORNET-Storage/Scionic-Merkle-Tree/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/HORNET-Storage/Scionic-Merkle-Tree/graph/badge.svg?token=1UBLJ1YYFI)](https://codecov.io/gh/HORNET-Storage/Scionic-Merkle-Tree) ![Version](https://img.shields.io/badge/version-2.5.6-blue) ![Go 1.26+](https://img.shields.io/badge/go-1.26%2B-00ADD8) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![nostr Badge](https://img.shields.io/badge/nostr-8e30eb?style=flat) ![Go Badge](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white) <img src="https://static.wixstatic.com/media/e9326a_3823e7e6a7e14488954bb312d11636da~mv2.png" height="20"> [![CI](https://github.com/HORNET-Storage/Scionic-MerkleTree-Go/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HORNET-Storage/Scionic-MerkleTree-Go/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/HORNET-Storage/Scionic-Merkle-Tree/graph/badge.svg?token=1UBLJ1YYFI)](https://codecov.io/gh/HORNET-Storage/Scionic-Merkle-Tree) ![Version](https://img.shields.io/badge/version-2.5.6-blue) ![Go 1.26+](https://img.shields.io/badge/go-1.26%2B-00ADD8) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
 # Scionic Merkle Trees
 
@@ -166,14 +166,14 @@ Version 2.5.6 is a new tree format, built for deduplication and for trees of a t
 ## Install
 
 ```sh
-go get github.com/HORNET-Storage/Scionic-Merkle-Tree/v2@v2.5.6
+go get github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2@v2.5.6
 ```
 
 The package is named `scionic`, and it is the module's root:
 
 ```go
 import (
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 ```
 
@@ -195,7 +195,7 @@ import (
 	"fmt"
 	"log"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 func main() {
@@ -252,7 +252,7 @@ import (
 	"fmt"
 	"log"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 func main() {
@@ -324,7 +324,7 @@ import (
 	"bufio"
 	"net"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 // serveOnePeer is the side that holds the tree. It answers one peer's
@@ -405,7 +405,7 @@ import (
 	"log"
 	"os"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 func main() {

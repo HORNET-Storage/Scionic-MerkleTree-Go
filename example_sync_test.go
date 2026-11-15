@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 // Anything that answers requests is a peer: a connection to another machine,

@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 // dirStore keeps each thing as a file named by its hash.

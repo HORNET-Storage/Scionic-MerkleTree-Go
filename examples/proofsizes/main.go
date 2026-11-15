@@ -16,7 +16,7 @@ import (
 	"io"
 	"os"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 // folderCounts and fileCounts are the sizes that are measured.

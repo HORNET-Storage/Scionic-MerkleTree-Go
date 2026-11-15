@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 // A whole tree can travel as one stream, and two trees in one store can be

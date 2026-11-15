@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 // The example is run, so that it cannot fall behind the library: a folder

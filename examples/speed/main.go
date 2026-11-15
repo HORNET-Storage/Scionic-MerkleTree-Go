@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 // filler gives bytes that look random and cost little to make: a xorshift

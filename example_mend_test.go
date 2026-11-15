@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	scionic "github.com/HORNET-Storage/Scionic-Merkle-Tree/v2"
+	scionic "github.com/HORNET-Storage/Scionic-MerkleTree-Go/v2"
 )
 
 // Bytes that were harmed where a store keeps them are found when the tree is
