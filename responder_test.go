@@ -108,6 +108,54 @@ func TestAResponderCanKeepToItselfWhichChunksItHolds(t *testing.T) {
 	}
 }
 
+// A responder fills one frame again for every chunk it sends, from one
+// request to the next. What it sends is the chunk that was asked for and
+// nothing of a longer one before it, and a frame that is lent out is never
+// filled again: a request that is answered inside the answer to another is
+// given a frame of its own.
+func TestAFrameThatIsFilledAgainHoldsTheChunkAskedForAlone(t *testing.T) {
+	store := NewMemoryStore()
+	long := corpusBytes("frame-long", 4000)
+	short := corpusBytes("frame-short", 10)
+	for _, chunk := range [][]byte{long, short} {
+		if err := store.Put(StoredChunk, HashOf(chunk), chunk); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ask := func(chunk []byte) []byte { return RequestChunk(HashOf(chunk)).Encode() }
+	responder := NewResponder(store)
+	sent := func(request []byte, inside func() error) []byte {
+		t.Helper()
+		var frames [][]byte
+		err := responder.Answer(request, func(frame []byte) error {
+			if err := inside(); err != nil {
+				return err
+			}
+			// Taken after the answer inside, which left this frame as it was.
+			frames = append(frames, bytes.Clone(frame))
+			return nil
+		})
+		if err != nil || len(frames) != 1 {
+			t.Fatalf("%d frames (%v)", len(frames), err)
+		}
+		return frames[0]
+	}
+	nothing := func() error { return nil }
+	for _, chunk := range [][]byte{long, short, long, short} {
+		if frame := sent(ask(chunk), nothing); !bytes.Equal(frame, ChunkFrame(chunk)) {
+			t.Fatalf("a chunk of %d bytes was sent in a frame of %d", len(chunk), len(frame))
+		}
+	}
+	var inner []byte
+	outer := sent(ask(long), func() error {
+		inner = sent(ask(short), nothing)
+		return nil
+	})
+	if !bytes.Equal(outer, ChunkFrame(long)) || !bytes.Equal(inner, ChunkFrame(short)) {
+		t.Fatalf("frames of %d and %d bytes", len(outer), len(inner))
+	}
+}
+
 func TestAListReadWithItsTreeIsTheListReadAlone(t *testing.T) {
 	for _, count := range []int{0, 1, 2, 3, 5, 8, 13, 100} {
 		var items []ChunkRef

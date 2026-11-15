@@ -222,8 +222,10 @@ type Responder struct {
 	// built last. Showing a part of a long list needs its tree.
 	files   recent[OpenFile]
 	folders recent[OpenFolder]
-	recent  uint64
-	have    bool
+	// frames are frames that chunks were sent in, to be filled again.
+	frames sync.Pool
+	recent uint64
+	have   bool
 }
 
 // NewResponder makes a responder that answers from store.
@@ -317,6 +319,25 @@ func (r *Responder) openFolder(folder Hash) (*OpenFolder, error) {
 	return open, nil
 }
 
+// withFrame hands with a frame to send chunks in, and keeps it for the next
+// answer once with is done. Memory that is used again costs much less than
+// fresh memory for every chunk, which a system has to find and clear first.
+// Each goroutine that answers at the same moment, and each answer that is
+// given inside another, is given a frame of its own.
+func (r *Responder) withFrame(with func(frame *[]byte) error) error {
+	frame, _ := r.frames.Get().(*[]byte)
+	if frame == nil {
+		frame = new([]byte)
+	}
+	defer r.frames.Put(frame)
+	return with(frame)
+}
+
+// refill fills frame with the frame of a chunk, from its start.
+func refill(frame *[]byte, chunk []byte) {
+	*frame = append(append((*frame)[:0], byte(FrameChunk)), chunk...)
+}
+
 // Answer answers one request. Each frame of the answer is handed to
 // onFrame, and is lent for the call only. A request that is malformed is
 // an error. A request for something the store does not hold is answered
@@ -347,18 +368,19 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 	case AskFile:
 		return whole(StoredFileList, FileListFrame)
 	case AskChunk:
-		var frame []byte
-		held, err := lent(r.store, StoredChunk, asked.Hash, func(kept []byte) error {
-			frame = ChunkFrame(kept)
-			return nil
+		return r.withFrame(func(frame *[]byte) error {
+			held, err := lent(r.store, StoredChunk, asked.Hash, func(kept []byte) error {
+				refill(frame, kept)
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+			if !held {
+				return notHeld()
+			}
+			return onFrame(*frame)
 		})
-		if err != nil {
-			return err
-		}
-		if !held {
-			return notHeld()
-		}
-		return onFrame(frame)
 	case AskFolderBranch:
 		open, err := r.openFolder(asked.Hash)
 		if err != nil {
@@ -445,27 +467,26 @@ func (r *Responder) Answer(request []byte, onFrame func(frame []byte) error) err
 		}
 		items := list.Items()[asked.Start:]
 		items = items[:min(uint64(len(items)), uint64(asked.Count), maxChunksPerAnswer)]
-		// One frame is filled again for each chunk. Memory that is used
-		// again costs much less than fresh memory for every chunk, which a
-		// system has to find and clear first. A frame is lent to onFrame
-		// for the call only.
-		var frame []byte
-		for _, item := range items {
-			held, err := lent(r.store, StoredChunk, item.Hash, func(kept []byte) error {
-				frame = append(append(frame[:0], byte(FrameChunk)), kept...)
-				return nil
-			})
-			if err != nil {
-				return err
+		// A frame is lent to onFrame for the call only: the next chunk is
+		// filled into it.
+		return r.withFrame(func(frame *[]byte) error {
+			for _, item := range items {
+				held, err := lent(r.store, StoredChunk, item.Hash, func(kept []byte) error {
+					refill(frame, kept)
+					return nil
+				})
+				if err != nil {
+					return err
+				}
+				if !held {
+					return notHeld()
+				}
+				if err := onFrame(*frame); err != nil {
+					return err
+				}
 			}
-			if !held {
-				return notHeld()
-			}
-			if err := onFrame(frame); err != nil {
-				return err
-			}
-		}
-		return nil
+			return nil
+		})
 	case AskHave:
 		if !r.have {
 			return notHeld()
